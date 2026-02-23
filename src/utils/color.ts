@@ -35,8 +35,20 @@ export function stripAnsi(str: string): string {
 	return str.replace(ANSI_RE, '')
 }
 
-/** Default palette for processes without an explicit color config */
-const DEFAULT_COLORS = ['\x1b[36m', '\x1b[33m', '\x1b[35m', '\x1b[34m', '\x1b[32m', '\x1b[91m', '\x1b[93m', '\x1b[95m']
+/** Default palette as ANSI codes (for prefix mode stdout output) */
+const DEFAULT_ANSI_COLORS = [
+	'\x1b[36m',
+	'\x1b[33m',
+	'\x1b[35m',
+	'\x1b[34m',
+	'\x1b[32m',
+	'\x1b[91m',
+	'\x1b[93m',
+	'\x1b[95m'
+]
+
+/** Default palette as hex colors (for styled text rendering) */
+const DEFAULT_HEX_COLORS = ['#00cccc', '#cccc00', '#cc00cc', '#0000cc', '#00cc00', '#ff5555', '#ffff55', '#ff55ff']
 
 /** Build a map of process names to ANSI color codes, using explicit config colors or a default palette. */
 export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
@@ -48,7 +60,24 @@ export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfi
 		if (explicit) {
 			map.set(name, hexToAnsi(explicit))
 		} else {
-			map.set(name, DEFAULT_COLORS[paletteIndex % DEFAULT_COLORS.length])
+			map.set(name, DEFAULT_ANSI_COLORS[paletteIndex % DEFAULT_ANSI_COLORS.length])
+			paletteIndex++
+		}
+	}
+	return map
+}
+
+/** Build a map of process names to hex color strings (for StyledText rendering). */
+export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
+	const map = new Map<string, string>()
+	if ('NO_COLOR' in process.env) return map
+	let paletteIndex = 0
+	for (const name of names) {
+		const explicit = config.processes[name]?.color
+		if (explicit) {
+			map.set(name, explicit.startsWith('#') ? explicit : `#${explicit}`)
+		} else {
+			map.set(name, DEFAULT_HEX_COLORS[paletteIndex % DEFAULT_HEX_COLORS.length])
 			paletteIndex++
 		}
 	}
