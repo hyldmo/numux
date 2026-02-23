@@ -65,10 +65,9 @@ export class App {
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
 
-		// Wire tab events
+		// Wire tab events (mouse clicks)
 		this.tabBar.onSelect((_index, name) => this.switchPane(name))
 		this.tabBar.onSelectionChanged((_index, name) => this.switchPane(name))
-		this.tabBar.focus()
 
 		// Wire process events
 		this.manager.on(event => {
@@ -101,14 +100,31 @@ export class App {
 					return
 				}
 
-				// Alt+1-9: jump to tab
 				if (key.meta && !key.ctrl && !key.shift) {
+					// Alt+1-9: jump to tab
 					const num = Number.parseInt(key.name, 10)
 					if (num >= 1 && num <= 9 && num <= this.names.length) {
 						this.tabBar.setSelectedIndex(num - 1)
 						this.switchPane(this.names[num - 1])
 						return
 					}
+
+					// Alt+Left/Right: cycle tabs
+					if (key.name === 'left' || key.name === 'right') {
+						const current = this.tabBar.getSelectedIndex()
+						const next =
+							key.name === 'right'
+								? (current + 1) % this.names.length
+								: (current - 1 + this.names.length) % this.names.length
+						this.tabBar.setSelectedIndex(next)
+						this.switchPane(this.names[next])
+						return
+					}
+				}
+
+				// Forward all other input to the active process
+				if (this.activePane && key.sequence) {
+					this.manager.write(this.activePane, key.sequence)
 				}
 			}
 		)
