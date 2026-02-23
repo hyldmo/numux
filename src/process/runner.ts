@@ -18,6 +18,7 @@ export class ProcessRunner {
 	private readiness: ReturnType<typeof createReadinessChecker>
 	private _ready = false
 	private decoder = new TextDecoder()
+	private generation = 0
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -31,7 +32,8 @@ export class ProcessRunner {
 	}
 
 	start(cols: number, rows: number): void {
-		log(`[${this.name}] Starting: ${this.config.command}`)
+		const gen = ++this.generation
+		log(`[${this.name}] Starting (gen ${gen}): ${this.config.command}`)
 		this.handler.onStatus('starting')
 
 		const env: Record<string, string> = {
@@ -50,6 +52,7 @@ export class ProcessRunner {
 				cols,
 				rows,
 				data: (_terminal, data) => {
+					if (this.generation !== gen) return
 					this.handler.onOutput(data)
 					this.checkReadiness(data)
 				}
@@ -63,6 +66,7 @@ export class ProcessRunner {
 		}
 
 		this.proc.exited.then(code => {
+			if (this.generation !== gen) return
 			log(`[${this.name}] Exited with code ${code}`)
 
 			if (this.readiness.dependsOnExit && code === 0) {
