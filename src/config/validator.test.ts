@@ -122,6 +122,33 @@ describe('validateConfig', () => {
 		expect(config.processes.web.maxRestarts).toBeUndefined()
 	})
 
+	test('preserves explicit readyTimeout', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyTimeout: 5000 }
+			}
+		})
+		expect(config.processes.web.readyTimeout).toBe(5000)
+	})
+
+	test('ignores non-positive readyTimeout', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyTimeout: 0 }
+			}
+		})
+		expect(config.processes.web.readyTimeout).toBeUndefined()
+	})
+
+	test('ignores non-number readyTimeout', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyTimeout: 'abc' }
+			}
+		})
+		expect(config.processes.web.readyTimeout).toBeUndefined()
+	})
+
 	test('throws on non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({

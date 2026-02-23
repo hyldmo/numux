@@ -20,6 +20,7 @@ export class ProcessRunner {
 	private stopping = false
 	private decoder = new TextDecoder()
 	private generation = 0
+	private readyTimer: ReturnType<typeof setTimeout> | null = null
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -67,6 +68,8 @@ export class ProcessRunner {
 			this.markReady()
 		}
 
+		this.startReadyTimeout(gen)
+
 		this.proc.exited.then(code => {
 			if (this.generation !== gen) return
 			log(`[${this.name}] Exited with code ${code}`)
@@ -89,9 +92,33 @@ export class ProcessRunner {
 		}
 	}
 
+	private startReadyTimeout(gen: number): void {
+		const timeout = this.config.readyTimeout
+		if (!(timeout && this.config.readyPattern) || this.config.persistent === false) return
+
+		this.readyTimer = setTimeout(() => {
+			this.readyTimer = null
+			if (this.generation !== gen || this._ready) return
+			log(`[${this.name}] Ready timeout after ${timeout}ms`)
+			const encoder = new TextEncoder()
+			const msg = `\r\n\x1b[31m[numux] readyPattern not matched within ${(timeout / 1000).toFixed(0)}s — marking as failed\x1b[0m\r\n`
+			this.handler.onOutput(encoder.encode(msg))
+			this.handler.onStatus('failed')
+			this.handler.onReady() // unblock the dependency tier
+		}, timeout)
+	}
+
+	private clearReadyTimeout(): void {
+		if (this.readyTimer) {
+			clearTimeout(this.readyTimer)
+			this.readyTimer = null
+		}
+	}
+
 	private markReady(): void {
 		if (this._ready) return
 		this._ready = true
+		this.clearReadyTimeout()
 		log(`[${this.name}] Ready`)
 		this.handler.onStatus('ready')
 		this.handler.onReady()
@@ -99,6 +126,7 @@ export class ProcessRunner {
 
 	async restart(cols: number, rows: number): Promise<void> {
 		log(`[${this.name}] Restarting`)
+		this.clearReadyTimeout()
 		if (this.proc) {
 			this.stopping = true
 			this.handler.onStatus('stopping')
@@ -121,6 +149,7 @@ export class ProcessRunner {
 	async stop(timeoutMs = 5000): Promise<void> {
 		if (!this.proc) return
 
+		this.clearReadyTimeout()
 		this.stopping = true
 		log(`[${this.name}] Stopping (timeout: ${timeoutMs}ms)`)
 		this.handler.onStatus('stopping')

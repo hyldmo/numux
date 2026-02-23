@@ -141,6 +141,88 @@ describe('ProcessRunner — non-persistent process', () => {
 	}, 5000)
 })
 
+describe('ProcessRunner — readyTimeout', () => {
+	test('marks process as failed when readyPattern not matched within timeout', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner(
+			'srv',
+			{
+				command: 'sleep 60',
+				persistent: true,
+				readyPattern: 'will_never_match',
+				readyTimeout: 200
+			},
+			handler
+		)
+
+		runner.start(80, 24)
+
+		// Wait for timeout to fire
+		await new Promise(r => setTimeout(r, 500))
+
+		expect(handler.statuses).toContain('failed')
+		expect(handler.readyCount).toBe(1) // onReady called to unblock tier
+		expect(runner.isReady).toBe(false) // but runner is not actually ready
+
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).toContain('readyPattern not matched')
+
+		await runner.stop()
+	}, 5000)
+
+	test('does not fire timeout if readyPattern matches in time', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner(
+			'srv',
+			{
+				command: "echo 'ready!' && sleep 60",
+				persistent: true,
+				readyPattern: 'ready!',
+				readyTimeout: 5000
+			},
+			handler
+		)
+
+		runner.start(80, 24)
+
+		// Wait for pattern match
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out waiting for ready'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
+
+		expect(handler.statuses).toContain('ready')
+		expect(handler.statuses).not.toContain('failed')
+
+		await runner.stop()
+	}, 5000)
+
+	test('does not apply timeout to non-persistent processes', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner(
+			'task',
+			{
+				command: 'true',
+				persistent: false,
+				readyTimeout: 100
+			},
+			handler
+		)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		// Should become ready via exit code, not timeout
+		expect(runner.isReady).toBe(true)
+		expect(handler.statuses).not.toContain('failed')
+	}, 5000)
+})
+
 describe('ProcessRunner — output', () => {
 	test('captures process output', async () => {
 		const handler = createHandler()
