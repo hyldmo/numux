@@ -63,6 +63,8 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 |------|-------------|
 | `-c, --config <path>` | Explicit config file path |
 | `-n, --name <name=cmd>` | Add a named process (repeatable) |
+| `--only <a,b,...>` | Only run these processes (+ their dependencies) |
+| `--exclude <a,b,...>` | Exclude these processes |
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |

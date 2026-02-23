@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { buildConfigFromArgs, parseArgs } from './cli'
+import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
+import type { NumuxConfig } from './types'
 
 /** Helper: simulates argv with bun + script prefix */
 function argv(...args: string[]): string[] {
@@ -79,6 +80,27 @@ describe('parseArgs', () => {
 		const result = parseArgs(argv('-n', 'env=KEY=VALUE echo test'))
 		expect(result.named).toEqual([{ name: 'env', command: 'KEY=VALUE echo test' }])
 	})
+
+	test('--only parses comma-separated names', () => {
+		const result = parseArgs(argv('--only', 'api,web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('--only trims whitespace', () => {
+		const result = parseArgs(argv('--only', 'api , web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('--exclude parses comma-separated names', () => {
+		const result = parseArgs(argv('--exclude', 'migrate'))
+		expect(result.exclude).toEqual(['migrate'])
+	})
+
+	test('--only and --exclude can coexist', () => {
+		const result = parseArgs(argv('--only', 'api,web,db', '--exclude', 'db'))
+		expect(result.only).toEqual(['api', 'web', 'db'])
+		expect(result.exclude).toEqual(['db'])
+	})
 })
 
 describe('buildConfigFromArgs', () => {
@@ -108,5 +130,76 @@ describe('buildConfigFromArgs', () => {
 	test('named and positional can be mixed', () => {
 		const config = buildConfigFromArgs(['echo hello'], [{ name: 'api', command: 'bun dev' }])
 		expect(Object.keys(config.processes).sort()).toEqual(['api', 'echo'])
+	})
+})
+
+const CHAIN_CONFIG: NumuxConfig = {
+	processes: {
+		db: { command: 'echo db' },
+		migrate: { command: 'echo migrate', persistent: false, dependsOn: ['db'] },
+		api: { command: 'echo api', dependsOn: ['migrate'] },
+		web: { command: 'echo web', dependsOn: ['api'] }
+	}
+}
+
+describe('filterConfig — --only', () => {
+	test('includes named process and its transitive deps', () => {
+		const result = filterConfig(CHAIN_CONFIG, ['api'])
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate'])
+	})
+
+	test('includes only the requested leaf', () => {
+		const result = filterConfig(CHAIN_CONFIG, ['db'])
+		expect(Object.keys(result.processes)).toEqual(['db'])
+	})
+
+	test('includes multiple --only targets and their deps', () => {
+		const result = filterConfig(CHAIN_CONFIG, ['web', 'db'])
+		// web depends on api → migrate → db, so all are included
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate', 'web'])
+	})
+
+	test('throws on unknown --only process', () => {
+		expect(() => filterConfig(CHAIN_CONFIG, ['nonexistent'])).toThrow('unknown process "nonexistent"')
+	})
+})
+
+describe('filterConfig — --exclude', () => {
+	test('removes named process', () => {
+		const result = filterConfig(CHAIN_CONFIG, undefined, ['web'])
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate'])
+	})
+
+	test('strips removed deps from remaining processes', () => {
+		const result = filterConfig(CHAIN_CONFIG, undefined, ['db'])
+		// migrate depended on db — that dep should be removed
+		expect(result.processes.migrate.dependsOn).toBeUndefined()
+	})
+
+	test('throws on unknown --exclude process', () => {
+		expect(() => filterConfig(CHAIN_CONFIG, undefined, ['bogus'])).toThrow('unknown process "bogus"')
+	})
+
+	test('throws when all processes are excluded', () => {
+		expect(() => filterConfig(CHAIN_CONFIG, undefined, ['db', 'migrate', 'api', 'web'])).toThrow(
+			'No processes left'
+		)
+	})
+})
+
+describe('filterConfig — --only + --exclude combined', () => {
+	test('only pulls in deps, then exclude removes specific ones', () => {
+		// --only web pulls in web,api,migrate,db; --exclude migrate removes it
+		const result = filterConfig(CHAIN_CONFIG, ['web'], ['migrate'])
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'web'])
+		// api originally depended on migrate, which was excluded
+		expect(result.processes.api.dependsOn).toBeUndefined()
+	})
+})
+
+describe('filterConfig — no-op', () => {
+	test('returns full config when neither only nor exclude provided', () => {
+		const result = filterConfig(CHAIN_CONFIG)
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate', 'web'])
 	})
 })

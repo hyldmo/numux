@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { buildConfigFromArgs, parseArgs } from './cli'
+import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
 import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
@@ -18,6 +18,8 @@ Usage:
 Options:
   -n, --name <name=command>  Add a named process
   -c, --config <path>        Config file path (default: auto-detect)
+  --only <a,b,...>           Only run these processes (+ their dependencies)
+  --exclude <a,b,...>        Exclude these processes
   --debug                    Enable debug logging to .numux/debug.log
   -h, --help                 Show this help
   -v, --version              Show version
@@ -51,6 +53,10 @@ async function main() {
 	} else {
 		const raw = await loadConfig(parsed.configPath)
 		config = validateConfig(raw)
+	}
+
+	if (parsed.only || parsed.exclude) {
+		config = filterConfig(config, parsed.only, parsed.exclude)
 	}
 
 	const manager = new ProcessManager(config)
