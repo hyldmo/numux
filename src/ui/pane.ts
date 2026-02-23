@@ -6,6 +6,8 @@ export class Pane {
 	readonly terminal: GhosttyTerminalRenderable
 	private decoder = new TextDecoder()
 
+	private _onScroll: (() => void) | null = null
+
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
@@ -13,7 +15,8 @@ export class Pane {
 			width: '100%',
 			stickyScroll: true,
 			stickyStart: 'bottom',
-			visible: false
+			visible: false,
+			onMouseScroll: () => this._onScroll?.()
 		})
 
 		this.terminal = new GhosttyTerminalRenderable(renderer, {
@@ -54,6 +57,10 @@ export class Pane {
 
 	scrollToBottom(): void {
 		this.scrollBox.scrollTo(this.scrollBox.scrollHeight)
+	}
+
+	onScroll(handler: () => void): void {
+		this._onScroll = handler
 	}
 
 	show(): void {

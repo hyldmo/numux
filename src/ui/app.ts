@@ -77,6 +77,9 @@ export class App {
 		// Create a pane per process
 		for (const name of this.names) {
 			const pane = new Pane(this.renderer, name, termCols, termRows)
+			pane.onScroll(() => {
+				if (name === this.activePane) this.updateScrollIndicator()
+			})
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
