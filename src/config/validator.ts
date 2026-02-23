@@ -68,7 +68,10 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
 		if (readyPattern && !persistent) {
-			warnings?.push({ process: name, message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)' })
+			warnings?.push({
+				process: name,
+				message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)'
+			})
 		}
 
 		validated[name] = {

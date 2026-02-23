@@ -354,4 +354,3 @@ export class App {
 		process.exit(0)
 	}
 }
-
