@@ -46,9 +46,10 @@ export default defineConfig({
     // String shorthand for simple processes
     web: 'bun run dev:web',
     // Interactive process — keyboard input is forwarded
-    shell: {
-      command: 'psql -U postgres',
+    confirm: {
+      command: 'sh -c "printf \'Deploy to staging? [y/n] \' && read answer && echo $answer"',
       interactive: true,
+      persistent: false,
     },
   },
 })

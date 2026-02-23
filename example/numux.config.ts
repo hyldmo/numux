@@ -22,6 +22,12 @@ export default defineConfig({
 			command: 'bun servers/worker.ts',
 			dependsOn: ['db'],
 			color: '#ce93d8'
+		},
+		deploy: {
+			command: 'bun servers/prompt.ts',
+			interactive: true,
+			persistent: false,
+			color: '#ffb74d'
 		}
 	}
 })
