@@ -38,6 +38,12 @@ export class Pane {
 		this.terminal.rows = rows
 	}
 
+	get isAtBottom(): boolean {
+		const { scrollTop, scrollHeight, viewport } = this.scrollBox
+		if (scrollHeight <= 0) return true
+		return scrollTop >= scrollHeight - viewport.height - 2
+	}
+
 	scrollBy(delta: number): void {
 		this.scrollBox.scrollBy(delta)
 	}

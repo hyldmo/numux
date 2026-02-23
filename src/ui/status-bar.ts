@@ -15,6 +15,7 @@ export class StatusBar {
 	readonly renderable: TextRenderable
 	private statuses = new Map<string, ProcessStatus>()
 	private colors: Map<string, string>
+	private scrolledUp = false
 
 	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
 		this.colors = colors ?? new Map()
@@ -37,6 +38,12 @@ export class StatusBar {
 		this.renderable.content = this.buildContent()
 	}
 
+	setScrollIndicator(scrolledUp: boolean): void {
+		if (this.scrolledUp === scrolledUp) return
+		this.scrolledUp = scrolledUp
+		this.renderable.content = this.buildContent()
+	}
+
 	private buildContent(): string {
 		const parts: string[] = []
 		for (const [name, status] of this.statuses) {
@@ -47,6 +54,7 @@ export class StatusBar {
 				parts.push(`${name}:${status}`)
 			}
 		}
-		return `${parts.join('  ')}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+L: clear  Ctrl+C: quit`
+		const scroll = this.scrolledUp ? `  \x1b[33m[scrolled]\x1b[0m` : ''
+		return `${parts.join('  ')}${scroll}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+L: clear  Ctrl+C: quit`
 	}
 }

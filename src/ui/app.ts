@@ -99,6 +99,9 @@ export class App {
 			if (this.destroyed) return
 			if (event.type === 'output') {
 				this.panes.get(event.name)?.feed(event.data)
+				if (event.name === this.activePane) {
+					this.updateScrollIndicator()
+				}
 			} else if (event.type === 'status') {
 				this.tabBar.updateStatus(event.name, event.status)
 				this.statusBar.updateStatus(event.name, event.status)
@@ -163,16 +166,19 @@ export class App {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
 						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
+						this.updateScrollIndicator()
 						return
 					}
 
 					// Alt+Home/End: scroll to top/bottom
 					if (this.activePane && key.name === 'home') {
 						this.panes.get(this.activePane)?.scrollToTop()
+						this.updateScrollIndicator()
 						return
 					}
 					if (this.activePane && key.name === 'end') {
 						this.panes.get(this.activePane)?.scrollToBottom()
+						this.updateScrollIndicator()
 						return
 					}
 				}
@@ -200,6 +206,14 @@ export class App {
 		}
 		this.activePane = name
 		this.panes.get(name)?.show()
+		this.updateScrollIndicator()
+	}
+
+	private updateScrollIndicator(): void {
+		if (!this.activePane) return
+		const pane = this.panes.get(this.activePane)
+		if (!pane) return
+		this.statusBar.setScrollIndicator(!pane.isAtBottom)
 	}
 
 	async shutdown(): Promise<void> {
