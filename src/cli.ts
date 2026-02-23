@@ -6,6 +6,7 @@ export interface ParsedArgs {
 	debug: boolean
 	init: boolean
 	validate: boolean
+	completions?: string
 	prefix: boolean
 	killOthers: boolean
 	timestamps: boolean
@@ -91,6 +92,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.init = true
 		} else if (arg === 'validate' && result.commands.length === 0) {
 			result.validate = true
+		} else if (arg === 'completions' && result.commands.length === 0) {
+			result.completions = consumeValue(arg)
 		} else if (!arg.startsWith('-')) {
 			result.commands.push(arg)
 		} else {

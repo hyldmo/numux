@@ -161,6 +161,16 @@ describe('parseArgs', () => {
 		expect(result.configPath).toBe('custom.json')
 	})
 
+	test('completions parses shell argument', () => {
+		expect(parseArgs(argv('completions', 'bash')).completions).toBe('bash')
+		expect(parseArgs(argv('completions', 'zsh')).completions).toBe('zsh')
+		expect(parseArgs(argv('completions', 'fish')).completions).toBe('fish')
+	})
+
+	test('completions requires a shell argument', () => {
+		expect(() => parseArgs(argv('completions'))).toThrow('Missing value for completions')
+	})
+
 	test('--no-restart sets noRestart flag', () => {
 		expect(parseArgs(argv('--no-restart')).noRestart).toBe(true)
 	})

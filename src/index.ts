@@ -2,6 +2,7 @@
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
+import { generateCompletions } from './completions'
 import { loadConfig } from './config/loader'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
@@ -21,6 +22,7 @@ Usage:
   numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
   numux init                     Create a starter config file
   numux validate                 Validate config and show process graph
+  numux completions <shell>      Generate shell completions (bash, zsh, fish)
 
 Options:
   -n, --name <name=command>  Add a named process
@@ -80,6 +82,11 @@ async function main() {
 		}
 		writeFileSync(target, INIT_TEMPLATE)
 		console.info(`Created ${target}`)
+		process.exit(0)
+	}
+
+	if (parsed.completions) {
+		console.info(generateCompletions(parsed.completions))
 		process.exit(0)
 	}
 

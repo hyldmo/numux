@@ -62,11 +62,27 @@ numux
 ### Subcommands
 
 ```sh
-numux init         # Create a starter numux.config.ts
-numux validate     # Validate config and show process dependency graph
+numux init                  # Create a starter numux.config.ts
+numux validate              # Validate config and show process dependency graph
+numux completions <shell>   # Generate shell completions (bash, zsh, fish)
 ```
 
 `validate` respects `--only`/`--exclude` filters and shows processes grouped by dependency tiers.
+
+Set up completions for your shell:
+
+```sh
+# Bash (add to ~/.bashrc)
+eval "$(numux completions bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(numux completions zsh)"
+
+# Fish
+numux completions fish | source
+# Or save permanently:
+numux completions fish > ~/.config/fish/completions/numux.fish
+```
 
 ### Ad-hoc commands
 
