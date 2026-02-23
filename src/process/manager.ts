@@ -71,8 +71,17 @@ export class ProcessManager {
 			const readyPromises: Promise<void>[] = []
 
 			for (const name of tier) {
-				// Check if any dependency failed
-				const deps = this.config.processes[name].dependsOn ?? []
+				const proc = this.config.processes[name]
+
+				// Evaluate condition
+				if (proc.condition && !evaluateCondition(proc.condition)) {
+					log(`Skipping ${name}: condition "${proc.condition}" not met`)
+					this.updateStatus(name, 'skipped')
+					continue
+				}
+
+				// Check if any dependency failed or was skipped
+				const deps = proc.dependsOn ?? []
 				const failedDep = deps.find(d => {
 					const s = this.states.get(d)!.status
 					return s === 'failed' || s === 'skipped'
@@ -312,4 +321,17 @@ export class ProcessManager {
 			await Promise.allSettled(tier.map(name => this.runners.get(name)?.stop()).filter(Boolean))
 		}
 	}
+}
+
+const FALSY_VALUES = new Set(['', '0', 'false', 'no', 'off'])
+
+/** Evaluate a condition string against environment variables.
+ *  `"VAR"` → truthy if VAR is set and not a falsy value.
+ *  `"!VAR"` → truthy if VAR is unset or a falsy value. */
+function evaluateCondition(condition: string): boolean {
+	const negated = condition.startsWith('!')
+	const varName = negated ? condition.slice(1) : condition
+	const value = process.env[varName]
+	const isTruthy = value !== undefined && !FALSY_VALUES.has(value.toLowerCase())
+	return negated ? !isTruthy : isTruthy
 }

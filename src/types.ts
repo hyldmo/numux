@@ -9,6 +9,7 @@ export interface NumuxProcessConfig {
 	maxRestarts?: number // default Infinity, limit auto-restart attempts
 	readyTimeout?: number // ms to wait for readyPattern before failing (default: none)
 	delay?: number // ms to wait before starting the process (default: none)
+	condition?: string // env var name (prefix with ! to negate); process skipped if condition is falsy
 	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
 	color?: string
 }

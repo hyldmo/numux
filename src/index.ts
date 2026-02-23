@@ -112,6 +112,7 @@ async function main() {
 				if (proc.readyPattern) flags.push(`ready: /${proc.readyPattern}/`)
 				if (proc.persistent === false) flags.push('one-shot')
 				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
+				if (proc.condition) flags.push(`if: ${proc.condition}`)
 				const suffix = flags.length > 0 ? `  (${flags.join(', ')})` : ''
 				console.info(`  ${name}: ${proc.command}${suffix}`)
 			}

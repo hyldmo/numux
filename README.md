@@ -137,6 +137,7 @@ Each process accepts:
 | `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
 | `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
+| `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 
@@ -159,6 +160,23 @@ processes:
 | `${VAR:?error}` | Value of `VAR`, or error with message if unset |
 
 Interpolation applies to all string values in the config (command, cwd, env, envFile, readyPattern, etc.).
+
+### Conditional processes
+
+Use `condition` to run a process only when an environment variable is set:
+
+```yaml
+processes:
+  seed:
+    command: bun run seed
+    persistent: false
+    condition: SEED_DB        # only runs when SEED_DB is set and truthy
+  storybook:
+    command: bun run storybook
+    condition: "!CI"           # skipped in CI environments
+```
+
+Falsy values: unset, empty string, `"0"`, `"false"`, `"no"`, `"off"` (case-insensitive). If a conditional process is skipped, its dependents are also skipped.
 
 ### Dependency orchestration
 

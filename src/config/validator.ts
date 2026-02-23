@@ -94,6 +94,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
 			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
+			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			stopSignal: validateStopSignal(p.stopSignal),
 			color: typeof p.color === 'string' ? p.color : undefined
 		}

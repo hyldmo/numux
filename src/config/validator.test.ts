@@ -176,6 +176,42 @@ describe('validateConfig', () => {
 		expect(config.processes.web.delay).toBeUndefined()
 	})
 
+	test('preserves condition string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', condition: 'CI' }
+			}
+		})
+		expect(config.processes.web.condition).toBe('CI')
+	})
+
+	test('preserves negated condition', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', condition: '!CI' }
+			}
+		})
+		expect(config.processes.web.condition).toBe('!CI')
+	})
+
+	test('ignores empty condition', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', condition: '' }
+			}
+		})
+		expect(config.processes.web.condition).toBeUndefined()
+	})
+
+	test('ignores non-string condition', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', condition: 123 }
+			}
+		})
+		expect(config.processes.web.condition).toBeUndefined()
+	})
+
 	test('preserves valid stopSignal', () => {
 		for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
 			const config = validateConfig({

@@ -622,6 +622,97 @@ describe('ProcessManager — delay', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — condition', () => {
+	test('skips process when condition env var is unset', async () => {
+		delete process.env.NUMUX_TEST_CONDITION
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('guarded')?.status).toBe('skipped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('runs process when condition env var is truthy', async () => {
+		process.env.NUMUX_TEST_CONDITION = '1'
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('guarded')?.status).not.toBe('skipped')
+		delete process.env.NUMUX_TEST_CONDITION
+		await mgr.stopAll()
+	}, 5000)
+
+	test('skips process when condition env var is "false"', async () => {
+		process.env.NUMUX_TEST_CONDITION = 'false'
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('guarded')?.status).toBe('skipped')
+		delete process.env.NUMUX_TEST_CONDITION
+		await mgr.stopAll()
+	}, 5000)
+
+	test('negated condition runs when env var is unset', async () => {
+		delete process.env.NUMUX_TEST_CONDITION
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				guarded: { command: 'true', persistent: false, condition: '!NUMUX_TEST_CONDITION' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('guarded')?.status).not.toBe('skipped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('negated condition skips when env var is truthy', async () => {
+		process.env.NUMUX_TEST_CONDITION = 'yes'
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				guarded: { command: 'true', persistent: false, condition: '!NUMUX_TEST_CONDITION' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('guarded')?.status).toBe('skipped')
+		delete process.env.NUMUX_TEST_CONDITION
+		await mgr.stopAll()
+	}, 5000)
+
+	test('skipped condition cascades to dependents', async () => {
+		delete process.env.NUMUX_TEST_CONDITION
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				parent: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' },
+				child: { command: 'true', persistent: false, dependsOn: ['parent'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('parent')?.status).toBe('skipped')
+		expect(mgr.getState('child')?.status).toBe('skipped')
+		await mgr.stopAll()
+	}, 5000)
+})
+
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {
