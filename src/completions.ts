@@ -40,7 +40,7 @@ _numux() {
   if [[ "$cur" == -* ]]; then
     COMPREPLY=( $(compgen -W "-h --help -v --version -c --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
   else
-    local subcmds="init validate completions"
+    local subcmds="init validate exec completions"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
   fi
 }
@@ -56,6 +56,7 @@ _numux() {
   subcmds=(
     'init:Create a starter config file'
     'validate:Validate config and show process graph'
+    'exec:Run a command in a process environment'
     'completions:Generate shell completions'
   )
 
@@ -95,6 +96,7 @@ complete -c numux -f
 # Subcommands
 complete -c numux -n __fish_use_subcommand -a init -d 'Create a starter config file'
 complete -c numux -n __fish_use_subcommand -a validate -d 'Validate config and show process graph'
+complete -c numux -n __fish_use_subcommand -a exec -d 'Run a command in a process environment'
 complete -c numux -n __fish_use_subcommand -a completions -d 'Generate shell completions'
 
 # Completions subcommand

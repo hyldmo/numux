@@ -6,6 +6,9 @@ export interface ParsedArgs {
 	debug: boolean
 	init: boolean
 	validate: boolean
+	exec: boolean
+	execName?: string
+	execCommand?: string
 	completions?: string
 	prefix: boolean
 	killOthers: boolean
@@ -27,6 +30,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		debug: false,
 		init: false,
 		validate: false,
+		exec: false,
 		prefix: false,
 		killOthers: false,
 		timestamps: false,
@@ -96,6 +100,17 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.init = true
 		} else if (arg === 'validate' && result.commands.length === 0) {
 			result.validate = true
+		} else if (arg === 'exec' && result.commands.length === 0) {
+			result.exec = true
+			const name = args[++i]
+			if (!name) throw new Error('exec requires a process name')
+			result.execName = name
+			// Skip optional --
+			if (args[i + 1] === '--') i++
+			const rest = args.slice(i + 1)
+			if (rest.length === 0) throw new Error('exec requires a command to run')
+			result.execCommand = rest.join(' ')
+			break
 		} else if (arg === 'completions' && result.commands.length === 0) {
 			result.completions = consumeValue(arg)
 		} else if (!arg.startsWith('-')) {

@@ -10,6 +10,7 @@ import { ProcessManager } from './process/manager'
 import type { ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
+import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { setupShutdownHandlers } from './utils/shutdown'
@@ -22,6 +23,7 @@ Usage:
   numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
   numux init                     Create a starter config file
   numux validate                 Validate config and show process graph
+  numux exec <name> [--] <cmd>   Run a command in a process's environment
   numux completions <shell>      Generate shell completions (bash, zsh, fish)
 
 Options:
@@ -130,6 +132,33 @@ async function main() {
 		}
 		printWarnings(warnings)
 		process.exit(0)
+	}
+
+	if (parsed.exec) {
+		const raw = await loadConfig(parsed.configPath)
+		const config = validateConfig(raw)
+		const proc = config.processes[parsed.execName!]
+		if (!proc) {
+			const names = Object.keys(config.processes)
+			throw new Error(`Unknown process "${parsed.execName}". Available: ${names.join(', ')}`)
+		}
+
+		const cwd = proc.cwd ? resolve(proc.cwd) : process.cwd()
+		const envFromFile = proc.envFile ? loadEnvFiles(proc.envFile, cwd) : {}
+		const env: Record<string, string> = {
+			...(process.env as Record<string, string>),
+			...envFromFile,
+			...proc.env
+		}
+
+		const child = Bun.spawn(['sh', '-c', parsed.execCommand!], {
+			cwd,
+			env,
+			stdout: 'inherit',
+			stdin: 'inherit',
+			stderr: 'inherit'
+		})
+		process.exit(await child.exited)
 	}
 
 	if (parsed.debug) {

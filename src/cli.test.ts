@@ -187,6 +187,36 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).noWatch).toBe(false)
 	})
 
+	test('exec parses process name and command', () => {
+		const result = parseArgs(argv('exec', 'api', 'npx', 'prisma', 'migrate'))
+		expect(result.exec).toBe(true)
+		expect(result.execName).toBe('api')
+		expect(result.execCommand).toBe('npx prisma migrate')
+	})
+
+	test('exec supports -- separator', () => {
+		const result = parseArgs(argv('exec', 'api', '--', 'npx', 'prisma', 'migrate', '--force'))
+		expect(result.exec).toBe(true)
+		expect(result.execName).toBe('api')
+		expect(result.execCommand).toBe('npx prisma migrate --force')
+	})
+
+	test('exec requires a process name', () => {
+		expect(() => parseArgs(argv('exec'))).toThrow('exec requires a process name')
+	})
+
+	test('exec requires a command', () => {
+		expect(() => parseArgs(argv('exec', 'api'))).toThrow('exec requires a command')
+	})
+
+	test('exec with -c config flag', () => {
+		const result = parseArgs(argv('-c', 'custom.json', 'exec', 'api', 'echo', 'hi'))
+		expect(result.exec).toBe(true)
+		expect(result.configPath).toBe('custom.json')
+		expect(result.execName).toBe('api')
+		expect(result.execCommand).toBe('echo hi')
+	})
+
 	test('throws on missing value for -c', () => {
 		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
 	})

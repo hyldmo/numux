@@ -62,12 +62,20 @@ numux
 ### Subcommands
 
 ```sh
-numux init                  # Create a starter numux.config.ts
-numux validate              # Validate config and show process dependency graph
-numux completions <shell>   # Generate shell completions (bash, zsh, fish)
+numux init                         # Create a starter numux.config.ts
+numux validate                     # Validate config and show process dependency graph
+numux exec <name> [--] <command>   # Run a command in a process's environment
+numux completions <shell>          # Generate shell completions (bash, zsh, fish)
 ```
 
 `validate` respects `--only`/`--exclude` filters and shows processes grouped by dependency tiers.
+
+`exec` runs a one-off command using a process's configured `cwd`, `env`, and `envFile` — useful for migrations, scripts, or any command that needs the same environment:
+
+```sh
+numux exec api -- npx prisma migrate
+numux exec web npm run build
+```
 
 Set up completions for your shell:
 
