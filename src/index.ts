@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { buildConfigFromArgs, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
 import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
@@ -25,81 +26,6 @@ Config files (auto-detected):
   numux.config.ts, numux.config.js, numux.config.json,
   or "numux" key in package.json`
 
-function parseArgs(argv: string[]): {
-	help: boolean
-	version: boolean
-	debug: boolean
-	configPath?: string
-	commands: string[]
-	named: Array<{ name: string; command: string }>
-} {
-	const result = {
-		help: false,
-		version: false,
-		debug: false,
-		configPath: undefined as string | undefined,
-		commands: [] as string[],
-		named: [] as Array<{ name: string; command: string }>
-	}
-
-	const args = argv.slice(2) // skip bun + script
-	let i = 0
-
-	while (i < args.length) {
-		const arg = args[i]
-
-		if (arg === '-h' || arg === '--help') {
-			result.help = true
-		} else if (arg === '-v' || arg === '--version') {
-			result.version = true
-		} else if (arg === '--debug') {
-			result.debug = true
-		} else if (arg === '-c' || arg === '--config') {
-			result.configPath = args[++i]
-		} else if (arg === '-n' || arg === '--name') {
-			const value = args[++i]
-			const eq = value?.indexOf('=')
-			if (!value || eq === undefined || eq < 1) {
-				console.error(`Invalid --name value: expected "name=command", got "${value}"`)
-				process.exit(1)
-			}
-			result.named.push({
-				name: value.slice(0, eq),
-				command: value.slice(eq + 1)
-			})
-		} else if (!arg.startsWith('-')) {
-			result.commands.push(arg)
-		} else {
-			console.error(`Unknown option: ${arg}`)
-			process.exit(1)
-		}
-
-		i++
-	}
-
-	return result
-}
-
-function buildConfigFromArgs(commands: string[], named: Array<{ name: string; command: string }>): NumuxConfig {
-	const processes: NumuxConfig['processes'] = {}
-
-	for (const { name, command } of named) {
-		processes[name] = { command, persistent: true }
-	}
-
-	for (let i = 0; i < commands.length; i++) {
-		const cmd = commands[i]
-		// Derive name from command: first word, deduplicated
-		let name = cmd.split(/\s+/)[0].split('/').pop()!
-		if (processes[name]) {
-			name = `${name}-${i}`
-		}
-		processes[name] = { command: cmd, persistent: true }
-	}
-
-	return { processes }
-}
-
 async function main() {
 	const parsed = parseArgs(process.argv)
 
@@ -121,10 +47,8 @@ async function main() {
 	let config: NumuxConfig
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
-		// CLI mode: build config from arguments
 		config = buildConfigFromArgs(parsed.commands, parsed.named)
 	} else {
-		// Config file mode
 		const raw = await loadConfig(parsed.configPath)
 		config = validateConfig(raw)
 	}
