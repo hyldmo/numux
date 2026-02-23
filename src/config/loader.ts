@@ -26,7 +26,7 @@ async function loadFile(path: string): Promise<NumuxConfig> {
 		try {
 			return parseYaml(content) as NumuxConfig
 		} catch (err) {
-			throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : err}`)
+			throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
 		}
 	}
 	const mod = await import(path)
