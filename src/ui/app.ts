@@ -23,6 +23,8 @@ export class App {
 
 	private processColors: Map<string, string>
 
+	private resizeTimer: ReturnType<typeof setTimeout> | null = null
+
 	// Search state
 	private searchMode = false
 	private searchQuery = ''
@@ -118,14 +120,18 @@ export class App {
 			}
 		})
 
-		// Handle resize
+		// Handle resize (debounced to avoid excessive PTY resize calls)
 		this.renderer.on('resize', (w: number, h: number) => {
 			this.termCols = Math.max(40, w - 2)
 			this.termRows = Math.max(5, h - 5)
-			for (const pane of this.panes.values()) {
-				pane.resize(this.termCols, this.termRows)
-			}
-			this.manager.resizeAll(this.termCols, this.termRows)
+			if (this.resizeTimer) clearTimeout(this.resizeTimer)
+			this.resizeTimer = setTimeout(() => {
+				this.resizeTimer = null
+				for (const pane of this.panes.values()) {
+					pane.resize(this.termCols, this.termRows)
+				}
+				this.manager.resizeAll(this.termCols, this.termRows)
+			}, 50)
 		})
 
 		// Global keyboard handler
