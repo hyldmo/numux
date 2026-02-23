@@ -217,10 +217,11 @@ export class ProcessManager {
 			this.fileWatcher.watch(name, patterns, cwd, changedFile => {
 				const state = this.states.get(name)
 				if (!state) return
-				// Don't restart processes that are stopped (user intentionally stopped), pending, stopping, or skipped
+				// Don't restart processes that are stopped/finished, pending, stopping, or skipped
 				if (
 					state.status === 'pending' ||
 					state.status === 'stopped' ||
+					state.status === 'finished' ||
 					state.status === 'stopping' ||
 					state.status === 'skipped'
 				)
@@ -269,6 +270,7 @@ export class ProcessManager {
 		if (
 			state.status === 'pending' ||
 			state.status === 'stopped' ||
+			state.status === 'finished' ||
 			state.status === 'stopping' ||
 			state.status === 'skipped'
 		)
@@ -300,7 +302,7 @@ export class ProcessManager {
 	start(name: string, cols: number, rows: number): void {
 		const state = this.states.get(name)
 		if (!state) return
-		if (state.status !== 'stopped' && state.status !== 'failed') return
+		if (state.status !== 'stopped' && state.status !== 'finished' && state.status !== 'failed') return
 
 		// Cancel pending auto-restart and reset backoff
 		const timer = this.restartTimers.get(name)

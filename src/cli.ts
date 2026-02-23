@@ -19,6 +19,7 @@ export interface ParsedArgs {
 	logDir?: string
 	only?: string[]
 	exclude?: string[]
+	colors?: string[]
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }
@@ -72,8 +73,13 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.noRestart = true
 		} else if (arg === '--no-watch') {
 			result.noWatch = true
-		} else if (arg === '-c' || arg === '--config') {
+		} else if (arg === '--config') {
 			result.configPath = consumeValue(arg)
+		} else if (arg === '-c' || arg === '--color') {
+			result.colors = consumeValue(arg)
+				.split(',')
+				.map(s => s.trim())
+				.filter(Boolean)
 		} else if (arg === '--log-dir') {
 			result.logDir = consumeValue(arg)
 		} else if (arg === '--only') {
@@ -128,13 +134,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export function buildConfigFromArgs(
 	commands: string[],
 	named: Array<{ name: string; command: string }>,
-	options?: { noRestart?: boolean }
+	options?: { noRestart?: boolean; colors?: string[] }
 ): ResolvedNumuxConfig {
 	const processes: ResolvedNumuxConfig['processes'] = {}
 	const maxRestarts = options?.noRestart ? 0 : undefined
+	const colors = options?.colors
+	let colorIndex = 0
 
 	for (const { name, command } of named) {
-		processes[name] = { command, persistent: true, maxRestarts }
+		const color = colors?.[colorIndex++ % colors.length]
+		processes[name] = { command, persistent: true, maxRestarts, ...(color ? { color } : {}) }
 	}
 
 	for (let i = 0; i < commands.length; i++) {
@@ -144,7 +153,8 @@ export function buildConfigFromArgs(
 		if (processes[name]) {
 			name = `${name}-${i}`
 		}
-		processes[name] = { command: cmd, persistent: true, maxRestarts }
+		const color = colors?.[colorIndex++ % colors.length]
+		processes[name] = { command: cmd, persistent: true, maxRestarts, ...(color ? { color } : {}) }
 	}
 
 	return { processes }

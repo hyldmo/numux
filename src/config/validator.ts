@@ -72,8 +72,18 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		}
 
 		// Validate color hex format
-		if (typeof p.color === 'string' && !HEX_COLOR_RE.test(p.color)) {
-			throw new Error(`Process "${name}".color must be a valid hex color (e.g. "#ff8800"), got "${p.color}"`)
+		if (typeof p.color === 'string') {
+			if (!HEX_COLOR_RE.test(p.color)) {
+				throw new Error(`Process "${name}".color must be a valid hex color (e.g. "#ff8800"), got "${p.color}"`)
+			}
+		} else if (Array.isArray(p.color)) {
+			for (const c of p.color) {
+				if (typeof c !== 'string' || !HEX_COLOR_RE.test(c)) {
+					throw new Error(
+						`Process "${name}".color entries must be valid hex colors (e.g. "#ff8800"), got "${c}"`
+					)
+				}
+			}
 		}
 
 		const persistent = typeof p.persistent === 'boolean' ? p.persistent : true
@@ -113,7 +123,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			stopSignal: validateStopSignal(p.stopSignal),
-			color: typeof p.color === 'string' ? p.color : undefined,
+			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
 			watch: validateStringOrStringArray(p.watch),
 			interactive: typeof p.interactive === 'boolean' ? p.interactive : false
 		}

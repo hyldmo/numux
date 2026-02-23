@@ -1,4 +1,12 @@
-import { type CliRenderer, SelectRenderable, SelectRenderableEvents } from '@opentui/core'
+import {
+	type CliRenderer,
+	type MouseEvent,
+	type OptimizedBuffer,
+	parseColor,
+	type RGBA,
+	SelectRenderable,
+	SelectRenderableEvents
+} from '@opentui/core'
 import type { ProcessStatus } from '../types'
 
 const STATUS_ICONS: Record<ProcessStatus, string> = {
@@ -8,22 +16,106 @@ const STATUS_ICONS: Record<ProcessStatus, string> = {
 	ready: '●',
 	stopping: '◑',
 	stopped: '■',
+	finished: '✓',
 	failed: '✖',
 	skipped: '⊘'
 }
 
+/** Status-specific icon colors (override process colors) */
+const STATUS_ICON_HEX: Partial<Record<ProcessStatus, string>> = {
+	ready: '#00cc00',
+	finished: '#66aa66',
+	failed: '#ff5555',
+	stopped: '#888888',
+	skipped: '#888888'
+}
+
+/** Statuses that represent a terminal (done) state — tabs move to bottom */
+const TERMINAL_STATUSES = new Set<ProcessStatus>(['finished', 'stopped', 'failed', 'skipped'])
+
+interface OptionColors {
+	icon: RGBA | null
+	name: RGBA | null
+}
+
+/**
+ * SelectRenderable subclass that supports per-option coloring.
+ * The base SelectRenderable draws all option text with a single color.
+ * This overrides renderSelf to repaint the icon and name with individual
+ * RGBA colors after the base render.
+ */
+class ColoredSelectRenderable extends SelectRenderable {
+	private _optionColors: OptionColors[] = []
+
+	setOptionColors(colors: OptionColors[]): void {
+		this._optionColors = colors
+		this.requestRender()
+	}
+
+	protected renderSelf(buffer: OptimizedBuffer, deltaTime: number): void {
+		const wasDirty = this.isDirty
+		super.renderSelf(buffer, deltaTime)
+		if (wasDirty && this.frameBuffer && this._optionColors.length > 0) {
+			this.colorizeOptions()
+		}
+	}
+
+	protected onMouseEvent(event: MouseEvent): void {
+		if (event.type === 'down') {
+			const linesPerItem = (this as any).linesPerItem as number
+			const scrollOffset = (this as any).scrollOffset as number
+			const clickedIndex = scrollOffset + Math.floor(event.y / linesPerItem)
+			if (clickedIndex >= 0 && clickedIndex < this.options.length) {
+				this.setSelectedIndex(clickedIndex)
+				this.selectCurrent()
+			}
+		}
+	}
+
+	private colorizeOptions(): void {
+		const fb = this.frameBuffer!
+		// Access internal layout state (private in TS, accessible at runtime)
+		const scrollOffset = (this as any).scrollOffset as number
+		const maxVisibleItems = (this as any).maxVisibleItems as number
+		const linesPerItem = (this as any).linesPerItem as number
+		const options = this.options
+		const visibleCount = Math.min(maxVisibleItems, options.length - scrollOffset)
+
+		for (let i = 0; i < visibleCount; i++) {
+			const actualIndex = scrollOffset + i
+			const colors = this._optionColors[actualIndex]
+			if (!colors) continue
+			const itemY = i * linesPerItem
+			// Layout: "▶ ○ name" or "  ○ name" (drawText at x=1, prefix 2 chars)
+			// Icon at x=3, space at x=4, name starts at x=5
+			const optName = options[actualIndex].name
+			if (colors.icon) {
+				fb.drawText(optName.charAt(0), 3, itemY, colors.icon)
+			}
+			if (colors.name) {
+				fb.drawText(optName.slice(2), 5, itemY, colors.name)
+			}
+		}
+	}
+}
+
 export class TabBar {
-	readonly renderable: SelectRenderable
+	readonly renderable: ColoredSelectRenderable
+	private originalNames: string[]
 	private names: string[]
 	private statuses: Map<string, ProcessStatus>
-	private descriptions: Map<string, string>
+	private baseDescriptions: Map<string, string>
+	private processColors: Map<string, string>
+	private inputWaiting = new Set<string>()
 
-	constructor(renderer: CliRenderer, names: string[]) {
-		this.names = names
+	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
+		this.originalNames = names
+		this.names = [...names]
 		this.statuses = new Map(names.map(n => [n, 'pending' as ProcessStatus]))
-		this.descriptions = new Map(names.map(n => [n, 'pending']))
+		this.baseDescriptions = new Map(names.map(n => [n, 'pending']))
+		this.processColors = colors ?? new Map()
 
-		this.renderable = new SelectRenderable(renderer, {
+		this.renderable = new ColoredSelectRenderable(renderer, {
 			id: 'tab-bar',
 			width: '100%',
 			height: '100%',
@@ -37,6 +129,7 @@ export class TabBar {
 			showDescription: true,
 			wrapSelection: true
 		})
+		this.updateOptionColors()
 	}
 
 	onSelect(handler: (index: number, name: string) => void): void {
@@ -53,11 +146,74 @@ export class TabBar {
 
 	updateStatus(name: string, status: ProcessStatus, exitCode?: number | null, restartCount?: number): void {
 		this.statuses.set(name, status)
-		this.descriptions.set(name, this.formatDescription(status, exitCode, restartCount))
+		this.baseDescriptions.set(name, this.formatDescription(status, exitCode, restartCount))
+		// Clear input waiting on terminal status changes
+		if (TERMINAL_STATUSES.has(status) || status === 'stopping') {
+			this.inputWaiting.delete(name)
+		}
+		this.refreshOptions()
+	}
+
+	setInputWaiting(name: string, waiting: boolean): void {
+		if (waiting) this.inputWaiting.add(name)
+		else this.inputWaiting.delete(name)
+		this.refreshOptions()
+	}
+
+	/** Get the process name at the given display index */
+	getNameAtIndex(index: number): string {
+		return this.names[index]
+	}
+
+	get count(): number {
+		return this.names.length
+	}
+
+	private refreshOptions(): void {
+		// Preserve currently selected name
+		const currentIdx = this.renderable.getSelectedIndex()
+		const currentName = this.names[currentIdx]
+
+		// Reorder: active first, terminal states at bottom
+		this.names = this.getDisplayOrder()
+
 		this.renderable.options = this.names.map(n => ({
 			name: this.formatTab(n, this.statuses.get(n)!),
-			description: this.descriptions.get(n)!
+			description: this.getDescription(n)
 		}))
+
+		// Restore selection by name
+		const newIdx = this.names.indexOf(currentName)
+		if (newIdx >= 0 && newIdx !== currentIdx) {
+			this.renderable.setSelectedIndex(newIdx)
+		}
+
+		this.updateOptionColors()
+	}
+
+	private getDisplayOrder(): string[] {
+		const active = this.originalNames.filter(n => !TERMINAL_STATUSES.has(this.statuses.get(n)!))
+		const terminal = this.originalNames.filter(n => TERMINAL_STATUSES.has(this.statuses.get(n)!))
+		return [...active, ...terminal]
+	}
+
+	private getDescription(name: string): string {
+		if (this.inputWaiting.has(name)) return 'awaiting input'
+		return this.baseDescriptions.get(name) ?? 'pending'
+	}
+
+	private updateOptionColors(): void {
+		const colors = this.names.map(name => {
+			const status = this.statuses.get(name)!
+			const waiting = this.inputWaiting.has(name)
+			const statusHex = waiting ? '#ffaa00' : STATUS_ICON_HEX[status]
+			const processHex = this.processColors.get(name)
+			return {
+				icon: parseColor(statusHex ?? processHex ?? '#888888'),
+				name: processHex ? parseColor(processHex) : null
+			}
+		})
+		this.renderable.setOptionColors(colors)
 	}
 
 	private formatDescription(status: ProcessStatus, exitCode?: number | null, restartCount?: number): string {

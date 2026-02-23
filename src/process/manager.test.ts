@@ -184,7 +184,7 @@ describe('ProcessManager — skip propagation', () => {
 
 		await mgr.startAll(80, 24)
 
-		expect(mgr.getState('good')?.status).toBe('stopped')
+		expect(mgr.getState('good')?.status).toBe('finished')
 		expect(mgr.getState('bad')?.status).toBe('failed')
 		expect(mgr.getState('child_of_good')?.status).not.toBe('skipped')
 		expect(mgr.getState('child_of_bad')?.status).toBe('skipped')
@@ -403,7 +403,7 @@ describe('ProcessManager — stop (individual)', () => {
 		await mgr.stopAll()
 	}, 10000)
 
-	test('no-op for already stopped process', async () => {
+	test('no-op for already finished process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
 				task: { command: 'true', persistent: false }
@@ -414,11 +414,11 @@ describe('ProcessManager — stop (individual)', () => {
 
 		// Wait for the process to finish
 		await new Promise(r => setTimeout(r, 500))
-		expect(mgr.getState('task')?.status).toBe('stopped')
+		expect(mgr.getState('task')?.status).toBe('finished')
 
 		// Should not throw
 		await mgr.stop('task')
-		expect(mgr.getState('task')?.status).toBe('stopped')
+		expect(mgr.getState('task')?.status).toBe('finished')
 		await mgr.stopAll()
 	}, 5000)
 
