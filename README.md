@@ -265,25 +265,7 @@ Persistent processes that crash are auto-restarted with exponential backoff (1s�
 
 ## Keybindings
 
-| Key | Action |
-|-----|--------|
-| `Ctrl+C` | Quit (graceful shutdown) |
-| `R` | Restart active process |
-| `Shift+R` | Restart all processes |
-| `S` | Stop/start active process |
-| `L` | Clear active pane output |
-| `F` | Search in active pane output |
-| `Y` | Copy selected text to clipboard |
-| `1`–`9` | Jump to tab |
-| `Left/Right` | Cycle tabs |
-| `PageUp/PageDown` | Scroll output by page |
-| `Home/End` | Scroll to top/bottom |
-
-While searching: type to filter, `Enter`/`Shift+Enter` to navigate matches, `Escape` to close.
-
-Mouse drag selects text and auto-copies to clipboard on release.
-
-Panes are readonly by default — keyboard input is not forwarded to processes. Set `interactive: true` on processes that need stdin (REPLs, shells, etc.).
+Keybindings are shown in the status bar at the bottom of the app. Panes are readonly by default — keyboard input is not forwarded to processes. Set `interactive: true` on processes that need stdin (REPLs, shells, etc.).
 
 ## Tab icons
 
