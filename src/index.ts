@@ -80,10 +80,16 @@ async function main() {
 
 	if (parsed.validate) {
 		const raw = await loadConfig(parsed.configPath)
-		const config = validateConfig(raw)
+		let config = validateConfig(raw)
+
+		if (parsed.only || parsed.exclude) {
+			config = filterConfig(config, parsed.only, parsed.exclude)
+		}
+
 		const tiers = resolveDependencyTiers(config)
 		const names = Object.keys(config.processes)
-		console.info(`Config valid: ${names.length} process${names.length === 1 ? '' : 'es'}\n`)
+		const filterNote = parsed.only || parsed.exclude ? ' (filtered)' : ''
+		console.info(`Config valid: ${names.length} process${names.length === 1 ? '' : 'es'}${filterNote}\n`)
 		for (let i = 0; i < tiers.length; i++) {
 			console.info(`Tier ${i}:`)
 			for (const name of tiers[i]) {
