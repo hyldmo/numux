@@ -1,17 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { extname, resolve } from 'node:path'
-import { parse as parseYaml } from 'yaml'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { NumuxConfig } from '../types'
 import { log } from '../utils/logger'
 import { interpolateConfig } from './interpolate'
 
-const CONFIG_FILES = [
-	'numux.config.ts',
-	'numux.config.js',
-	'numux.config.yaml',
-	'numux.config.yml',
-	'numux.config.json'
-] as const
+const CONFIG_FILES = ['numux.config.ts', 'numux.config.js'] as const
 
 export async function loadConfig(configPath?: string, cwd?: string): Promise<NumuxConfig> {
 	if (configPath) {
@@ -21,24 +14,12 @@ export async function loadConfig(configPath?: string, cwd?: string): Promise<Num
 }
 
 async function loadFile(path: string): Promise<NumuxConfig> {
-	const ext = extname(path)
-	let config: NumuxConfig
-	if (ext === '.yaml' || ext === '.yml') {
-		const content = readFileSync(path, 'utf-8')
-		try {
-			config = parseYaml(content) as NumuxConfig
-		} catch (err) {
-			throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
-		}
-	} else {
-		try {
-			const mod = await import(path)
-			config = mod.default ?? mod
-		} catch (err) {
-			throw new Error(`Failed to load ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
-		}
+	try {
+		const mod = await import(path)
+		return interpolateConfig(mod.default ?? mod)
+	} catch (err) {
+		throw new Error(`Failed to load ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
 	}
-	return interpolateConfig(config)
 }
 
 async function loadExplicitConfig(configPath: string): Promise<NumuxConfig> {
@@ -59,18 +40,5 @@ async function autoDetectConfig(cwd: string): Promise<NumuxConfig> {
 		}
 	}
 
-	// Try package.json "numux" key
-	const pkgPath = resolve(cwd, 'package.json')
-	if (existsSync(pkgPath)) {
-		const pkg = await import(pkgPath)
-		const config = (pkg.default ?? pkg).numux
-		if (config) {
-			log('Found config in package.json "numux" key')
-			return interpolateConfig(config as NumuxConfig)
-		}
-	}
-
-	throw new Error(
-		`No numux config found. Create one of: ${CONFIG_FILES.join(', ')} or add a "numux" key to package.json`
-	)
+	throw new Error(`No numux config found. Create one of: ${CONFIG_FILES.join(', ')}`)
 }
