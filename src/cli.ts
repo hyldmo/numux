@@ -35,8 +35,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	const consumeValue = (flag: string): string => {
 		const next = args[++i]
 		if (next === undefined || next.startsWith('-')) {
-			console.error(`Missing value for ${flag}`)
-			process.exit(1)
+			throw new Error(`Missing value for ${flag}`)
 		}
 		return next
 	}
@@ -70,8 +69,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			const value = consumeValue(arg)
 			const eq = value.indexOf('=')
 			if (eq < 1) {
-				console.error(`Invalid --name value: expected "name=command", got "${value}"`)
-				process.exit(1)
+				throw new Error(`Invalid --name value: expected "name=command", got "${value}"`)
 			}
 			result.named.push({
 				name: value.slice(0, eq),
@@ -84,8 +82,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		} else if (!arg.startsWith('-')) {
 			result.commands.push(arg)
 		} else {
-			console.error(`Unknown option: ${arg}`)
-			process.exit(1)
+			throw new Error(`Unknown option: ${arg}`)
 		}
 
 		i++

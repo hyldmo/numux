@@ -140,6 +140,38 @@ describe('parseArgs', () => {
 		expect(result.validate).toBe(true)
 		expect(result.configPath).toBe('custom.json')
 	})
+
+	test('throws on missing value for -c', () => {
+		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
+	})
+
+	test('throws on missing value for --config', () => {
+		expect(() => parseArgs(argv('--config'))).toThrow('Missing value for --config')
+	})
+
+	test('throws on missing value for --log-dir', () => {
+		expect(() => parseArgs(argv('--log-dir'))).toThrow('Missing value for --log-dir')
+	})
+
+	test('throws on missing value for --only', () => {
+		expect(() => parseArgs(argv('--only'))).toThrow('Missing value for --only')
+	})
+
+	test('throws on missing value for -n', () => {
+		expect(() => parseArgs(argv('-n'))).toThrow('Missing value for -n')
+	})
+
+	test('throws on flag-like value for -c', () => {
+		expect(() => parseArgs(argv('-c', '--debug'))).toThrow('Missing value for -c')
+	})
+
+	test('throws on invalid --name format (no equals)', () => {
+		expect(() => parseArgs(argv('-n', 'noequals'))).toThrow('Invalid --name value')
+	})
+
+	test('throws on unknown option', () => {
+		expect(() => parseArgs(argv('--bogus'))).toThrow('Unknown option: --bogus')
+	})
 })
 
 describe('buildConfigFromArgs', () => {
