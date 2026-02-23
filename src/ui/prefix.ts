@@ -52,6 +52,15 @@ export class PrefixDisplay {
 
 		process.on('SIGINT', () => this.shutdown())
 		process.on('SIGTERM', () => this.shutdown())
+		process.on('uncaughtException', err => {
+			process.stderr.write(`numux: unexpected error: ${err?.stack ?? err}\n`)
+			this.shutdown()
+		})
+		process.on('unhandledRejection', (reason: unknown) => {
+			const message = reason instanceof Error ? reason.message : String(reason)
+			process.stderr.write(`numux: unhandled rejection: ${message}\n`)
+			this.shutdown()
+		})
 
 		const cols = process.stdout.columns || 80
 		const rows = process.stdout.rows || 24
