@@ -18,15 +18,21 @@
     "orchestration"
   ],
   "engines": {
-    "bun": ">=1.0"
+    "bun": ">=1.0",
+    "node": ">=18"
   },
   "bin": {
-    "numux": "src/index.ts"
+    "numux": "dist/bin.js"
   },
   "exports": {
-    ".": "./src/config.ts"
+    ".": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    }
   },
   "scripts": {
+    "build": "bun build src/index.ts --outfile dist/bin.js --target bun --packages external && bun build src/config.ts --outfile dist/config.js --packages external && bunx tsc src/config.ts src/types.ts --emitDeclarationOnly --declaration --outDir dist --target ESNext --module ESNext --moduleResolution bundler",
+    "prepublishOnly": "bun run build",
     "dev": "cd example && bun run dev --debug",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
@@ -34,8 +40,7 @@
     "fix": "biome check . --fix --unsafe"
   },
   "files": [
-    "src/**/*.ts",
-    "!src/**/*.test.ts"
+    "dist/"
   ],
   "dependencies": {
     "@opentui/core": "^0.1.81",
