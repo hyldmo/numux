@@ -1,4 +1,5 @@
 import type { App } from '../ui/app'
+import { log } from './logger'
 
 export function setupShutdownHandlers(app: App): void {
 	const shutdown = () => {
@@ -8,7 +9,9 @@ export function setupShutdownHandlers(app: App): void {
 	process.on('SIGINT', shutdown)
 	process.on('SIGTERM', shutdown)
 	process.on('uncaughtException', err => {
-		console.error('Uncaught exception:', err)
-		shutdown()
+		log('Uncaught exception:', err?.message ?? err)
+		app.shutdown().catch(() => {
+			process.exit(1)
+		})
 	})
 }
