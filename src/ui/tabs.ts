@@ -78,22 +78,30 @@ class ColoredSelectRenderable extends SelectRenderable {
 		const scrollOffset = (this as any).scrollOffset as number
 		const maxVisibleItems = (this as any).maxVisibleItems as number
 		const linesPerItem = (this as any).linesPerItem as number
+		const selectedIndex = this.getSelectedIndex()
 		const options = this.options
 		const visibleCount = Math.min(maxVisibleItems, options.length - scrollOffset)
+		const baseTextColor = (this as any)._focused ? (this as any)._focusedTextColor : (this as any)._textColor
+		const selectedTextColor = (this as any)._selectedTextColor
 
 		for (let i = 0; i < visibleCount; i++) {
 			const actualIndex = scrollOffset + i
-			const colors = this._optionColors[actualIndex]
-			if (!colors) continue
 			const itemY = i * linesPerItem
-			// Layout: "▶ ○ name" or "  ○ name" (drawText at x=1, prefix 2 chars)
-			// Icon at x=3, space at x=4, name starts at x=5
 			const optName = options[actualIndex].name
-			if (colors.icon) {
-				fb.drawText(optName.charAt(0), 3, itemY, colors.icon)
+			const isSelected = actualIndex === selectedIndex
+			const defaultColor = isSelected ? selectedTextColor : baseTextColor
+			const colors = this._optionColors[actualIndex]
+
+			// Redraw at x=1 to remove the base class's ▶ prefix (background color shows selection)
+			// Trailing spaces clear the 2-char artifact from the shifted text
+			fb.drawText(`${optName}  `, 1, itemY, defaultColor)
+
+			// Layout: "○ name" (icon at x=1, name at x=3)
+			if (colors?.icon) {
+				fb.drawText(optName.charAt(0), 1, itemY, colors.icon)
 			}
-			if (colors.name) {
-				fb.drawText(optName.slice(2), 5, itemY, colors.name)
+			if (colors?.name) {
+				fb.drawText(optName.slice(2), 3, itemY, colors.name)
 			}
 		}
 	}
