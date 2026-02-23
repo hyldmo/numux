@@ -5,21 +5,24 @@ import { log } from '../utils/logger'
 
 const CONFIG_FILES = ['numux.config.ts', 'numux.config.js', 'numux.config.json'] as const
 
-export async function loadConfig(pathOrCwd?: string): Promise<NumuxConfig> {
-	// Explicit config file path
-	if (pathOrCwd && (pathOrCwd.endsWith('.ts') || pathOrCwd.endsWith('.js') || pathOrCwd.endsWith('.json'))) {
-		const path = resolve(pathOrCwd)
-		if (!existsSync(path)) {
-			throw new Error(`Config file not found: ${path}`)
-		}
-		log(`Loading explicit config: ${path}`)
-		const mod = await import(path)
-		return mod.default ?? mod
+export async function loadConfig(configPath?: string): Promise<NumuxConfig> {
+	if (configPath) {
+		return loadExplicitConfig(configPath)
 	}
+	return autoDetectConfig(process.cwd())
+}
 
-	const cwd = pathOrCwd ?? process.cwd()
+async function loadExplicitConfig(configPath: string): Promise<NumuxConfig> {
+	const path = resolve(configPath)
+	if (!existsSync(path)) {
+		throw new Error(`Config file not found: ${path}`)
+	}
+	log(`Loading explicit config: ${path}`)
+	const mod = await import(path)
+	return mod.default ?? mod
+}
 
-	// Try dedicated config files first
+async function autoDetectConfig(cwd: string): Promise<NumuxConfig> {
 	for (const file of CONFIG_FILES) {
 		const path = resolve(cwd, file)
 		if (existsSync(path)) {
