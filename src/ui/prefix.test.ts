@@ -181,7 +181,7 @@ describe('PrefixDisplay (integration)', () => {
 			'no-color.json',
 			JSON.stringify({
 				processes: {
-					ansi: { command: "printf '\\x1b[32mgreen\\x1b[0m plain'", persistent: false }
+					ansi: { command: "printf '\\033[32mgreen\\033[0m plain'", persistent: false }
 				}
 			})
 		)
