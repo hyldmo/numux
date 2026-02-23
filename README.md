@@ -139,6 +139,26 @@ Each process accepts:
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 
+### Environment variable interpolation
+
+Config values support `${VAR}` syntax for environment variable substitution:
+
+```yaml
+processes:
+  api:
+    command: node server.js --port ${PORT:-3000}
+    env:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+```
+
+| Syntax | Behavior |
+|--------|----------|
+| `${VAR}` | Value of `VAR`, or empty string if unset |
+| `${VAR:-default}` | Value of `VAR`, or `default` if unset |
+| `${VAR:?error}` | Value of `VAR`, or error with message if unset |
+
+Interpolation applies to all string values in the config (command, cwd, env, envFile, readyPattern, etc.).
+
 ### Dependency orchestration
 
 Processes are grouped into tiers by topological sort. Each tier starts after the previous tier is ready. If a process fails, its dependents are skipped.

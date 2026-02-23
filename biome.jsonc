@@ -89,6 +89,16 @@
 				"indentWidth": 2,
 				"lineWidth": 200
 			}
+		},
+		{
+			"includes": ["**/interpolate.test.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noTemplateCurlyInString": "off"
+					}
+				}
+			}
 		}
 	]
 }
