@@ -163,7 +163,7 @@ export class ProcessManager {
 	restart(name: string, cols: number, rows: number): void {
 		const state = this.states.get(name)
 		if (!state) return
-		if (state.status !== 'stopped' && state.status !== 'failed') return
+		if (state.status === 'pending' || state.status === 'stopping' || state.status === 'skipped') return
 
 		const runner = this.runners.get(name)
 		if (!runner) return

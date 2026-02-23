@@ -94,6 +94,7 @@ export class ProcessRunner {
 	async restart(cols: number, rows: number): Promise<void> {
 		log(`[${this.name}] Restarting`)
 		if (this.proc) {
+			this.handler.onStatus('stopping')
 			this.proc.kill('SIGTERM')
 			await Promise.race([this.proc.exited, new Promise<void>(r => setTimeout(r, 2000))])
 			if (this.proc) {
