@@ -236,7 +236,7 @@ export class ProcessRunner {
 	}
 
 	write(data: string): void {
-		if (this.proc?.terminal) {
+		if (this.config.interactive && this.proc?.terminal) {
 			this.proc.terminal.write(data)
 		}
 	}

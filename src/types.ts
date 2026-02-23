@@ -13,6 +13,7 @@ export interface NumuxProcessConfig {
 	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
 	color?: string
 	watch?: string | string[] // Glob patterns — restart process when matching files change
+	interactive?: boolean // default false — when true, keyboard input is forwarded to the process
 }
 
 /** Raw config as authored — processes can be string shorthand or full objects */

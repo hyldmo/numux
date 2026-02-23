@@ -174,6 +174,7 @@ Each process accepts:
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
+| `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
 
 ### File watching
 
@@ -257,13 +258,16 @@ Persistent processes that crash are auto-restarted with exponential backoff (1s�
 | `Alt+L` | Clear active pane output |
 | `Alt+1`–`Alt+9` | Jump to tab |
 | `Alt+Left/Right` | Cycle tabs |
+| `Up/Down` | Scroll output 1 line (non-interactive panes) |
+| `PageUp/PageDown` | Scroll output by page (non-interactive panes) |
+| `Home/End` | Scroll to top/bottom (non-interactive panes) |
 | `Alt+PageUp/PageDown` | Scroll output up/down |
 | `Alt+Home/End` | Scroll to top/bottom |
 | `Alt+F` | Search in active pane output |
 
 While searching: type to filter, `Enter`/`Shift+Enter` to navigate matches, `Escape` to close.
 
-All other input is forwarded to the active process.
+Panes are readonly by default — keyboard input is not forwarded to processes. Set `interactive: true` on processes that need stdin (REPLs, shells, etc.).
 
 ## Tab icons
 

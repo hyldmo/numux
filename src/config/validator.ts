@@ -114,7 +114,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			stopSignal: validateStopSignal(p.stopSignal),
 			color: typeof p.color === 'string' ? p.color : undefined,
-			watch: validateStringOrStringArray(p.watch)
+			watch: validateStringOrStringArray(p.watch),
+			interactive: typeof p.interactive === 'boolean' ? p.interactive : false
 		}
 	}
 
