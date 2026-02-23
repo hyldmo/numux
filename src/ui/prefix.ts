@@ -1,5 +1,6 @@
 import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
+import { hexToAnsi } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 
 /** Default ANSI colors for process name prefixes */
@@ -12,15 +13,6 @@ const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
 	failed: '\x1b[31m',
 	stopped: '\x1b[90m',
 	skipped: '\x1b[90m'
-}
-
-function hexToAnsi(hex: string): string {
-	const h = hex.replace('#', '')
-	const r = Number.parseInt(h.slice(0, 2), 16)
-	const g = Number.parseInt(h.slice(2, 4), 16)
-	const b = Number.parseInt(h.slice(4, 6), 16)
-	if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return ''
-	return `\x1b[38;2;${r};${g};${b}m`
 }
 
 /**
