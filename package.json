@@ -8,6 +8,9 @@
   "bin": {
     "numux": "src/index.ts"
   },
+  "exports": {
+    ".": "./src/config.ts"
+  },
   "scripts": {
     "dev": "bun run src/index.ts",
     "test": "bun test",
