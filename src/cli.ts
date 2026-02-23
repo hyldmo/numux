@@ -4,6 +4,7 @@ export interface ParsedArgs {
 	help: boolean
 	version: boolean
 	debug: boolean
+	init: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -17,6 +18,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		help: false,
 		version: false,
 		debug: false,
+		init: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -59,6 +61,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				name: value.slice(0, eq),
 				command: value.slice(eq + 1)
 			})
+		} else if (arg === 'init' && result.commands.length === 0) {
+			result.init = true
 		} else if (!arg.startsWith('-')) {
 			result.commands.push(arg)
 		} else {

@@ -105,6 +105,14 @@ describe('parseArgs', () => {
 		expect(result.only).toEqual(['api', 'web', 'db'])
 		expect(result.exclude).toEqual(['db'])
 	})
+
+	test('init sets init flag', () => {
+		expect(parseArgs(argv('init')).init).toBe(true)
+	})
+
+	test('init is false by default', () => {
+		expect(parseArgs(argv()).init).toBe(false)
+	})
 })
 
 describe('buildConfigFromArgs', () => {

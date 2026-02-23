@@ -12,6 +12,14 @@ bun install -g numux
 
 ## Usage
 
+### Quick start
+
+```sh
+numux init
+```
+
+This creates a starter `numux.config.ts` with commented-out examples. Edit it, then run `numux`.
+
 ### Config file
 
 Create `numux.config.ts` (or `.js`, `.json`, or a `"numux"` key in `package.json`):

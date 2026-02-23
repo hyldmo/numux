@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { existsSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
 import { validateConfig } from './config/validator'
@@ -15,6 +17,7 @@ Usage:
   numux                          Run processes from config file
   numux <cmd1> <cmd2> ...        Run ad-hoc commands in parallel
   numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
+  numux init                     Create a starter config file
 
 Options:
   -n, --name <name=command>  Add a named process
@@ -30,6 +33,23 @@ Config files (auto-detected):
   numux.config.ts, numux.config.js, numux.config.json,
   or "numux" key in package.json`
 
+const INIT_TEMPLATE = `import { defineConfig } from 'numux'
+
+export default defineConfig({
+  processes: {
+    // dev: 'npm run dev',
+    // api: {
+    //   command: 'npm run dev:api',
+    //   readyPattern: 'listening on port',
+    // },
+    // web: {
+    //   command: 'npm run dev:web',
+    //   dependsOn: ['api'],
+    // },
+  },
+})
+`
+
 async function main() {
 	const parsed = parseArgs(process.argv)
 
@@ -41,6 +61,17 @@ async function main() {
 	if (parsed.version) {
 		const pkg = await import('../package.json')
 		console.info(`numux v${(pkg.default ?? pkg).version}`)
+		process.exit(0)
+	}
+
+	if (parsed.init) {
+		const target = resolve('numux.config.ts')
+		if (existsSync(target)) {
+			console.error(`Already exists: ${target}`)
+			process.exit(1)
+		}
+		writeFileSync(target, INIT_TEMPLATE)
+		console.info(`Created ${target}`)
 		process.exit(0)
 	}
 
