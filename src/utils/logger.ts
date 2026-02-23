@@ -15,9 +15,14 @@ export function enableDebugLog(dir?: string): void {
 
 export function log(message: string, ...args: unknown[]): void {
 	if (!enabled) return
-	const timestamp = new Date().toISOString()
-	const formatted = args.length > 0 ? `${message} ${args.map(a => JSON.stringify(a)).join(' ')}` : message
-	appendFileSync(logFile, `[${timestamp}] ${formatted}\n`)
+	try {
+		const timestamp = new Date().toISOString()
+		const formatted = args.length > 0 ? `${message} ${args.map(a => JSON.stringify(a)).join(' ')}` : message
+		appendFileSync(logFile, `[${timestamp}] ${formatted}\n`)
+	} catch {
+		// Disk errors in debug logging should not crash the app
+		enabled = false
+	}
 }
 
 /** Reset logger state (for testing only) */
