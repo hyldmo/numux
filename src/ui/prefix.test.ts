@@ -158,6 +158,23 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(0)
 	}, 10000)
 
+	test('prints exit summary after all processes finish', async () => {
+		const config = writeConfig(
+			'summary.json',
+			JSON.stringify({
+				processes: {
+					ok: { command: 'true', persistent: false },
+					fail: { command: "sh -c 'exit 2'", persistent: false }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config)
+		// Summary should appear after all output, showing status and exit codes
+		const lines = stdout.split('\n')
+		const summaryLines = lines.filter(l => l.includes('exit 2') && !l.startsWith('['))
+		expect(summaryLines.length).toBeGreaterThan(0)
+	}, 10000)
+
 	test('skips dependents of failed processes', async () => {
 		const config = writeConfig(
 			'skip.json',

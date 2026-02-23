@@ -137,6 +137,7 @@ export class PrefixDisplay {
 		const states = this.manager.getAllStates()
 		const allDone = states.every(s => s.status === 'stopped' || s.status === 'failed' || s.status === 'skipped')
 		if (allDone) {
+			this.printSummary()
 			const anyFailed = states.some(s => s.status === 'failed')
 			process.exit(anyFailed ? 1 : 0)
 		}
@@ -149,12 +150,29 @@ export class PrefixDisplay {
 		const code = state?.exitCode ?? 1
 		this.manager.stopAll().then(() => {
 			this.logWriter?.close()
-			// Flush all remaining buffers
 			for (const name of this.manager.getProcessNames()) {
 				this.flushBuffer(name)
 			}
+			this.printSummary()
 			process.exit(code === 0 ? 0 : 1)
 		})
+	}
+
+	private printSummary(): void {
+		const states = this.manager.getAllStates()
+		const namePad = Math.max(...states.map(s => s.name.length))
+		process.stdout.write('\n')
+		for (const s of states) {
+			const name = s.name.padEnd(namePad)
+			const exitStr = s.exitCode !== null ? `exit ${s.exitCode}` : ''
+			if (this.noColor) {
+				process.stdout.write(`  ${name}  ${s.status}${exitStr ? `  (${exitStr})` : ''}\n`)
+			} else {
+				const ansi = STATUS_ANSI[s.status] ?? ''
+				const statusText = ansi ? `${ansi}${s.status}${RESET}` : s.status
+				process.stdout.write(`  ${name}  ${statusText}${exitStr ? `  ${DIM}(${exitStr})${RESET}` : ''}\n`)
+			}
+		}
 	}
 
 	async shutdown(): Promise<void> {
