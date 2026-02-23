@@ -11,6 +11,7 @@ export interface ParsedArgs {
 	killOthers: boolean
 	timestamps: boolean
 	noRestart: boolean
+	noWatch: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -30,6 +31,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		killOthers: false,
 		timestamps: false,
 		noRestart: false,
+		noWatch: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -64,6 +66,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.timestamps = true
 		} else if (arg === '--no-restart') {
 			result.noRestart = true
+		} else if (arg === '--no-watch') {
+			result.noWatch = true
 		} else if (arg === '-c' || arg === '--config') {
 			result.configPath = consumeValue(arg)
 		} else if (arg === '--log-dir') {

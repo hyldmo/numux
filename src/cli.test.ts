@@ -179,6 +179,14 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).noRestart).toBe(false)
 	})
 
+	test('--no-watch sets noWatch flag', () => {
+		expect(parseArgs(argv('--no-watch')).noWatch).toBe(true)
+	})
+
+	test('noWatch is false by default', () => {
+		expect(parseArgs(argv()).noWatch).toBe(false)
+	})
+
 	test('throws on missing value for -c', () => {
 		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
 	})

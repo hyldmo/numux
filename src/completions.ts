@@ -38,7 +38,7 @@ _numux() {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "-h --help -v --version -c --config -n --name -p --prefix --only --exclude --kill-others --no-restart -t --timestamps --log-dir --debug" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help -v --version -c --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
   else
     local subcmds="init validate completions"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
@@ -69,6 +69,7 @@ _numux() {
     '--exclude[Exclude these processes]:processes' \\
     '--kill-others[Kill all when any exits]' \\
     '--no-restart[Disable auto-restart]' \\
+    '--no-watch[Disable file watching]' \\
     '(-t --timestamps)'{-t,--timestamps}'[Add timestamps to output]' \\
     '--log-dir[Log directory]:directory:_directories' \\
     '--debug[Enable debug logging]' \\
@@ -109,6 +110,7 @@ complete -c numux -l only -r -d 'Only run these processes'
 complete -c numux -l exclude -r -d 'Exclude these processes'
 complete -c numux -l kill-others -d 'Kill all when any exits'
 complete -c numux -l no-restart -d 'Disable auto-restart'
+complete -c numux -l no-watch -d 'Disable file watching'
 complete -c numux -s t -l timestamps -d 'Add timestamps to output'
 complete -c numux -l log-dir -ra '(__fish_complete_directories)' -d 'Log directory'
 complete -c numux -l debug -d 'Enable debug logging'`

@@ -105,6 +105,7 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 | `--exclude <a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits |
 | `--no-restart` | Disable auto-restart for crashed processes |
+| `--no-watch` | Disable file watching even if config has `watch` patterns |
 | `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |
 | `--log-dir <path>` | Write per-process output to `<path>/<name>.log` |
 | `--debug` | Log to `.numux/debug.log` |
