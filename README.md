@@ -17,7 +17,9 @@ bun install -g numux
 Create `numux.config.ts` (or `.js`, `.json`, or a `"numux"` key in `package.json`):
 
 ```ts
-export default {
+import { defineConfig } from 'numux'
+
+export default defineConfig({
   processes: {
     db: {
       command: 'docker compose up postgres',
@@ -38,8 +40,10 @@ export default {
       dependsOn: ['api'],
     },
   },
-}
+})
 ```
+
+The `defineConfig()` helper is optional — it provides type checking for your config.
 
 Then run:
 
@@ -79,10 +83,13 @@ Each process accepts:
 | `command` | `string` | *required* | Shell command to run |
 | `cwd` | `string` | `process.cwd()` | Working directory |
 | `env` | `Record<string, string>` | — | Extra environment variables |
+| `envFile` | `string \| string[]` | — | `.env` file path(s) to load (relative to `cwd`) |
 | `dependsOn` | `string[]` | — | Processes that must be ready first |
 | `readyPattern` | `string` | — | Regex matched against stdout to signal readiness |
+| `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
 | `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
 | `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
+| `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 
 ### Dependency orchestration
