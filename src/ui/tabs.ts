@@ -64,6 +64,10 @@ export class TabBar {
 		return this.renderable.getSelectedIndex()
 	}
 
+	setSelectedIndex(index: number): void {
+		this.renderable.setSelectedIndex(index)
+	}
+
 	focus(): void {
 		this.renderable.focus()
 	}

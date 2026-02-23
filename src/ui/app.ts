@@ -91,12 +91,27 @@ export class App {
 			this.manager.resizeAll(cols, rows)
 		})
 
-		// Handle Ctrl+C
-		this.renderer.keyInput.on('keypress', (key: { ctrl: boolean; name: string }) => {
-			if (key.ctrl && key.name === 'c') {
-				this.shutdown()
+		// Global keyboard handler
+		this.renderer.keyInput.on(
+			'keypress',
+			(key: { ctrl: boolean; shift: boolean; meta: boolean; name: string; sequence: string }) => {
+				// Ctrl+C: quit
+				if (key.ctrl && key.name === 'c') {
+					this.shutdown()
+					return
+				}
+
+				// Number keys 1-9: jump to tab (no modifiers)
+				if (!(key.ctrl || key.meta || key.shift)) {
+					const num = Number.parseInt(key.name, 10)
+					if (num >= 1 && num <= 9 && num <= this.names.length) {
+						this.tabBar.setSelectedIndex(num - 1)
+						this.switchPane(this.names[num - 1])
+						return
+					}
+				}
 			}
-		})
+		)
 
 		// Show first pane
 		if (this.names.length > 0) {
