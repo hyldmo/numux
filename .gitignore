@@ -3,3 +3,4 @@ dist/
 .numux/
 *.tsbuildinfo
 .DS_Store
+.claude/worktrees/
