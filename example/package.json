@@ -1,0 +1,8 @@
+{
+  "name": "numux-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ../src/index.ts"
+  }
+}
