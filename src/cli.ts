@@ -9,6 +9,7 @@ export interface ParsedArgs {
 	prefix: boolean
 	killOthers: boolean
 	timestamps: boolean
+	noRestart: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -27,6 +28,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		prefix: false,
 		killOthers: false,
 		timestamps: false,
+		noRestart: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -59,6 +61,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.killOthers = true
 		} else if (arg === '-t' || arg === '--timestamps') {
 			result.timestamps = true
+		} else if (arg === '--no-restart') {
+			result.noRestart = true
 		} else if (arg === '-c' || arg === '--config') {
 			result.configPath = consumeValue(arg)
 		} else if (arg === '--log-dir') {
@@ -101,12 +105,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 export function buildConfigFromArgs(
 	commands: string[],
-	named: Array<{ name: string; command: string }>
+	named: Array<{ name: string; command: string }>,
+	options?: { noRestart?: boolean }
 ): ResolvedNumuxConfig {
 	const processes: ResolvedNumuxConfig['processes'] = {}
+	const maxRestarts = options?.noRestart ? 0 : undefined
 
 	for (const { name, command } of named) {
-		processes[name] = { command, persistent: true }
+		processes[name] = { command, persistent: true, maxRestarts }
 	}
 
 	for (let i = 0; i < commands.length; i++) {
@@ -116,7 +122,7 @@ export function buildConfigFromArgs(
 		if (processes[name]) {
 			name = `${name}-${i}`
 		}
-		processes[name] = { command: cmd, persistent: true }
+		processes[name] = { command: cmd, persistent: true, maxRestarts }
 	}
 
 	return { processes }

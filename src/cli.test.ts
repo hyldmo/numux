@@ -161,6 +161,14 @@ describe('parseArgs', () => {
 		expect(result.configPath).toBe('custom.json')
 	})
 
+	test('--no-restart sets noRestart flag', () => {
+		expect(parseArgs(argv('--no-restart')).noRestart).toBe(true)
+	})
+
+	test('noRestart is false by default', () => {
+		expect(parseArgs(argv()).noRestart).toBe(false)
+	})
+
 	test('throws on missing value for -c', () => {
 		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
 	})
@@ -221,6 +229,17 @@ describe('buildConfigFromArgs', () => {
 	test('named and positional can be mixed', () => {
 		const config = buildConfigFromArgs(['echo hello'], [{ name: 'api', command: 'bun dev' }])
 		expect(Object.keys(config.processes).sort()).toEqual(['api', 'echo'])
+	})
+
+	test('noRestart sets maxRestarts: 0 on all processes', () => {
+		const config = buildConfigFromArgs(['echo hello'], [{ name: 'api', command: 'bun dev' }], { noRestart: true })
+		expect(config.processes.echo.maxRestarts).toBe(0)
+		expect(config.processes.api.maxRestarts).toBe(0)
+	})
+
+	test('maxRestarts is undefined by default', () => {
+		const config = buildConfigFromArgs(['echo hello'], [])
+		expect(config.processes.echo.maxRestarts).toBeUndefined()
 	})
 })
 

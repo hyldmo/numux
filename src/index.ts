@@ -29,6 +29,7 @@ Options:
   --only <a,b,...>           Only run these processes (+ their dependencies)
   --exclude <a,b,...>        Exclude these processes
   --kill-others              Kill all processes when any exits
+  --no-restart               Disable auto-restart for crashed processes
   -t, --timestamps           Add timestamps to prefixed output lines
   --log-dir <path>           Write per-process logs to directory
   --debug                    Enable debug logging to .numux/debug.log
@@ -119,10 +120,16 @@ async function main() {
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
-		config = buildConfigFromArgs(parsed.commands, parsed.named)
+		config = buildConfigFromArgs(parsed.commands, parsed.named, { noRestart: parsed.noRestart })
 	} else {
 		const raw = await loadConfig(parsed.configPath)
 		config = validateConfig(raw, warnings)
+
+		if (parsed.noRestart) {
+			for (const proc of Object.values(config.processes)) {
+				proc.maxRestarts = 0
+			}
+		}
 	}
 
 	if (parsed.only || parsed.exclude) {
