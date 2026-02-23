@@ -109,10 +109,10 @@ describe('PrefixDisplay (integration)', () => {
 		// Both should appear in output
 		expect(stdout).toContain('step1')
 		expect(stdout).toContain('step2')
-		// "first" should reach stopped status before "second" starts
-		const firstStopped = stdout.indexOf('stopped')
+		// "first" should reach finished status before "second" starts
+		const firstFinished = stdout.indexOf('finished')
 		const secondOutput = stdout.indexOf('step2')
-		expect(firstStopped).toBeLessThan(secondOutput)
+		expect(firstFinished).toBeLessThan(secondOutput)
 		expect(exitCode).toBe(0)
 	}, 10000)
 

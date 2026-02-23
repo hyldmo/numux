@@ -20,6 +20,7 @@ import type { ProcessStatus, ResolvedNumuxConfig } from '../types'
 export const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
 	ready: '\x1b[32m',
 	running: '\x1b[36m',
+	finished: '\x1b[32m',
 	failed: '\x1b[31m',
 	stopped: '\x1b[90m',
 	skipped: '\x1b[90m'
