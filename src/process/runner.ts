@@ -154,13 +154,13 @@ export class ProcessRunner {
 		if (this.proc) {
 			this.stopping = true
 			this.handler.onStatus('stopping')
-			this.proc.kill(this.signal)
+			this.killProcessGroup(this.signal)
 			const result = await Promise.race([
 				this.proc.exited.then(() => 'exited' as const),
 				new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 2000))
 			])
 			if (result === 'timeout' && this.proc) {
-				this.proc.kill('SIGKILL')
+				this.killProcessGroup('SIGKILL')
 				await this.proc.exited
 			}
 		}
@@ -177,7 +177,7 @@ export class ProcessRunner {
 		this.stopping = true
 		log(`[${this.name}] Stopping (timeout: ${timeoutMs}ms)`)
 		this.handler.onStatus('stopping')
-		this.proc.kill(this.signal)
+		this.killProcessGroup(this.signal)
 
 		const exited = Promise.race([
 			this.proc.exited,
@@ -186,11 +186,27 @@ export class ProcessRunner {
 
 		const result = await exited
 		if (result === 'timeout') {
-			this.proc.kill('SIGKILL')
+			this.killProcessGroup('SIGKILL')
 			await this.proc.exited
 		}
 
 		this.proc = null
+	}
+
+	/** Signal the entire process group (child + its descendants), falling back to direct PID */
+	private killProcessGroup(sig: NodeJS.Signals): void {
+		if (!this.proc) return
+		try {
+			// Negative PID signals the entire process group
+			process.kill(-this.proc.pid, sig)
+		} catch {
+			// Process group may not exist; fall back to direct kill
+			try {
+				this.proc.kill(sig)
+			} catch {
+				// Process already exited
+			}
+		}
 	}
 
 	resize(cols: number, rows: number): void {
