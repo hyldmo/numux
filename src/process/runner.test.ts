@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ProcessStatus } from '../types'
-import { type RunnerEventHandler, ProcessRunner } from './runner'
+import { ProcessRunner, type RunnerEventHandler } from './runner'
 
 function createHandler(): RunnerEventHandler & {
 	statuses: ProcessStatus[]
@@ -64,7 +64,11 @@ describe('ProcessRunner — persistent process', () => {
 		const handler = createHandler()
 		const runner = new ProcessRunner(
 			'srv',
-			{ command: "echo 'server listening on port 3000' && sleep 10", persistent: true, readyPattern: 'listening on port \\d+' },
+			{
+				command: "echo 'server listening on port 3000' && sleep 10",
+				persistent: true,
+				readyPattern: 'listening on port \\d+'
+			},
 			handler
 		)
 
