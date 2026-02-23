@@ -3,7 +3,7 @@ import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
 import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
-import type { NumuxConfig } from './types'
+import type { ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
@@ -48,7 +48,7 @@ async function main() {
 		enableDebugLog()
 	}
 
-	let config: NumuxConfig
+	let config: ResolvedNumuxConfig
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
 		config = buildConfigFromArgs(parsed.commands, parsed.named)

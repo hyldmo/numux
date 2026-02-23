@@ -1,6 +1,6 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
 import type { ProcessManager } from '../process/manager'
-import type { NumuxConfig } from '../types'
+import type { ResolvedNumuxConfig } from '../types'
 import { Pane } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
@@ -22,13 +22,13 @@ export class App {
 
 	private processColors: Map<string, string>
 
-	constructor(manager: ProcessManager, config: NumuxConfig) {
+	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
 		this.names = manager.getProcessNames()
 		this.processColors = this.buildColorMap(config)
 	}
 
-	private buildColorMap(config: NumuxConfig): Map<string, string> {
+	private buildColorMap(config: ResolvedNumuxConfig): Map<string, string> {
 		const map = new Map<string, string>()
 		let paletteIndex = 0
 		for (const name of this.names) {

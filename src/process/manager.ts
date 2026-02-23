@@ -1,5 +1,5 @@
 import { resolveDependencyTiers } from '../config/resolver'
-import type { NumuxConfig, ProcessEvent, ProcessState, ProcessStatus } from '../types'
+import type { ProcessEvent, ProcessState, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { log } from '../utils/logger'
 import { ProcessRunner } from './runner'
 
@@ -10,7 +10,7 @@ const BACKOFF_MAX_MS = 30_000
 const BACKOFF_RESET_MS = 10_000
 
 export class ProcessManager {
-	private config: NumuxConfig
+	private config: ResolvedNumuxConfig
 	private runners = new Map<string, ProcessRunner>()
 	private states = new Map<string, ProcessState>()
 	private tiers: string[][]
@@ -22,7 +22,7 @@ export class ProcessManager {
 	private restartTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private startTimes = new Map<string, number>()
 
-	constructor(config: NumuxConfig) {
+	constructor(config: ResolvedNumuxConfig) {
 		this.config = config
 		this.tiers = resolveDependencyTiers(config)
 		log(`Resolved ${this.tiers.length} dependency tiers:`, this.tiers)

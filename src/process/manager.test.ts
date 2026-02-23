@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { NumuxConfig, ProcessEvent } from '../types'
+import type { ProcessEvent, ResolvedNumuxConfig } from '../types'
 import { ProcessManager } from './manager'
 
 function collectEvents(mgr: ProcessManager): ProcessEvent[] {
@@ -10,7 +10,7 @@ function collectEvents(mgr: ProcessManager): ProcessEvent[] {
 
 describe('ProcessManager — initialization', () => {
 	test('initializes all states to pending', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				a: { command: 'echo a' },
 				b: { command: 'echo b' }
@@ -22,7 +22,7 @@ describe('ProcessManager — initialization', () => {
 	})
 
 	test('getAllStates returns all process states', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				x: { command: 'echo x' },
 				y: { command: 'echo y' },
@@ -34,7 +34,7 @@ describe('ProcessManager — initialization', () => {
 	})
 
 	test('getState returns undefined for unknown process', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: { a: { command: 'echo a' } }
 		}
 		const mgr = new ProcessManager(config)
@@ -42,7 +42,7 @@ describe('ProcessManager — initialization', () => {
 	})
 
 	test('getProcessNames returns topological order', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				web: { command: 'echo web', dependsOn: ['api'] },
 				api: { command: 'echo api', dependsOn: ['db'] },
@@ -56,7 +56,7 @@ describe('ProcessManager — initialization', () => {
 	})
 
 	test('getProcessNames groups independent processes in same tier', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				a: { command: 'echo a' },
 				b: { command: 'echo b' },
@@ -73,7 +73,7 @@ describe('ProcessManager — initialization', () => {
 
 describe('ProcessManager — startAll', () => {
 	test('starts a non-persistent process and completes', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				task: { command: 'true', persistent: false }
 			}
@@ -91,7 +91,7 @@ describe('ProcessManager — startAll', () => {
 	}, 5000)
 
 	test('persistent process without readyPattern becomes ready immediately', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				server: { command: 'sleep 10', persistent: true }
 			}
@@ -110,7 +110,7 @@ describe('ProcessManager — startAll', () => {
 	}, 5000)
 
 	test('respects dependency order across tiers', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				dep: { command: 'true', persistent: false },
 				child: { command: 'true', persistent: false, dependsOn: ['dep'] }
@@ -133,7 +133,7 @@ describe('ProcessManager — startAll', () => {
 
 describe('ProcessManager — skip propagation', () => {
 	test('skips dependents when a dependency fails', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				failing: { command: "sh -c 'exit 1'", persistent: false },
 				child: { command: 'true', persistent: false, dependsOn: ['failing'] }
@@ -154,7 +154,7 @@ describe('ProcessManager — skip propagation', () => {
 	}, 5000)
 
 	test('skips transitive dependents', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				root: { command: "sh -c 'exit 1'", persistent: false },
 				mid: { command: 'true', persistent: false, dependsOn: ['root'] },
@@ -172,7 +172,7 @@ describe('ProcessManager — skip propagation', () => {
 	}, 5000)
 
 	test('only skips affected branch, not siblings', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				good: { command: 'true', persistent: false },
 				bad: { command: "sh -c 'exit 1'", persistent: false },
@@ -194,7 +194,7 @@ describe('ProcessManager — skip propagation', () => {
 
 describe('ProcessManager — event emission', () => {
 	test('emits exit events with correct code', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				ok: { command: 'true', persistent: false },
 				fail: { command: "sh -c 'exit 42'", persistent: false }
@@ -220,7 +220,7 @@ describe('ProcessManager — event emission', () => {
 
 describe('ProcessManager — manual restart', () => {
 	test('ignores restart for unknown process', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: { a: { command: 'sleep 10' } }
 		}
 		const mgr = new ProcessManager(config)
@@ -229,7 +229,7 @@ describe('ProcessManager — manual restart', () => {
 	})
 
 	test('ignores restart for pending process', () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: { a: { command: 'sleep 10' } }
 		}
 		const mgr = new ProcessManager(config)
@@ -239,7 +239,7 @@ describe('ProcessManager — manual restart', () => {
 	})
 
 	test('ignores restart for skipped process', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				dep: { command: "sh -c 'exit 1'", persistent: false },
 				child: { command: 'true', persistent: false, dependsOn: ['dep'] }
@@ -257,7 +257,7 @@ describe('ProcessManager — manual restart', () => {
 
 describe('ProcessManager — maxRestarts', () => {
 	test('stops auto-restarting after maxRestarts is reached', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 2 }
 			}
@@ -289,7 +289,7 @@ describe('ProcessManager — maxRestarts', () => {
 	}, 10000)
 
 	test('maxRestarts: 0 prevents any auto-restart', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 0 }
 			}
@@ -314,7 +314,7 @@ describe('ProcessManager — maxRestarts', () => {
 	}, 5000)
 
 	test('undefined maxRestarts allows unlimited restarts', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				crasher: { command: "sh -c 'exit 1'", persistent: true }
 			}
@@ -343,7 +343,7 @@ describe('ProcessManager — maxRestarts', () => {
 
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
-		const config: NumuxConfig = {
+		const config: ResolvedNumuxConfig = {
 			processes: {
 				server: { command: 'sleep 60', persistent: true }
 			}

@@ -1,4 +1,4 @@
-import type { NumuxConfig } from './types'
+import type { ResolvedNumuxConfig } from './types'
 
 export interface ParsedArgs {
 	help: boolean
@@ -72,8 +72,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	return result
 }
 
-export function buildConfigFromArgs(commands: string[], named: Array<{ name: string; command: string }>): NumuxConfig {
-	const processes: NumuxConfig['processes'] = {}
+export function buildConfigFromArgs(
+	commands: string[],
+	named: Array<{ name: string; command: string }>
+): ResolvedNumuxConfig {
+	const processes: ResolvedNumuxConfig['processes'] = {}
 
 	for (const { name, command } of named) {
 		processes[name] = { command, persistent: true }
@@ -93,7 +96,7 @@ export function buildConfigFromArgs(commands: string[], named: Array<{ name: str
 }
 
 /** Filter a config to include/exclude specific processes. --only also pulls in transitive dependencies. */
-export function filterConfig(config: NumuxConfig, only?: string[], exclude?: string[]): NumuxConfig {
+export function filterConfig(config: ResolvedNumuxConfig, only?: string[], exclude?: string[]): ResolvedNumuxConfig {
 	const allNames = Object.keys(config.processes)
 
 	let selected: Set<string>
@@ -134,7 +137,7 @@ export function filterConfig(config: NumuxConfig, only?: string[], exclude?: str
 		throw new Error('No processes left after filtering')
 	}
 
-	const processes: NumuxConfig['processes'] = {}
+	const processes: ResolvedNumuxConfig['processes'] = {}
 	for (const name of selected) {
 		const proc = { ...config.processes[name] }
 		// Remove deps that were filtered out

@@ -35,15 +35,15 @@ export default defineConfig({
       dependsOn: ['migrate'],
       readyPattern: 'listening on port 3000',
     },
-    web: {
-      command: 'bun run dev:web',
-      dependsOn: ['api'],
-    },
+    // String shorthand for simple processes
+    web: 'bun run dev:web',
   },
 })
 ```
 
 The `defineConfig()` helper is optional — it provides type checking for your config.
+
+Processes can be a string (shorthand for `{ command: "..." }`) or a full config object.
 
 Then run:
 

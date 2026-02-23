@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { NumuxProcessConfig } from '../types'
 import { loadConfig } from './loader'
+
+/** Helper to cast raw process config to the full object type (for test assertions on loader output) */
+const proc = (p: NumuxProcessConfig | string) => p as NumuxProcessConfig
 
 const TMP = join(import.meta.dir, '../../.tmp-loader-test')
 
@@ -31,7 +35,7 @@ describe('loadConfig — explicit path', () => {
 			})
 		})
 		const config = await loadConfig(join(dir, 'custom.json'))
-		expect(config.processes.web.command).toBe('echo hi')
+		expect(proc(config.processes.web).command).toBe('echo hi')
 	})
 
 	test('loads a config with a custom name', async () => {
@@ -41,7 +45,7 @@ describe('loadConfig — explicit path', () => {
 			})
 		})
 		const config = await loadConfig(join(dir, 'my-numux.json'))
-		expect(config.processes.api.command).toBe('echo api')
+		expect(proc(config.processes.api).command).toBe('echo api')
 	})
 
 	test('loads a .ts config with default export', async () => {
@@ -49,7 +53,7 @@ describe('loadConfig — explicit path', () => {
 			'config.ts': `export default { processes: { app: { command: 'echo app' } } }`
 		})
 		const config = await loadConfig(join(dir, 'config.ts'))
-		expect(config.processes.app.command).toBe('echo app')
+		expect(proc(config.processes.app).command).toBe('echo app')
 	})
 
 	test('loads a .js config with default export', async () => {
@@ -57,7 +61,7 @@ describe('loadConfig — explicit path', () => {
 			'config.js': `export default { processes: { worker: { command: 'echo worker' } } }`
 		})
 		const config = await loadConfig(join(dir, 'config.js'))
-		expect(config.processes.worker.command).toBe('echo worker')
+		expect(proc(config.processes.worker).command).toBe('echo worker')
 	})
 
 	test('throws when explicit path does not exist', async () => {
@@ -87,7 +91,7 @@ describe('loadConfig — auto-detect', () => {
 			})
 		})
 		const config = await loadConfig(undefined, dir)
-		expect(config.processes.db.command).toBe('echo db')
+		expect(proc(config.processes.db).command).toBe('echo db')
 	})
 
 	test('auto-detects numux.config.ts', async () => {
@@ -95,7 +99,7 @@ describe('loadConfig — auto-detect', () => {
 			'numux.config.ts': `export default { processes: { api: { command: 'echo api' } } }`
 		})
 		const config = await loadConfig(undefined, dir)
-		expect(config.processes.api.command).toBe('echo api')
+		expect(proc(config.processes.api).command).toBe('echo api')
 	})
 
 	test('auto-detects numux.config.js', async () => {
@@ -103,7 +107,7 @@ describe('loadConfig — auto-detect', () => {
 			'numux.config.js': `export default { processes: { web: { command: 'echo web' } } }`
 		})
 		const config = await loadConfig(undefined, dir)
-		expect(config.processes.web.command).toBe('echo web')
+		expect(proc(config.processes.web).command).toBe('echo web')
 	})
 
 	test('prefers numux.config.ts over .js and .json', async () => {
@@ -126,7 +130,7 @@ describe('loadConfig — auto-detect', () => {
 			})
 		})
 		const config = await loadConfig(undefined, dir)
-		expect(config.processes.svc.command).toBe('echo svc')
+		expect(proc(config.processes.svc).command).toBe('echo svc')
 	})
 
 	test('ignores package.json without "numux" key', async () => {

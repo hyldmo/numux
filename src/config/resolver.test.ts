@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import type { NumuxConfig } from '../types'
+import type { ResolvedNumuxConfig } from '../types'
 import { resolveDependencyTiers } from './resolver'
 
-function makeConfig(deps: Record<string, string[]>): NumuxConfig {
-	const processes: NumuxConfig['processes'] = {}
+function makeConfig(deps: Record<string, string[]>): ResolvedNumuxConfig {
+	const processes: ResolvedNumuxConfig['processes'] = {}
 	for (const [name, dependsOn] of Object.entries(deps)) {
 		processes[name] = { command: `echo ${name}`, dependsOn: dependsOn.length > 0 ? dependsOn : undefined }
 	}

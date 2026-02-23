@@ -1,6 +1,6 @@
-import type { NumuxConfig, NumuxProcessConfig } from '../types'
+import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
 
-export function validateConfig(raw: unknown): NumuxConfig {
+export function validateConfig(raw: unknown): ResolvedNumuxConfig {
 	if (!raw || typeof raw !== 'object') {
 		throw new Error('Config must be an object')
 	}
@@ -20,9 +20,15 @@ export function validateConfig(raw: unknown): NumuxConfig {
 	const validated: Record<string, NumuxProcessConfig> = {}
 
 	for (const name of names) {
-		const proc = processes[name]
+		let proc = processes[name]
+
+		// String shorthand: "command" → { command: "command" }
+		if (typeof proc === 'string') {
+			proc = { command: proc }
+		}
+
 		if (!proc || typeof proc !== 'object') {
-			throw new Error(`Process "${name}" must be an object`)
+			throw new Error(`Process "${name}" must be an object or a command string`)
 		}
 
 		const p = proc as Record<string, unknown>

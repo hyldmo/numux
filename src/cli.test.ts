@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
-import type { NumuxConfig } from './types'
+import type { ResolvedNumuxConfig } from './types'
 
 /** Helper: simulates argv with bun + script prefix */
 function argv(...args: string[]): string[] {
@@ -137,7 +137,7 @@ describe('buildConfigFromArgs', () => {
 	})
 })
 
-const CHAIN_CONFIG: NumuxConfig = {
+const CHAIN_CONFIG: ResolvedNumuxConfig = {
 	processes: {
 		db: { command: 'echo db' },
 		migrate: { command: 'echo migrate', persistent: false, dependsOn: ['db'] },

@@ -206,4 +206,32 @@ describe('validateConfig', () => {
 			})
 		).toThrow('dependsOn must be an array')
 	})
+
+	test('accepts string shorthand for processes', () => {
+		const config = validateConfig({
+			processes: {
+				web: 'bun dev:web',
+				api: 'bun dev:api'
+			}
+		})
+		expect(config.processes.web.command).toBe('bun dev:web')
+		expect(config.processes.web.persistent).toBe(true)
+		expect(config.processes.api.command).toBe('bun dev:api')
+	})
+
+	test('accepts mix of string shorthand and full objects', () => {
+		const config = validateConfig({
+			processes: {
+				db: { command: 'docker compose up postgres', readyPattern: 'ready' },
+				web: 'bun dev:web'
+			}
+		})
+		expect(config.processes.db.command).toBe('docker compose up postgres')
+		expect(config.processes.db.readyPattern).toBe('ready')
+		expect(config.processes.web.command).toBe('bun dev:web')
+	})
+
+	test('throws on empty string shorthand', () => {
+		expect(() => validateConfig({ processes: { web: '  ' } })).toThrow('non-empty "command" string')
+	})
 })

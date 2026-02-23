@@ -1,11 +1,11 @@
-import type { NumuxConfig } from '../types'
+import type { ResolvedNumuxConfig } from '../types'
 
 /**
  * Kahn's topological sort — groups processes into tiers.
  * Tier 0: no deps, Tier 1: deps all in tier 0, etc.
  * Throws if a cycle is detected.
  */
-export function resolveDependencyTiers(config: NumuxConfig): string[][] {
+export function resolveDependencyTiers(config: ResolvedNumuxConfig): string[][] {
 	const names = Object.keys(config.processes)
 	const inDegree = new Map<string, number>()
 	const dependents = new Map<string, string[]>()

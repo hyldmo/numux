@@ -12,7 +12,13 @@ export interface NumuxProcessConfig {
 	color?: string
 }
 
+/** Raw config as authored — processes can be string shorthand or full objects */
 export interface NumuxConfig {
+	processes: Record<string, NumuxProcessConfig | string>
+}
+
+/** Validated config with all shorthand expanded to full objects */
+export interface ResolvedNumuxConfig {
 	processes: Record<string, NumuxProcessConfig>
 }
 
