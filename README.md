@@ -268,18 +268,15 @@ Persistent processes that crash are auto-restarted with exponential backoff (1s�
 | Key | Action |
 |-----|--------|
 | `Ctrl+C` | Quit (graceful shutdown) |
-| `Alt+R` | Restart active process |
-| `Alt+Shift+R` | Restart all processes |
-| `Alt+S` | Stop/start active process |
-| `Alt+L` | Clear active pane output |
-| `Alt+1`–`Alt+9` | Jump to tab |
-| `Alt+Left/Right` | Cycle tabs |
-| `Up/Down` | Navigate between tabs |
-| `PageUp/PageDown` | Scroll output by page (non-interactive panes) |
-| `Home/End` | Scroll to top/bottom (non-interactive panes) |
-| `Alt+PageUp/PageDown` | Scroll output up/down |
-| `Alt+Home/End` | Scroll to top/bottom |
-| `Alt+F` | Search in active pane output |
+| `R` | Restart active process |
+| `Shift+R` | Restart all processes |
+| `S` | Stop/start active process |
+| `L` | Clear active pane output |
+| `F` | Search in active pane output |
+| `1`–`9` | Jump to tab |
+| `Left/Right` | Cycle tabs |
+| `PageUp/PageDown` | Scroll output by page |
+| `Home/End` | Scroll to top/bottom |
 
 While searching: type to filter, `Enter`/`Shift+Enter` to navigate matches, `Escape` to close.
 
@@ -297,6 +294,12 @@ Panes are readonly by default — keyboard input is not forwarded to processes. 
 | ■ | Stopped |
 | ✖ | Failed |
 | ⊘ | Skipped |
+
+## Dependencies
+
+### ghostty-opentui
+
+Despite the name, [`ghostty-opentui`](https://github.com/user/ghostty-opentui) is **not** a compatibility layer for the [Ghostty](https://ghostty.org) terminal. It uses Ghostty's Zig-based VT parser as the ANSI terminal emulation engine for OpenTUI's terminal renderable. It works in any terminal emulator (iTerm, Kitty, Alacritty, WezTerm, etc.) and adds ~8MB to install size due to native binaries.
 
 ## License
 
