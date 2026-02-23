@@ -38,7 +38,7 @@ _numux() {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "-h --help -v --version -c --color --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help -v --version -c --color --colors --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
   else
     local subcmds="init validate exec completions"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
@@ -64,6 +64,7 @@ _numux() {
     '(-h --help)'{-h,--help}'[Show help]' \\
     '(-v --version)'{-v,--version}'[Show version]' \\
     '(-c --color)'{-c,--color}'[Comma-separated colors for processes]' \\
+    '--colors[Auto-assign colors based on process name]' \\
     '--config[Config file path]:file:_files' \\
     '(-n --name)'{-n,--name}'[Named process (name=command)]:named process' \\
     '(-p --prefix)'{-p,--prefix}'[Prefixed output mode]' \\
@@ -107,6 +108,7 @@ complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish
 complete -c numux -s h -l help -d 'Show help'
 complete -c numux -s v -l version -d 'Show version'
 complete -c numux -s c -l color -r -d 'Comma-separated colors for processes'
+complete -c numux -l colors -d 'Auto-assign colors based on process name'
 complete -c numux -l config -rF -d 'Config file path'
 complete -c numux -s n -l name -r -d 'Named process (name=command)'
 complete -c numux -s p -l prefix -d 'Prefixed output mode'
