@@ -28,26 +28,6 @@ function setupDir(name: string, files: Record<string, string>): string {
 }
 
 describe('loadConfig — explicit path', () => {
-	test('loads a .json config by explicit path', async () => {
-		const dir = setupDir('explicit-json', {
-			'custom.json': JSON.stringify({
-				processes: { web: { command: 'echo hi' } }
-			})
-		})
-		const config = await loadConfig(join(dir, 'custom.json'))
-		expect(proc(config.processes.web).command).toBe('echo hi')
-	})
-
-	test('loads a config with a custom name', async () => {
-		const dir = setupDir('explicit-custom', {
-			'my-numux.json': JSON.stringify({
-				processes: { api: { command: 'echo api' } }
-			})
-		})
-		const config = await loadConfig(join(dir, 'my-numux.json'))
-		expect(proc(config.processes.api).command).toBe('echo api')
-	})
-
 	test('loads a .ts config with default export', async () => {
 		const dir = setupDir('ts-default', {
 			'config.ts': `export default { processes: { app: { command: 'echo app' } } }`
@@ -65,35 +45,21 @@ describe('loadConfig — explicit path', () => {
 	})
 
 	test('throws when explicit path does not exist', async () => {
-		await expect(loadConfig('/nonexistent/path/config.json')).rejects.toThrow('Config file not found')
+		await expect(loadConfig('/nonexistent/path/config.ts')).rejects.toThrow('Config file not found')
 	})
 
 	test('explicit path takes precedence over auto-detect', async () => {
 		const dir = setupDir('explicit-precedence', {
-			'numux.config.json': JSON.stringify({
-				processes: { auto: { command: 'echo auto' } }
-			}),
-			'custom.json': JSON.stringify({
-				processes: { custom: { command: 'echo custom' } }
-			})
+			'numux.config.ts': `export default { processes: { auto: { command: 'echo auto' } } }`,
+			'custom.ts': `export default { processes: { custom: { command: 'echo custom' } } }`
 		})
-		const config = await loadConfig(join(dir, 'custom.json'), dir)
+		const config = await loadConfig(join(dir, 'custom.ts'), dir)
 		expect(config.processes.custom).toBeDefined()
 		expect(config.processes.auto).toBeUndefined()
 	})
 })
 
 describe('loadConfig — auto-detect', () => {
-	test('auto-detects numux.config.json', async () => {
-		const dir = setupDir('auto-json', {
-			'numux.config.json': JSON.stringify({
-				processes: { db: { command: 'echo db' } }
-			})
-		})
-		const config = await loadConfig(undefined, dir)
-		expect(proc(config.processes.db).command).toBe('echo db')
-	})
-
 	test('auto-detects numux.config.ts', async () => {
 		const dir = setupDir('auto-ts', {
 			'numux.config.ts': `export default { processes: { api: { command: 'echo api' } } }`
@@ -110,73 +76,17 @@ describe('loadConfig — auto-detect', () => {
 		expect(proc(config.processes.web).command).toBe('echo web')
 	})
 
-	test('prefers numux.config.ts over .js and .json', async () => {
+	test('prefers numux.config.ts over .js', async () => {
 		const dir = setupDir('auto-priority', {
 			'numux.config.ts': `export default { processes: { ts: { command: 'echo ts' } } }`,
-			'numux.config.js': `export default { processes: { js: { command: 'echo js' } } }`,
-			'numux.config.json': JSON.stringify({ processes: { json: { command: 'echo json' } } })
+			'numux.config.js': `export default { processes: { js: { command: 'echo js' } } }`
 		})
 		const config = await loadConfig(undefined, dir)
 		expect(config.processes.ts).toBeDefined()
 	})
 
-	test('falls back to package.json "numux" key', async () => {
-		const dir = setupDir('auto-pkg', {
-			'package.json': JSON.stringify({
-				name: 'test-project',
-				numux: {
-					processes: { svc: { command: 'echo svc' } }
-				}
-			})
-		})
-		const config = await loadConfig(undefined, dir)
-		expect(proc(config.processes.svc).command).toBe('echo svc')
-	})
-
-	test('ignores package.json without "numux" key', async () => {
-		const dir = setupDir('auto-pkg-no-numux', {
-			'package.json': JSON.stringify({ name: 'test-project' })
-		})
-		await expect(loadConfig(undefined, dir)).rejects.toThrow('No numux config found')
-	})
-
 	test('throws when no config is found (empty dir)', async () => {
 		const dir = setupDir('empty', {})
 		await expect(loadConfig(undefined, dir)).rejects.toThrow('No numux config found')
-	})
-
-	test('auto-detects numux.config.yaml', async () => {
-		const yaml = `processes:\n  api:\n    command: echo api\n`
-		const dir = setupDir('auto-yaml', { 'numux.config.yaml': yaml })
-		const config = await loadConfig(undefined, dir)
-		expect(proc(config.processes.api).command).toBe('echo api')
-	})
-
-	test('auto-detects numux.config.yml', async () => {
-		const yml = `processes:\n  web:\n    command: echo web\n`
-		const dir = setupDir('auto-yml', { 'numux.config.yml': yml })
-		const config = await loadConfig(undefined, dir)
-		expect(proc(config.processes.web).command).toBe('echo web')
-	})
-
-	test('loads explicit .yaml config', async () => {
-		const yaml = `processes:\n  db:\n    command: echo db\n    readyPattern: ready\n`
-		const dir = setupDir('explicit-yaml', { 'custom.yaml': yaml })
-		const config = await loadConfig(join(dir, 'custom.yaml'))
-		expect(proc(config.processes.db).command).toBe('echo db')
-		expect(proc(config.processes.db).readyPattern).toBe('ready')
-	})
-
-	test('yaml supports string shorthand', async () => {
-		const yaml = `processes:\n  web: bun dev\n`
-		const dir = setupDir('yaml-shorthand', { 'numux.config.yaml': yaml })
-		const config = await loadConfig(undefined, dir)
-		expect(config.processes.web).toBe('bun dev')
-	})
-
-	test('throws descriptive error for malformed YAML', async () => {
-		const malformed = `processes:\n  web:\n    command: echo hi\n  bad: [unterminated`
-		const dir = setupDir('yaml-malformed', { 'numux.config.yaml': malformed })
-		await expect(loadConfig(undefined, dir)).rejects.toThrow('Failed to parse')
 	})
 })

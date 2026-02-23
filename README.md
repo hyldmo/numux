@@ -22,7 +22,7 @@ This creates a starter `numux.config.ts` with commented-out examples. Edit it, t
 
 ### Config file
 
-Create `numux.config.ts` (or `.js`, `.yaml`, `.yml`, `.json`, or a `"numux"` key in `package.json`):
+Create `numux.config.ts` (or `.js`):
 
 ```ts
 import { defineConfig } from 'numux'
@@ -209,12 +209,17 @@ A watched process is only restarted if it's currently running, ready, or failed 
 
 Config values support `${VAR}` syntax for environment variable substitution:
 
-```yaml
-processes:
-  api:
-    command: node server.js --port ${PORT:-3000}
-    env:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+```ts
+export default defineConfig({
+  processes: {
+    api: {
+      command: 'node server.js --port ${PORT:-3000}',
+      env: {
+        DATABASE_URL: '${DATABASE_URL:?DATABASE_URL must be set}',
+      },
+    },
+  },
+})
 ```
 
 | Syntax | Behavior |
@@ -229,15 +234,20 @@ Interpolation applies to all string values in the config (command, cwd, env, env
 
 Use `condition` to run a process only when an environment variable is set:
 
-```yaml
-processes:
-  seed:
-    command: bun run seed
-    persistent: false
-    condition: SEED_DB        # only runs when SEED_DB is set and truthy
-  storybook:
-    command: bun run storybook
-    condition: "!CI"           # skipped in CI environments
+```ts
+export default defineConfig({
+  processes: {
+    seed: {
+      command: 'bun run seed',
+      persistent: false,
+      condition: 'SEED_DB',    // only runs when SEED_DB is set and truthy
+    },
+    storybook: {
+      command: 'bun run storybook',
+      condition: '!CI',         // skipped in CI environments
+    },
+  },
+})
 ```
 
 Falsy values: unset, empty string, `"0"`, `"false"`, `"no"`, `"off"` (case-insensitive). If a conditional process is skipped, its dependents are also skipped.
