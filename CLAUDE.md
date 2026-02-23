@@ -35,7 +35,7 @@ src/
 ## Key behavior
 
 - Panes are **readonly by default** — keyboard input is not forwarded to processes
-- Arrow keys (Up/Down) scroll output 1 line, PageUp/PageDown by page, Home/End to top/bottom
+- Arrow keys (Up/Down) navigate between tabs, PageUp/PageDown scroll by page, Home/End to top/bottom
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor
 
