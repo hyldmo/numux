@@ -38,6 +38,7 @@ src/
 - Arrow keys (Up/Down) navigate between tabs, PageUp/PageDown scroll by page, Home/End to top/bottom
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor
+- Set `errorMatcher: true` to detect ANSI red output, or a regex string to match custom patterns — shows a red indicator on the tab while the process keeps running
 
 ## CI
 

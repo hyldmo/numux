@@ -115,6 +115,7 @@ export class TabBar {
 	private baseDescriptions: Map<string, string>
 	private processColors: Map<string, string>
 	private inputWaiting = new Set<string>()
+	private erroredProcesses = new Set<string>()
 
 	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
 		this.originalNames = names
@@ -159,12 +160,22 @@ export class TabBar {
 		if (TERMINAL_STATUSES.has(status) || status === 'stopping') {
 			this.inputWaiting.delete(name)
 		}
+		// Clear error indicator when process restarts
+		if (status === 'starting') {
+			this.erroredProcesses.delete(name)
+		}
 		this.refreshOptions()
 	}
 
 	setInputWaiting(name: string, waiting: boolean): void {
 		if (waiting) this.inputWaiting.add(name)
 		else this.inputWaiting.delete(name)
+		this.refreshOptions()
+	}
+
+	setError(name: string, hasError: boolean): void {
+		if (hasError) this.erroredProcesses.add(name)
+		else this.erroredProcesses.delete(name)
 		this.refreshOptions()
 	}
 
@@ -207,6 +218,7 @@ export class TabBar {
 
 	private getDescription(name: string): string {
 		if (this.inputWaiting.has(name)) return 'awaiting input'
+		if (this.erroredProcesses.has(name)) return 'error detected'
 		return this.baseDescriptions.get(name) ?? 'pending'
 	}
 
@@ -214,7 +226,8 @@ export class TabBar {
 		const colors = this.names.map(name => {
 			const status = this.statuses.get(name)!
 			const waiting = this.inputWaiting.has(name)
-			const statusHex = waiting ? '#ffaa00' : STATUS_ICON_HEX[status]
+			const errored = this.erroredProcesses.has(name)
+			const statusHex = waiting ? '#ffaa00' : errored ? '#ff5555' : STATUS_ICON_HEX[status]
 			const processHex = this.processColors.get(name)
 			return {
 				icon: parseColor(statusHex ?? processHex ?? '#888888'),

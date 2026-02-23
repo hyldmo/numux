@@ -465,6 +465,53 @@ describe('validateConfig', () => {
 		})
 		expect(config.processes.web.interactive).toBe(false)
 	})
+
+	test('preserves errorMatcher: true', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', errorMatcher: true }
+			}
+		})
+		expect(config.processes.web.errorMatcher).toBe(true)
+	})
+
+	test('preserves errorMatcher regex string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', errorMatcher: 'ERROR:' }
+			}
+		})
+		expect(config.processes.web.errorMatcher).toBe('ERROR:')
+	})
+
+	test('errorMatcher: false treated as undefined', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', errorMatcher: false }
+			}
+		})
+		expect(config.processes.web.errorMatcher).toBeUndefined()
+	})
+
+	test('throws on invalid errorMatcher type', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', errorMatcher: 42 }
+				}
+			})
+		).toThrow('errorMatcher must be true or a regex string')
+	})
+
+	test('throws on invalid errorMatcher regex', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', errorMatcher: '[invalid' }
+				}
+			})
+		).toThrow('not a valid regex')
+	})
 })
 
 describe('validateConfig — global options', () => {

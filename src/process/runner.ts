@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import type { NumuxProcessConfig, ProcessStatus } from '../types'
 import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
+import { createErrorChecker } from './error'
 import { createReadinessChecker } from './ready'
 
 export type RunnerEventHandler = {
@@ -9,6 +10,7 @@ export type RunnerEventHandler = {
 	onOutput: (data: Uint8Array) => void
 	onExit: (code: number | null) => void
 	onReady: () => void
+	onError: () => void
 }
 
 export class ProcessRunner {
@@ -17,9 +19,11 @@ export class ProcessRunner {
 	private handler: RunnerEventHandler
 	private proc: ReturnType<typeof Bun.spawn> | null = null
 	private readiness: ReturnType<typeof createReadinessChecker>
+	private errorChecker: ReturnType<typeof createErrorChecker>
 	private _ready = false
 	private stopping = false
 	private decoder = new TextDecoder()
+	private errorDecoder = new TextDecoder()
 	private generation = 0
 	private readyTimer: ReturnType<typeof setTimeout> | null = null
 	private restarting = false
@@ -30,6 +34,7 @@ export class ProcessRunner {
 		this.config = config
 		this.handler = handler
 		this.readiness = createReadinessChecker(config)
+		this.errorChecker = createErrorChecker(config)
 	}
 
 	get isReady(): boolean {
@@ -69,6 +74,7 @@ export class ProcessRunner {
 						if (this.generation !== gen) return
 						this.handler.onOutput(data)
 						this.checkReadiness(data)
+						this.checkError(data)
 					}
 				}
 			})
@@ -131,6 +137,14 @@ export class ProcessRunner {
 		}
 	}
 
+	private checkError(data: Uint8Array): void {
+		if (!this.errorChecker) return
+		const text = this.errorDecoder.decode(data, { stream: true })
+		if (this.errorChecker.feedOutput(text)) {
+			this.handler.onError()
+		}
+	}
+
 	private startReadyTimeout(gen: number): void {
 		const timeout = this.config.readyTimeout
 		if (!(timeout && this.config.readyPattern) || this.config.persistent === false) return
@@ -187,6 +201,7 @@ export class ProcessRunner {
 		this.restarting = false
 		this.readyTimedOut = false
 		this.readiness = createReadinessChecker(this.config)
+		this.errorChecker = createErrorChecker(this.config)
 		this.start(cols, rows)
 	}
 
