@@ -25,11 +25,13 @@ export class TabBar {
 	readonly renderable: TabSelectRenderable
 	private names: string[]
 	private statuses: Map<string, ProcessStatus>
+	private descriptions: Map<string, string>
 	private colors: Map<string, string>
 
 	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
 		this.names = names
 		this.statuses = new Map(names.map(n => [n, 'pending' as ProcessStatus]))
+		this.descriptions = new Map(names.map(n => [n, 'pending']))
 		this.colors = colors ?? new Map()
 
 		this.renderable = new TabSelectRenderable(renderer, {
@@ -63,11 +65,11 @@ export class TabBar {
 
 	updateStatus(name: string, status: ProcessStatus, exitCode?: number | null, restartCount?: number): void {
 		this.statuses.set(name, status)
-		const options = this.names.map(n => {
-			const s = this.statuses.get(n)!
-			const desc: string = n === name ? this.formatDescription(status, exitCode, restartCount) : s
-			return { name: this.formatTab(n, s), description: desc }
-		})
+		this.descriptions.set(name, this.formatDescription(status, exitCode, restartCount))
+		const options = this.names.map(n => ({
+			name: this.formatTab(n, this.statuses.get(n)!),
+			description: this.descriptions.get(n)!
+		}))
 		this.renderable.setOptions(options)
 	}
 
