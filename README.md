@@ -264,7 +264,7 @@ Persistent processes that crash are auto-restarted with exponential backoff (1sâ
 | `Alt+L` | Clear active pane output |
 | `Alt+1`â€“`Alt+9` | Jump to tab |
 | `Alt+Left/Right` | Cycle tabs |
-| `Up/Down` | Scroll output 1 line (non-interactive panes) |
+| `Up/Down` | Navigate between tabs |
 | `PageUp/PageDown` | Scroll output by page (non-interactive panes) |
 | `Home/End` | Scroll to top/bottom (non-interactive panes) |
 | `Alt+PageUp/PageDown` | Scroll output up/down |

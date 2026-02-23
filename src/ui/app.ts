@@ -248,13 +248,10 @@ export class App {
 
 				const isInteractive = this.config.processes[this.activePane]?.interactive === true
 
-				// Non-interactive panes: arrow keys scroll, all other input is dropped
+				// Non-interactive panes: PageUp/PageDown/Home/End scroll output,
+				// up/down arrows are handled by the tab sidebar for navigation
 				if (!isInteractive) {
-					if (key.name === 'up' || key.name === 'down') {
-						const pane = this.panes.get(this.activePane)
-						pane?.scrollBy(key.name === 'up' ? -1 : 1)
-						this.updateScrollIndicator()
-					} else if (key.name === 'pageup' || key.name === 'pagedown') {
+					if (key.name === 'pageup' || key.name === 'pagedown') {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
 						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
@@ -276,9 +273,10 @@ export class App {
 			}
 		)
 
-		// Show first pane
+		// Show first pane and focus sidebar for keyboard navigation
 		if (this.names.length > 0) {
 			this.switchPane(this.names[0])
+			this.tabBar.focus()
 		}
 
 		// Start all processes
