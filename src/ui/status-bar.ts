@@ -70,7 +70,7 @@ export class StatusBar {
 			}
 		}
 		const scroll = this.scrolledUp ? `  \x1b[33m[scrolled]\x1b[0m` : ''
-		return `${parts.join('  ')}${scroll}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+L: clear  Ctrl+C: quit`
+		return `${parts.join('  ')}${scroll}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+S: stop/start  Ctrl+C: quit`
 	}
 
 	private buildSearchContent(): string {

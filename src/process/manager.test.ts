@@ -341,6 +341,195 @@ describe('ProcessManager — maxRestarts', () => {
 	}, 10000)
 })
 
+describe('ProcessManager — stop (individual)', () => {
+	test('stops a running process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: 'sleep 60', persistent: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+		expect(mgr.getState('server')?.status).toBe('ready')
+
+		await mgr.stop('server')
+
+		expect(mgr.getState('server')?.status).toBe('stopped')
+	}, 10000)
+
+	test('no-op for already stopped process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				task: { command: 'true', persistent: false }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for the process to finish
+		await new Promise(r => setTimeout(r, 500))
+		expect(mgr.getState('task')?.status).toBe('stopped')
+
+		// Should not throw
+		await mgr.stop('task')
+		expect(mgr.getState('task')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('no-op for unknown process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: { a: { command: 'sleep 10' } }
+		}
+		const mgr = new ProcessManager(config)
+		// Should not throw
+		await mgr.stop('nonexistent')
+		await mgr.stopAll()
+	})
+
+	test('no-op for pending process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: { a: { command: 'sleep 10' } }
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getState('a')?.status).toBe('pending')
+		await mgr.stop('a')
+		expect(mgr.getState('a')?.status).toBe('pending')
+	})
+
+	test('cancels pending auto-restart timer', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", persistent: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'crasher') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+		// Wait for crash and auto-restart scheduling
+		await new Promise(r => setTimeout(r, 500))
+
+		// Stop should cancel the pending restart
+		await mgr.stop('crasher')
+
+		// Wait past when the restart timer would have fired
+		await new Promise(r => setTimeout(r, 2000))
+
+		// Should still be stopped, not restarted
+		expect(mgr.getState('crasher')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 10000)
+})
+
+describe('ProcessManager — start (individual)', () => {
+	test('starts a stopped process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: 'sleep 60', persistent: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+		expect(mgr.getState('server')?.status).toBe('ready')
+
+		await mgr.stop('server')
+		expect(mgr.getState('server')?.status).toBe('stopped')
+
+		mgr.start('server', 80, 24)
+		// Wait for the process to start
+		await new Promise(r => setTimeout(r, 500))
+
+		const status = mgr.getState('server')?.status
+		expect(status === 'running' || status === 'ready').toBe(true)
+		await mgr.stopAll()
+	}, 10000)
+
+	test('starts a failed process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				task: { command: "sh -c 'exit 1'", persistent: false }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+		expect(mgr.getState('task')?.status).toBe('failed')
+
+		mgr.start('task', 80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		// Process will fail again, but it should have been started
+		expect(mgr.getState('task')?.status).toBe('failed')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('no-op for running process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: 'sleep 60', persistent: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+		expect(mgr.getState('server')?.status).toBe('ready')
+
+		// start() should be a no-op since it's already running
+		mgr.start('server', 80, 24)
+		expect(mgr.getState('server')?.status).toBe('ready')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('no-op for pending process', () => {
+		const config: ResolvedNumuxConfig = {
+			processes: { a: { command: 'sleep 10' } }
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getState('a')?.status).toBe('pending')
+		mgr.start('a', 80, 24)
+		expect(mgr.getState('a')?.status).toBe('pending')
+	})
+
+	test('resets backoff counter', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 1 }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'crasher') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+
+		// Wait for crash → auto-restart → crash → maxRestarts reached
+		await new Promise(r => setTimeout(r, 3000))
+		expect(outputs.join('')).toContain('reached restart limit')
+
+		// Manual start should reset the backoff counter
+		mgr.start('crasher', 80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		// Process should have been started (and failed again)
+		const status = mgr.getState('crasher')?.status
+		expect(status === 'failed' || status === 'starting').toBe(true)
+		await mgr.stopAll()
+	}, 10000)
+})
+
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {

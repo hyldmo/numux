@@ -194,6 +194,55 @@ export class ProcessManager {
 		runner.restart(cols, rows)
 	}
 
+	/** Stop a single process. No-op if already stopped or not running. */
+	async stop(name: string): Promise<void> {
+		const state = this.states.get(name)
+		if (!state) return
+		if (
+			state.status === 'pending' ||
+			state.status === 'stopped' ||
+			state.status === 'stopping' ||
+			state.status === 'skipped'
+		)
+			return
+
+		// Cancel pending auto-restart
+		const timer = this.restartTimers.get(name)
+		if (timer) {
+			clearTimeout(timer)
+			this.restartTimers.delete(name)
+		}
+
+		// If the process already exited (failed), just mark as stopped
+		if (state.status === 'failed') {
+			this.updateStatus(name, 'stopped')
+			return
+		}
+
+		const runner = this.runners.get(name)
+		if (!runner) return
+		await runner.stop()
+	}
+
+	/** Start a single process that is stopped or failed. */
+	start(name: string, cols: number, rows: number): void {
+		const state = this.states.get(name)
+		if (!state) return
+		if (state.status !== 'stopped' && state.status !== 'failed') return
+
+		// Cancel pending auto-restart and reset backoff
+		const timer = this.restartTimers.get(name)
+		if (timer) {
+			clearTimeout(timer)
+			this.restartTimers.delete(name)
+		}
+		this.restartAttempts.set(name, 0)
+
+		state.exitCode = null
+		this.startTimes.set(name, Date.now())
+		this.runners.get(name)?.restart(cols, rows)
+	}
+
 	resize(name: string, cols: number, rows: number): void {
 		this.runners.get(name)?.resize(cols, rows)
 	}

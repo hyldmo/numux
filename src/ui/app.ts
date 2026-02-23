@@ -167,6 +167,17 @@ export class App {
 						return
 					}
 
+					// Alt+S: stop/start active process
+					if (key.name === 's' && this.activePane) {
+						const state = this.manager.getState(this.activePane)
+						if (state?.status === 'stopped' || state?.status === 'failed') {
+							this.manager.start(this.activePane, this.termCols, this.termRows)
+						} else {
+							this.manager.stop(this.activePane)
+						}
+						return
+					}
+
 					// Alt+L: clear active pane
 					if (key.name === 'l' && this.activePane) {
 						this.panes.get(this.activePane)?.clear()
