@@ -2,6 +2,9 @@
   "name": "numux",
   "version": "0.0.1",
   "type": "module",
+  "engines": {
+    "bun": ">=1.0"
+  },
   "bin": {
     "numux": "src/index.ts"
   },
