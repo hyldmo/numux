@@ -87,7 +87,17 @@ export class ProcessRunner {
 		this.handler.onReady()
 	}
 
-	restart(cols: number, rows: number): void {
+	async restart(cols: number, rows: number): Promise<void> {
+		if (this.proc) {
+			this.proc.kill('SIGTERM')
+			await Promise.race([
+				this.proc.exited,
+				new Promise<void>(r => setTimeout(r, 2000))
+			])
+			if (this.proc) {
+				this.proc.kill('SIGKILL')
+			}
+		}
 		this.proc = null
 		this._ready = false
 		this.readiness = createReadinessChecker(this.config)
