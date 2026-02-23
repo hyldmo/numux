@@ -58,6 +58,10 @@ export class Pane {
 		this.scrollBox.visible = false
 	}
 
+	clear(): void {
+		this.terminal.reset()
+	}
+
 	destroy(): void {
 		this.terminal.destroy()
 	}

@@ -132,6 +132,12 @@ export class App {
 						return
 					}
 
+					// Alt+L: clear active pane
+					if (key.name === 'l' && this.activePane) {
+						this.panes.get(this.activePane)?.clear()
+						return
+					}
+
 					// Alt+1-9: jump to tab
 					const num = Number.parseInt(key.name, 10)
 					if (num >= 1 && num <= 9 && num <= this.names.length) {

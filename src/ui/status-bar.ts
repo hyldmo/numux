@@ -47,6 +47,6 @@ export class StatusBar {
 				parts.push(`${name}:${status}`)
 			}
 		}
-		return `${parts.join('  ')}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Ctrl+C: quit`
+		return `${parts.join('  ')}  Alt+←→/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+L: clear  Ctrl+C: quit`
 	}
 }
