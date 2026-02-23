@@ -130,7 +130,7 @@ async function main() {
 	}
 
 	const manager = new ProcessManager(config)
-	const app = new App(manager)
+	const app = new App(manager, config)
 
 	setupShutdownHandlers(app)
 	await app.start()

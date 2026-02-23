@@ -1,11 +1,23 @@
 import { type CliRenderer, TextRenderable } from '@opentui/core'
 import type { ProcessStatus } from '../types'
 
+const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
+	ready: '\x1b[32m',
+	running: '\x1b[36m',
+	failed: '\x1b[31m',
+	stopped: '\x1b[90m',
+	skipped: '\x1b[90m'
+}
+
+const RESET = '\x1b[0m'
+
 export class StatusBar {
 	readonly renderable: TextRenderable
 	private statuses = new Map<string, ProcessStatus>()
+	private colors: Map<string, string>
 
-	constructor(renderer: CliRenderer, names: string[]) {
+	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
+		this.colors = colors ?? new Map()
 		for (const name of names) {
 			this.statuses.set(name, 'pending')
 		}
@@ -28,7 +40,12 @@ export class StatusBar {
 	private buildContent(): string {
 		const parts: string[] = []
 		for (const [name, status] of this.statuses) {
-			parts.push(`${name}:${status}`)
+			const ansi = STATUS_ANSI[status] ?? this.colors.get(name)
+			if (ansi) {
+				parts.push(`${ansi}${name}:${status}${RESET}`)
+			} else {
+				parts.push(`${name}:${status}`)
+			}
 		}
 		return `${parts.join('  ')}  Alt+←→/1-9: tabs  Alt+R: restart  Ctrl+C: quit`
 	}
