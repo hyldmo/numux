@@ -30,6 +30,6 @@ export class StatusBar {
 		for (const [name, status] of this.statuses) {
 			parts.push(`${name}:${status}`)
 		}
-		return `${parts.join('  ')}  Alt+←→/N: tabs  Alt+R: restart  Ctrl+C: quit`
+		return `${parts.join('  ')}  Alt+←→/1-9: tabs  Alt+R: restart  Ctrl+C: quit`
 	}
 }
