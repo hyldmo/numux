@@ -4,7 +4,7 @@ import type { ProcessStatus } from '../types'
 const STATUS_ICONS: Record<ProcessStatus, string> = {
 	pending: '○',
 	starting: '◐',
-	running: '●',
+	running: '◉',
 	ready: '●',
 	stopping: '◑',
 	stopped: '■',
