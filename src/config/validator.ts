@@ -96,18 +96,21 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			stopSignal: validateStopSignal(p.stopSignal),
-			color: typeof p.color === 'string' ? p.color : undefined
+			color: typeof p.color === 'string' ? p.color : undefined,
+			watch: validateStringOrStringArray(p.watch)
 		}
 	}
 
 	return { processes: validated }
 }
 
-function validateEnvFile(value: unknown): string | string[] | undefined {
+function validateStringOrStringArray(value: unknown): string | string[] | undefined {
 	if (typeof value === 'string') return value
 	if (Array.isArray(value) && value.every(v => typeof v === 'string')) return value as string[]
 	return undefined
 }
+
+const validateEnvFile = validateStringOrStringArray
 
 const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])
 

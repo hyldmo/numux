@@ -12,6 +12,7 @@ export interface NumuxProcessConfig {
 	condition?: string // env var name (prefix with ! to negate); process skipped if condition is falsy
 	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
 	color?: string
+	watch?: string | string[] // Glob patterns — restart process when matching files change
 }
 
 /** Raw config as authored — processes can be string shorthand or full objects */

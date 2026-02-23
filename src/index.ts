@@ -113,6 +113,10 @@ async function main() {
 				if (proc.persistent === false) flags.push('one-shot')
 				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
 				if (proc.condition) flags.push(`if: ${proc.condition}`)
+				if (proc.watch) {
+					const patterns = Array.isArray(proc.watch) ? proc.watch : [proc.watch]
+					flags.push(`watch: ${patterns.join(', ')}`)
+				}
 				const suffix = flags.length > 0 ? `  (${flags.join(', ')})` : ''
 				console.info(`  ${name}: ${proc.command}${suffix}`)
 			}

@@ -140,6 +140,30 @@ Each process accepts:
 | `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
+| `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
+
+### File watching
+
+Use `watch` to automatically restart a process when source files change:
+
+```ts
+export default defineConfig({
+  processes: {
+    api: {
+      command: 'node server.js',
+      watch: 'src/**/*.ts',
+    },
+    styles: {
+      command: 'sass --watch src:dist',
+      watch: ['src/**/*.scss', 'src/**/*.css'],
+    },
+  },
+})
+```
+
+Patterns are matched relative to the process's `cwd` (or the project root). Changes in `node_modules` and `.git` are always ignored. Rapid file changes are debounced (300ms) to avoid restart storms.
+
+A watched process is only restarted if it's currently running, ready, or failed — manually stopped processes are not affected.
 
 ### Environment variable interpolation
 

@@ -1,6 +1,8 @@
+import { resolve } from 'node:path'
 import { resolveDependencyTiers } from '../config/resolver'
 import type { ProcessEvent, ProcessState, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { log } from '../utils/logger'
+import { FileWatcher } from '../utils/watcher'
 import { ProcessRunner } from './runner'
 
 type EventListener = (event: ProcessEvent) => void
@@ -22,6 +24,7 @@ export class ProcessManager {
 	private restartTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private startTimes = new Map<string, number>()
 	private pendingReadyResolvers = new Map<string, () => void>()
+	private fileWatcher?: FileWatcher
 
 	constructor(config: ResolvedNumuxConfig) {
 		this.config = config
@@ -109,6 +112,8 @@ export class ProcessManager {
 				await Promise.all(readyPromises)
 			}
 		}
+
+		this.setupWatchers()
 	}
 
 	private startProcess(name: string, cols: number, rows: number): void {
@@ -198,6 +203,35 @@ export class ProcessManager {
 			runner.restart(this.lastCols, this.lastRows)
 		}, delay)
 		this.restartTimers.set(name, timer)
+	}
+
+	private setupWatchers(): void {
+		const encoder = new TextEncoder()
+		for (const [name, proc] of Object.entries(this.config.processes)) {
+			if (!proc.watch) continue
+			if (!this.fileWatcher) this.fileWatcher = new FileWatcher()
+
+			const patterns = Array.isArray(proc.watch) ? proc.watch : [proc.watch]
+			const cwd = proc.cwd ? resolve(proc.cwd) : process.cwd()
+
+			this.fileWatcher.watch(name, patterns, cwd, changedFile => {
+				const state = this.states.get(name)
+				if (!state) return
+				// Don't restart processes that are stopped (user intentionally stopped), pending, stopping, or skipped
+				if (
+					state.status === 'pending' ||
+					state.status === 'stopped' ||
+					state.status === 'stopping' ||
+					state.status === 'skipped'
+				)
+					return
+
+				log(`[${name}] File changed: ${changedFile}, restarting`)
+				const msg = `\r\n\x1b[36m[numux] file changed: ${changedFile}, restarting...\x1b[0m\r\n`
+				this.emit({ type: 'output', name, data: encoder.encode(msg) })
+				this.restart(name, this.lastCols, this.lastRows)
+			})
+		}
 	}
 
 	private updateStatus(name: string, status: ProcessStatus): void {
@@ -305,6 +339,8 @@ export class ProcessManager {
 	async stopAll(): Promise<void> {
 		log('Stopping all processes')
 		this.stopping = true
+		// Close file watchers
+		this.fileWatcher?.close()
 		// Cancel all pending auto-restart and delay timers
 		for (const timer of this.restartTimers.values()) {
 			clearTimeout(timer)

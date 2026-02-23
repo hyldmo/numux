@@ -393,4 +393,40 @@ describe('validateConfig', () => {
 		})
 		expect(config.processes.migrate.readyPattern).toBe('done')
 	})
+
+	test('preserves watch string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', watch: 'src/**/*.ts' }
+			}
+		})
+		expect(config.processes.web.watch).toBe('src/**/*.ts')
+	})
+
+	test('preserves watch array', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', watch: ['src/**/*.ts', 'src/**/*.css'] }
+			}
+		})
+		expect(config.processes.web.watch).toEqual(['src/**/*.ts', 'src/**/*.css'])
+	})
+
+	test('ignores invalid watch value', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', watch: 123 }
+			}
+		})
+		expect(config.processes.web.watch).toBeUndefined()
+	})
+
+	test('ignores watch array with non-string elements', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', watch: ['src/**/*.ts', 123] }
+			}
+		})
+		expect(config.processes.web.watch).toBeUndefined()
+	})
 })
