@@ -18,8 +18,7 @@
     "orchestration"
   ],
   "engines": {
-    "bun": ">=1.0",
-    "node": ">=18"
+    "bun": ">=1.0"
   },
   "bin": {
     "numux": "dist/bin.js"
@@ -31,7 +30,7 @@
     }
   },
   "scripts": {
-    "build": "bun build src/index.ts --outfile dist/bin.js --target bun --packages external && bun build src/config.ts --outfile dist/config.js --packages external && bunx tsc src/config.ts src/types.ts --emitDeclarationOnly --declaration --outDir dist --target ESNext --module ESNext --moduleResolution bundler",
+    "build": "bun build src/index.ts --outfile dist/numux.js --target bun --packages external && bun build src/config.ts --outfile dist/config.js --packages external && bunx tsc src/config.ts src/types.ts --emitDeclarationOnly --declaration --outDir dist --target ESNext --module ESNext --moduleResolution bundler && cp src/bin-wrapper.js dist/bin.js",
     "prepublishOnly": "bun run build",
     "dev": "cd example && bun run dev --debug",
     "test": "bun test",
