@@ -1,7 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
 	"files": {
-		"includes": ["**", "!**/worker-configuration.d.ts"]
+		"includes": ["**"]
 	},
 	"vcs": {
 		"enabled": true,
@@ -15,27 +15,12 @@
 		"indentWidth": 4,
 		"lineEnding": "lf",
 		"lineWidth": 120,
-		"attributePosition": "auto",
 		"bracketSpacing": true,
 		"includes": ["**"]
 	},
 	"linter": {
 		"enabled": true,
-		"domains": {
-			"react": "recommended"
-		},
 		"rules": {
-			"a11y": {
-				"useSemanticElements": "off",
-				"noNoninteractiveElementToInteractiveRole": "off",
-				"noLabelWithoutControl": {
-					"level": "error",
-					"options": {
-						"inputComponents": ["Input", "NumberInput"]
-					}
-				},
-				"useValidAutocomplete": "error"
-			},
 			"complexity": {
 				"noExcessiveNestedTestSuites": "error",
 				"noUselessStringRaw": "error",
@@ -45,9 +30,7 @@
 				"noBannedTypes": "off"
 			},
 			"correctness": {
-				"noRestrictedElements": "error",
 				"noUndeclaredDependencies": "warn",
-				"useExhaustiveDependencies": "error",
 				"noUnusedVariables": {
 					"level": "warn",
 					"fix": "none"
@@ -74,14 +57,6 @@
 				"noNonNullAssertion": "off"
 			},
 			"nursery": {
-				"useSortedClasses": {
-					"level": "warn",
-					"fix": "safe",
-					"options": {
-						"functions": ["cva", "cn"]
-					}
-				},
-				"noLeakedRender": "off", // Currently too many false positives as of v2.3.14
 				"useConsistentEnumValueType": "error",
 				"useConsistentMethodSignatures": "error",
 				"useErrorCause": "error",
@@ -95,33 +70,15 @@
 	},
 	"javascript": {
 		"formatter": {
-			"jsxQuoteStyle": "double",
 			"quoteProperties": "preserve",
 			"trailingCommas": "none",
 			"semicolons": "asNeeded",
 			"arrowParentheses": "asNeeded",
-			"bracketSameLine": false,
 			"quoteStyle": "single",
-			"attributePosition": "auto",
 			"bracketSpacing": true
 		},
 		"linter": {
 			"enabled": true
-		}
-	},
-	"html": {
-		"formatter": {
-			"enabled": true,
-			"selfCloseVoidElements": "always",
-			"indentScriptAndStyle": false
-		},
-		"linter": {
-			"enabled": true
-		}
-	},
-	"css": {
-		"parser": {
-			"tailwindDirectives": true
 		}
 	},
 	"overrides": [
@@ -131,16 +88,6 @@
 				"indentStyle": "space",
 				"indentWidth": 2,
 				"lineWidth": 200
-			}
-		},
-		{
-			"includes": ["workers/**"],
-			"linter": {
-				"rules": {
-					"correctness": {
-						"noUndeclaredDependencies": "off"
-					}
-				}
 			}
 		}
 	]
