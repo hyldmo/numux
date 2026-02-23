@@ -86,8 +86,8 @@ export class ProcessManager {
 				readyPromises.push(promise)
 
 				this.createRunner(name, resolve)
-				this.runners.get(name)!.start(cols, rows)
 				this.startTimes.set(name, Date.now())
+				this.runners.get(name)!.start(cols, rows)
 			}
 
 			// Wait for all processes in this tier to become ready
@@ -127,6 +127,8 @@ export class ProcessManager {
 		const proc = this.config.processes[name]
 		if (proc.persistent === false) return
 		if (exitCode === 0) return
+		// null exitCode means spawn failed — retrying won't help
+		if (exitCode === null) return
 		log(`Scheduling auto-restart for ${name} (exit code: ${exitCode})`)
 
 		// Reset backoff if the process ran long enough

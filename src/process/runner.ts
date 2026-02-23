@@ -88,25 +88,32 @@ export class ProcessRunner {
 
 		this.startReadyTimeout(gen)
 
-		this.proc.exited.then(code => {
-			if (this.generation !== gen) return
-			log(`[${this.name}] Exited with code ${code}`)
+		this.proc.exited
+			.then(code => {
+				if (this.generation !== gen) return
+				log(`[${this.name}] Exited with code ${code}`)
 
-			if (this.readiness.dependsOnExit && code === 0) {
-				this.markReady()
-			}
+				if (this.readiness.dependsOnExit && code === 0) {
+					this.markReady()
+				}
 
-			if (code === 127 || code === 126) {
-				const encoder = new TextEncoder()
-				const hint = code === 127 ? 'command not found' : 'permission denied'
-				const msg = `\r\n\x1b[31m[numux] exit ${code}: ${hint}\x1b[0m\r\n`
-				this.handler.onOutput(encoder.encode(msg))
-			}
+				if (code === 127 || code === 126) {
+					const encoder = new TextEncoder()
+					const hint = code === 127 ? 'command not found' : 'permission denied'
+					const msg = `\r\n\x1b[31m[numux] exit ${code}: ${hint}\x1b[0m\r\n`
+					this.handler.onOutput(encoder.encode(msg))
+				}
 
-			const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
-			this.handler.onStatus(status)
-			this.handler.onExit(code)
-		})
+				const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
+				this.handler.onStatus(status)
+				this.handler.onExit(code)
+			})
+			.catch(err => {
+				if (this.generation !== gen) return
+				log(`[${this.name}] proc.exited rejected: ${err}`)
+				this.handler.onStatus('failed')
+				this.handler.onExit(null)
+			})
 	}
 
 	private checkReadiness(data: Uint8Array): void {
