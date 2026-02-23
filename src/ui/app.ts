@@ -139,6 +139,15 @@ export class App {
 					return
 				}
 
+				// Alt+Shift combos
+				if (key.meta && key.shift && !key.ctrl) {
+					// Alt+Shift+R: restart all processes
+					if (key.name === 'r') {
+						this.manager.restartAll(this.termCols, this.termRows)
+						return
+					}
+				}
+
 				if (key.meta && !key.ctrl && !key.shift) {
 					// Alt+F: enter search mode
 					if (key.name === 'f' && this.activePane) {

@@ -255,6 +255,26 @@ describe('ProcessManager — manual restart', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — restartAll', () => {
+	test('restarts all running processes', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				a: { command: 'sleep 60' },
+				b: { command: 'sleep 60' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		mgr.restartAll(80, 24)
+		// Wait for restarts to complete
+		await new Promise(r => setTimeout(r, 1000))
+		expect(mgr.getState('a')?.restartCount).toBe(1)
+		expect(mgr.getState('b')?.restartCount).toBe(1)
+		await mgr.stopAll()
+	}, 10000)
+})
+
 describe('ProcessManager — maxRestarts', () => {
 	test('stops auto-restarting after maxRestarts is reached', async () => {
 		const config: ResolvedNumuxConfig = {

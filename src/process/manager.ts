@@ -248,6 +248,14 @@ export class ProcessManager {
 		this.runners.get(name)?.restart(cols, rows)
 	}
 
+	/** Restart all processes. Restarts each runner in-place without dependency re-resolution. */
+	restartAll(cols: number, rows: number): void {
+		log('Restarting all processes')
+		for (const name of this.tiers.flat()) {
+			this.restart(name, cols, rows)
+		}
+	}
+
 	resize(name: string, cols: number, rows: number): void {
 		this.runners.get(name)?.resize(cols, rows)
 	}

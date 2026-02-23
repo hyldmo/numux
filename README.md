@@ -139,6 +139,7 @@ Persistent processes that crash are auto-restarted with exponential backoff (1sâ
 |-----|--------|
 | `Ctrl+C` | Quit (graceful shutdown) |
 | `Alt+R` | Restart active process |
+| `Alt+Shift+R` | Restart all processes |
 | `Alt+S` | Stop/start active process |
 | `Alt+L` | Clear active pane output |
 | `Alt+1`â€“`Alt+9` | Jump to tab |
