@@ -1,5 +1,8 @@
 import type { NumuxProcessConfig } from '../types'
 
+/** Keep the last 64 KB of output for pattern matching */
+const BUFFER_CAP = 65_536
+
 /**
  * Determines when a process should be considered "ready"
  * based on its configuration.
@@ -17,6 +20,9 @@ export function createReadinessChecker(config: NumuxProcessConfig) {
 		feedOutput(data: string): boolean {
 			if (!(persistent && pattern)) return false
 			outputBuffer += data
+			if (outputBuffer.length > BUFFER_CAP) {
+				outputBuffer = outputBuffer.slice(-BUFFER_CAP)
+			}
 			return pattern.test(outputBuffer)
 		},
 

@@ -52,4 +52,17 @@ describe('createReadinessChecker', () => {
 		// Non-persistent processes depend on exit code, not pattern
 		expect(checker.feedOutput('done')).toBe(false)
 	})
+
+	test('buffer is capped to prevent unbounded memory growth', () => {
+		const checker = createReadinessChecker({
+			command: 'echo hi',
+			persistent: true,
+			readyPattern: 'READY'
+		})
+		// Feed 100 KB of filler — buffer should be trimmed to ~64 KB
+		const filler = 'x'.repeat(100_000)
+		expect(checker.feedOutput(filler)).toBe(false)
+		// Pattern at the end should still match after trim
+		expect(checker.feedOutput('READY')).toBe(true)
+	})
 })
