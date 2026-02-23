@@ -8,6 +8,7 @@ import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
 import type { ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
+import { PrefixDisplay } from './ui/prefix'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { setupShutdownHandlers } from './utils/shutdown'
@@ -24,6 +25,7 @@ Usage:
 Options:
   -n, --name <name=command>  Add a named process
   -c, --config <path>        Config file path (default: auto-detect)
+  -p, --prefix               Prefixed output mode (no TUI, for CI/scripts)
   --only <a,b,...>           Only run these processes (+ their dependencies)
   --exclude <a,b,...>        Exclude these processes
   --log-dir <path>           Write per-process logs to directory
@@ -127,13 +129,19 @@ async function main() {
 	let logWriter: LogWriter | undefined
 	if (parsed.logDir) {
 		logWriter = new LogWriter(parsed.logDir)
-		manager.on(logWriter.handleEvent)
 	}
 
-	const app = new App(manager, config)
-
-	setupShutdownHandlers(app, logWriter)
-	await app.start()
+	if (parsed.prefix) {
+		const display = new PrefixDisplay(manager, config, logWriter)
+		await display.start()
+	} else {
+		if (logWriter) {
+			manager.on(logWriter.handleEvent)
+		}
+		const app = new App(manager, config)
+		setupShutdownHandlers(app, logWriter)
+		await app.start()
+	}
 }
 
 main().catch(err => {

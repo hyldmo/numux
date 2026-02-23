@@ -6,6 +6,7 @@ export interface ParsedArgs {
 	debug: boolean
 	init: boolean
 	validate: boolean
+	prefix: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -21,6 +22,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		debug: false,
 		init: false,
 		validate: false,
+		prefix: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -38,6 +40,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.version = true
 		} else if (arg === '--debug') {
 			result.debug = true
+		} else if (arg === '-p' || arg === '--prefix') {
+			result.prefix = true
 		} else if (arg === '-c' || arg === '--config') {
 			result.configPath = args[++i]
 		} else if (arg === '--log-dir') {

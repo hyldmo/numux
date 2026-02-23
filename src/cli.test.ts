@@ -13,6 +13,7 @@ describe('parseArgs', () => {
 		expect(result.help).toBe(false)
 		expect(result.version).toBe(false)
 		expect(result.debug).toBe(false)
+		expect(result.prefix).toBe(false)
 		expect(result.configPath).toBeUndefined()
 		expect(result.commands).toEqual([])
 		expect(result.named).toEqual([])
@@ -36,6 +37,18 @@ describe('parseArgs', () => {
 
 	test('--debug sets debug flag', () => {
 		expect(parseArgs(argv('--debug')).debug).toBe(true)
+	})
+
+	test('-p sets prefix flag', () => {
+		expect(parseArgs(argv('-p')).prefix).toBe(true)
+	})
+
+	test('--prefix sets prefix flag', () => {
+		expect(parseArgs(argv('--prefix')).prefix).toBe(true)
+	})
+
+	test('prefix is false by default', () => {
+		expect(parseArgs(argv()).prefix).toBe(false)
 	})
 
 	test('-c sets config path', () => {
