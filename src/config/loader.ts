@@ -23,7 +23,11 @@ async function loadFile(path: string): Promise<NumuxConfig> {
 	const ext = extname(path)
 	if (ext === '.yaml' || ext === '.yml') {
 		const content = readFileSync(path, 'utf-8')
-		return parseYaml(content) as NumuxConfig
+		try {
+			return parseYaml(content) as NumuxConfig
+		} catch (err) {
+			throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : err}`)
+		}
 	}
 	const mod = await import(path)
 	return mod.default ?? mod

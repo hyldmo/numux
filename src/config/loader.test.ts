@@ -173,4 +173,10 @@ describe('loadConfig — auto-detect', () => {
 		const config = await loadConfig(undefined, dir)
 		expect(config.processes.web).toBe('bun dev')
 	})
+
+	test('throws descriptive error for malformed YAML', async () => {
+		const malformed = `processes:\n  web:\n    command: echo hi\n  bad: [unterminated`
+		const dir = setupDir('yaml-malformed', { 'numux.config.yaml': malformed })
+		await expect(loadConfig(undefined, dir)).rejects.toThrow('Failed to parse')
+	})
 })
