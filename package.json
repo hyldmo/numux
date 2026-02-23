@@ -1,7 +1,22 @@
 {
   "name": "numux",
   "version": "0.0.1",
+  "description": "Terminal multiplexer with dependency orchestration",
   "type": "module",
+  "license": "MIT",
+  "author": "hyldmo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyldmo/numux.git"
+  },
+  "keywords": [
+    "terminal",
+    "multiplexer",
+    "process-manager",
+    "tui",
+    "dev-tools",
+    "orchestration"
+  ],
   "engines": {
     "bun": ">=1.0"
   },
@@ -14,6 +29,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
     "lint": "biome check .",
     "fix": "biome check . --fix --unsafe"
   },
