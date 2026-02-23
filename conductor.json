@@ -1,0 +1,8 @@
+{
+	"scripts": {
+		"setup": "bun install",
+		"run": "bun run dev",
+		"archive": "rm -rf node_modules"
+	},
+	"runScriptMode": "concurrent"
+}
