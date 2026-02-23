@@ -1,7 +1,7 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
 import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
-import { buildProcessColorMap } from '../utils/color'
+import { buildProcessHexColorMap } from '../utils/color'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
@@ -18,7 +18,7 @@ export class App {
 	private termCols = 80
 	private termRows = 24
 
-	private processColors: Map<string, string>
+	private processHexColors: Map<string, string>
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -31,7 +31,7 @@ export class App {
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
 		this.names = manager.getProcessNames()
-		this.processColors = buildProcessColorMap(this.names, config)
+		this.processHexColors = buildProcessHexColorMap(this.names, config)
 	}
 
 	async start(): Promise<void> {
@@ -76,7 +76,7 @@ export class App {
 		}
 
 		// Status bar
-		this.statusBar = new StatusBar(this.renderer, this.names, this.processColors)
+		this.statusBar = new StatusBar(this.renderer, this.names, this.processHexColors)
 
 		// Assemble layout
 		layout.add(this.tabBar.renderable)
