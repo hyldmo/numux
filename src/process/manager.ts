@@ -98,6 +98,18 @@ export class ProcessManager {
 		this.emit({ type: 'status', name, status })
 	}
 
+	restart(name: string, cols: number, rows: number): void {
+		const state = this.states.get(name)
+		if (!state) return
+		if (state.status !== 'stopped' && state.status !== 'failed') return
+
+		const runner = this.runners.get(name)
+		if (!runner) return
+
+		state.exitCode = null
+		runner.restart(cols, rows)
+	}
+
 	resize(name: string, cols: number, rows: number): void {
 		this.runners.get(name)?.resize(cols, rows)
 	}

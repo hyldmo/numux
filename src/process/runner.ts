@@ -87,6 +87,13 @@ export class ProcessRunner {
 		this.handler.onReady()
 	}
 
+	restart(cols: number, rows: number): void {
+		this.proc = null
+		this._ready = false
+		this.readiness = createReadinessChecker(this.config)
+		this.start(cols, rows)
+	}
+
 	async stop(timeoutMs = 5000): Promise<void> {
 		if (!this.proc) return
 

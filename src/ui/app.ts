@@ -13,6 +13,8 @@ export class App {
 	private activePane: string | null = null
 	private destroyed = false
 	private names: string[]
+	private termCols = 80
+	private termRows = 24
 
 	constructor(manager: ProcessManager) {
 		this.manager = manager
@@ -26,8 +28,9 @@ export class App {
 		})
 
 		const { width, height } = this.renderer
-		const termCols = Math.max(40, width - 2)
-		const termRows = Math.max(5, height - 5)
+		this.termCols = Math.max(40, width - 2)
+		this.termRows = Math.max(5, height - 5)
+		const { termCols, termRows } = this
 
 		// Layout root
 		const layout = new BoxRenderable(this.renderer, {
@@ -82,12 +85,12 @@ export class App {
 
 		// Handle resize
 		this.renderer.on('resize', (w: number, h: number) => {
-			const cols = Math.max(40, w - 2)
-			const rows = Math.max(5, h - 5)
+			this.termCols = Math.max(40, w - 2)
+			this.termRows = Math.max(5, h - 5)
 			for (const pane of this.panes.values()) {
-				pane.resize(cols, rows)
+				pane.resize(this.termCols, this.termRows)
 			}
-			this.manager.resizeAll(cols, rows)
+			this.manager.resizeAll(this.termCols, this.termRows)
 		})
 
 		// Global keyboard handler
@@ -101,6 +104,12 @@ export class App {
 				}
 
 				if (key.meta && !key.ctrl && !key.shift) {
+					// Alt+R: restart active process
+					if (key.name === 'r' && this.activePane) {
+						this.manager.restart(this.activePane, this.termCols, this.termRows)
+						return
+					}
+
 					// Alt+1-9: jump to tab
 					const num = Number.parseInt(key.name, 10)
 					if (num >= 1 && num <= 9 && num <= this.names.length) {
