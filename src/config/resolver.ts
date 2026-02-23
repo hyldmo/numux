@@ -30,8 +30,8 @@ export function resolveDependencyTiers(config: ResolvedNumuxConfig): string[][] 
 		const tier = [...remaining].filter(n => inDegree.get(n) === 0)
 
 		if (tier.length === 0) {
-			const cycle = [...remaining].join(', ')
-			throw new Error(`Dependency cycle detected among: ${cycle}`)
+			const cycle = findCycle(remaining, config)
+			throw new Error(`Dependency cycle detected: ${cycle.join(' → ')} → ${cycle[0]}`)
 		}
 
 		tiers.push(tier)
@@ -45,4 +45,23 @@ export function resolveDependencyTiers(config: ResolvedNumuxConfig): string[][] 
 	}
 
 	return tiers
+}
+
+/** Trace from any node in `remaining` to find one cycle. */
+function findCycle(remaining: Set<string>, config: ResolvedNumuxConfig): string[] {
+	const start = remaining.values().next().value!
+	const visited = new Set<string>()
+	const path: string[] = []
+
+	let current = start
+	while (!visited.has(current)) {
+		visited.add(current)
+		path.push(current)
+		const deps = (config.processes[current].dependsOn ?? []).filter(d => remaining.has(d))
+		current = deps[0]
+	}
+
+	// `current` is where the cycle starts — trim the path to just the cycle
+	const cycleStart = path.indexOf(current)
+	return path.slice(cycleStart)
 }

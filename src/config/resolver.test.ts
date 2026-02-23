@@ -73,4 +73,25 @@ describe('resolveDependencyTiers', () => {
 			)
 		).toThrow('Dependency cycle')
 	})
+
+	test('cycle error shows only cycle members, not unrelated dependents', () => {
+		try {
+			resolveDependencyTiers(
+				makeConfig({
+					ok: [],
+					a: ['b'],
+					b: ['c'],
+					c: ['a'],
+					d: ['a'] // depends on cycle but is not part of it
+				})
+			)
+			expect.unreachable('should have thrown')
+		} catch (err) {
+			const msg = (err as Error).message
+			expect(msg).toContain('→')
+			expect(msg).not.toContain('ok')
+			// d depends on the cycle but is not part of it
+			expect(msg).not.toMatch(/\bd\b/)
+		}
+	})
 })
