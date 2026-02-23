@@ -17,6 +17,7 @@ export class App {
 	private names: string[]
 	private termCols = 80
 	private termRows = 24
+	private sidebarWidth = 20
 
 	private processHexColors: Map<string, string>
 
@@ -41,8 +42,10 @@ export class App {
 		})
 
 		const { width, height } = this.renderer
-		this.termCols = Math.max(40, width - 2)
-		this.termRows = Math.max(5, height - 5)
+		const maxNameLen = Math.max(...this.names.map(n => n.length))
+		this.sidebarWidth = Math.min(30, Math.max(16, maxNameLen + 5))
+		this.termCols = Math.max(40, width - this.sidebarWidth - 2)
+		this.termRows = Math.max(5, height - 2)
 		const { termCols, termRows } = this
 
 		// Layout root
@@ -54,14 +57,31 @@ export class App {
 			border: false
 		})
 
-		// Tab bar
+		// Tab bar (vertical sidebar)
 		this.tabBar = new TabBar(this.renderer, this.names)
+
+		// Content row: sidebar | pane
+		const contentRow = new BoxRenderable(this.renderer, {
+			id: 'content-row',
+			flexDirection: 'row',
+			flexGrow: 1,
+			width: '100%',
+			border: false
+		})
+
+		const sidebar = new BoxRenderable(this.renderer, {
+			id: 'sidebar',
+			width: this.sidebarWidth,
+			height: '100%',
+			border: ['right'],
+			borderColor: '#444'
+		})
+		sidebar.add(this.tabBar.renderable)
 
 		// Pane container
 		const paneContainer = new BoxRenderable(this.renderer, {
 			id: 'pane-container',
 			flexGrow: 1,
-			width: '100%',
 			border: false
 		})
 
@@ -79,8 +99,9 @@ export class App {
 		this.statusBar = new StatusBar(this.renderer, this.names, this.processHexColors)
 
 		// Assemble layout
-		layout.add(this.tabBar.renderable)
-		layout.add(paneContainer)
+		contentRow.add(sidebar)
+		contentRow.add(paneContainer)
+		layout.add(contentRow)
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
 
@@ -105,8 +126,8 @@ export class App {
 
 		// Handle resize (debounced to avoid excessive PTY resize calls)
 		this.renderer.on('resize', (w: number, h: number) => {
-			this.termCols = Math.max(40, w - 2)
-			this.termRows = Math.max(5, h - 5)
+			this.termCols = Math.max(40, w - this.sidebarWidth - 2)
+			this.termRows = Math.max(5, h - 2)
 			if (this.resizeTimer) clearTimeout(this.resizeTimer)
 			this.resizeTimer = setTimeout(() => {
 				this.resizeTimer = null

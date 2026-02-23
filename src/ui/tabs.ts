@@ -1,4 +1,4 @@
-import { type CliRenderer, TabSelectRenderable, TabSelectRenderableEvents } from '@opentui/core'
+import { type CliRenderer, SelectRenderable, SelectRenderableEvents } from '@opentui/core'
 import type { ProcessStatus } from '../types'
 
 const STATUS_ICONS: Record<ProcessStatus, string> = {
@@ -13,7 +13,7 @@ const STATUS_ICONS: Record<ProcessStatus, string> = {
 }
 
 export class TabBar {
-	readonly renderable: TabSelectRenderable
+	readonly renderable: SelectRenderable
 	private names: string[]
 	private statuses: Map<string, ProcessStatus>
 	private descriptions: Map<string, string>
@@ -23,31 +23,30 @@ export class TabBar {
 		this.statuses = new Map(names.map(n => [n, 'pending' as ProcessStatus]))
 		this.descriptions = new Map(names.map(n => [n, 'pending']))
 
-		this.renderable = new TabSelectRenderable(renderer, {
+		this.renderable = new SelectRenderable(renderer, {
 			id: 'tab-bar',
 			width: '100%',
+			height: '100%',
 			options: names.map(n => ({
 				name: this.formatTab(n, 'pending'),
 				description: 'pending'
 			})),
-			tabWidth: 20,
 			selectedBackgroundColor: '#334455',
 			selectedTextColor: '#fff',
 			textColor: '#888',
 			showDescription: true,
-			showUnderline: true,
 			wrapSelection: true
 		})
 	}
 
 	onSelect(handler: (index: number, name: string) => void): void {
-		this.renderable.on(TabSelectRenderableEvents.ITEM_SELECTED, (index: number) => {
+		this.renderable.on(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
 			handler(index, this.names[index])
 		})
 	}
 
 	onSelectionChanged(handler: (index: number, name: string) => void): void {
-		this.renderable.on(TabSelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
+		this.renderable.on(SelectRenderableEvents.SELECTION_CHANGED, (index: number) => {
 			handler(index, this.names[index])
 		})
 	}
@@ -55,11 +54,10 @@ export class TabBar {
 	updateStatus(name: string, status: ProcessStatus, exitCode?: number | null, restartCount?: number): void {
 		this.statuses.set(name, status)
 		this.descriptions.set(name, this.formatDescription(status, exitCode, restartCount))
-		const options = this.names.map(n => ({
+		this.renderable.options = this.names.map(n => ({
 			name: this.formatTab(n, this.statuses.get(n)!),
 			description: this.descriptions.get(n)!
 		}))
-		this.renderable.setOptions(options)
 	}
 
 	private formatDescription(status: ProcessStatus, exitCode?: number | null, restartCount?: number): string {
