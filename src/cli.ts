@@ -31,6 +31,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	const args = argv.slice(2) // skip bun + script
 	let i = 0
 
+	/** Consume the next argument as a value for the given flag, erroring if missing */
+	const consumeValue = (flag: string): string => {
+		const next = args[++i]
+		if (next === undefined || next.startsWith('-')) {
+			console.error(`Missing value for ${flag}`)
+			process.exit(1)
+		}
+		return next
+	}
+
 	while (i < args.length) {
 		const arg = args[i]
 
@@ -43,23 +53,23 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		} else if (arg === '-p' || arg === '--prefix') {
 			result.prefix = true
 		} else if (arg === '-c' || arg === '--config') {
-			result.configPath = args[++i]
+			result.configPath = consumeValue(arg)
 		} else if (arg === '--log-dir') {
-			result.logDir = args[++i]
+			result.logDir = consumeValue(arg)
 		} else if (arg === '--only') {
-			result.only = args[++i]
-				?.split(',')
+			result.only = consumeValue(arg)
+				.split(',')
 				.map(s => s.trim())
 				.filter(Boolean)
 		} else if (arg === '--exclude') {
-			result.exclude = args[++i]
-				?.split(',')
+			result.exclude = consumeValue(arg)
+				.split(',')
 				.map(s => s.trim())
 				.filter(Boolean)
 		} else if (arg === '-n' || arg === '--name') {
-			const value = args[++i]
-			const eq = value?.indexOf('=')
-			if (!value || eq === undefined || eq < 1) {
+			const value = consumeValue(arg)
+			const eq = value.indexOf('=')
+			if (eq < 1) {
 				console.error(`Invalid --name value: expected "name=command", got "${value}"`)
 				process.exit(1)
 			}
