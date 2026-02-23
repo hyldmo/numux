@@ -242,7 +242,7 @@ export class App {
 		}
 
 		// Start all processes
-		this.manager.startAll(termCols, termRows)
+		await this.manager.startAll(termCols, termRows)
 	}
 
 	private switchPane(name: string): void {
