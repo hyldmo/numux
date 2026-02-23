@@ -151,6 +151,24 @@ export class App {
 						this.switchPane(this.names[next])
 						return
 					}
+
+					// Alt+PageUp/PageDown: scroll output
+					if (this.activePane && (key.name === 'pageup' || key.name === 'pagedown')) {
+						const pane = this.panes.get(this.activePane)
+						const delta = this.termRows - 2
+						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
+						return
+					}
+
+					// Alt+Home/End: scroll to top/bottom
+					if (this.activePane && key.name === 'home') {
+						this.panes.get(this.activePane)?.scrollToTop()
+						return
+					}
+					if (this.activePane && key.name === 'end') {
+						this.panes.get(this.activePane)?.scrollToBottom()
+						return
+					}
 				}
 
 				// Forward all other input to the active process

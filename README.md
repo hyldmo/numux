@@ -100,6 +100,8 @@ Persistent processes that crash are auto-restarted with exponential backoff (1sâ
 | `Alt+R` | Restart active process |
 | `Alt+1`â€“`Alt+9` | Jump to tab |
 | `Alt+Left/Right` | Cycle tabs |
+| `Alt+PageUp/PageDown` | Scroll output up/down |
+| `Alt+Home/End` | Scroll to top/bottom |
 
 All other input is forwarded to the active process.
 

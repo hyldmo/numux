@@ -38,6 +38,18 @@ export class Pane {
 		this.terminal.rows = rows
 	}
 
+	scrollBy(delta: number): void {
+		this.scrollBox.scrollBy(delta)
+	}
+
+	scrollToTop(): void {
+		this.scrollBox.scrollTo(0)
+	}
+
+	scrollToBottom(): void {
+		this.scrollBox.scrollTo(this.scrollBox.scrollHeight)
+	}
+
 	show(): void {
 		this.scrollBox.visible = true
 	}
