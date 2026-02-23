@@ -4,6 +4,7 @@ import { GhosttyTerminalRenderable } from 'ghostty-opentui/terminal-buffer'
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
 	readonly terminal: GhosttyTerminalRenderable
+	private decoder = new TextDecoder()
 
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
@@ -28,7 +29,7 @@ export class Pane {
 	}
 
 	feed(data: Uint8Array): void {
-		const text = new TextDecoder().decode(data)
+		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
 	}
 
