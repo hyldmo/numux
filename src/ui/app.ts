@@ -95,6 +95,7 @@ export class App {
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
+			pane.onCopy(() => this.statusBar.showTemporaryMessage('Copied!'))
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
@@ -181,6 +182,12 @@ export class App {
 					// Shift+R: restart all processes
 					if (key.shift && name === 'r') {
 						this.manager.restartAll(this.termCols, this.termRows)
+						return
+					}
+
+					// Y: copy selected text (yank)
+					if (name === 'y') {
+						this.copySelection()
 						return
 					}
 
@@ -318,6 +325,18 @@ export class App {
 			this.awaitingInput.delete(name)
 			this.tabBar.setInputWaiting(name, false)
 		}
+	}
+
+	/** Copy selected text to clipboard. Returns true if there was a selection to copy. */
+	private copySelection(): boolean {
+		const selection = this.renderer.getSelection()
+		if (!selection?.isActive) return false
+		const text = selection.getSelectedText()
+		if (!text) return false
+		this.renderer.copyToClipboardOSC52(text)
+		this.renderer.clearSelection()
+		this.statusBar.showTemporaryMessage('Copied!')
+		return true
 	}
 
 	private enterSearch(): void {

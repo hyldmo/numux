@@ -1,4 +1,4 @@
-import { type CliRenderer, ScrollBoxRenderable } from '@opentui/core'
+import { type CliRenderer, ScrollBoxRenderable, type Selection } from '@opentui/core'
 import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
 
 export interface SearchMatch {
@@ -13,6 +13,7 @@ export class Pane {
 	private decoder = new TextDecoder()
 
 	private _onScroll: (() => void) | null = null
+	private _onCopy: ((text: string) => void) | null = null
 
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
@@ -33,6 +34,20 @@ export class Pane {
 			showCursor: interactive,
 			trimEnd: true
 		})
+
+		// Auto-copy to clipboard when mouse selection finishes
+		const origOnSelectionChanged = this.terminal.onSelectionChanged.bind(this.terminal)
+		this.terminal.onSelectionChanged = (selection: Selection | null): boolean => {
+			const result = origOnSelectionChanged(selection)
+			if (selection?.isActive && !selection.isDragging) {
+				const text = selection.getSelectedText()
+				if (text) {
+					renderer.copyToClipboardOSC52(text)
+					this._onCopy?.(text)
+				}
+			}
+			return result
+		}
 
 		this.scrollBox.add(this.terminal)
 	}
@@ -67,6 +82,10 @@ export class Pane {
 
 	onScroll(handler: () => void): void {
 		this._onScroll = handler
+	}
+
+	onCopy(handler: (text: string) => void): void {
+		this._onCopy = handler
 	}
 
 	show(): void {
