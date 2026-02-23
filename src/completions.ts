@@ -22,7 +22,7 @@ _numux() {
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
   case "$prev" in
-    -c|--config)
+    --config)
       COMPREPLY=( $(compgen -f -- "$cur") )
       return ;;
     --log-dir)
@@ -38,7 +38,7 @@ _numux() {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "-h --help -v --version -c --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help -v --version -c --color --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
   else
     local subcmds="init validate exec completions"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
@@ -63,7 +63,8 @@ _numux() {
   _arguments -s \\
     '(-h --help)'{-h,--help}'[Show help]' \\
     '(-v --version)'{-v,--version}'[Show version]' \\
-    '(-c --config)'{-c,--config}'[Config file path]:file:_files' \\
+    '(-c --color)'{-c,--color}'[Comma-separated colors for processes]' \\
+    '--config[Config file path]:file:_files' \\
     '(-n --name)'{-n,--name}'[Named process (name=command)]:named process' \\
     '(-p --prefix)'{-p,--prefix}'[Prefixed output mode]' \\
     '--only[Only run these processes]:processes' \\
@@ -105,7 +106,8 @@ complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish
 # Options
 complete -c numux -s h -l help -d 'Show help'
 complete -c numux -s v -l version -d 'Show version'
-complete -c numux -s c -l config -rF -d 'Config file path'
+complete -c numux -s c -l color -r -d 'Comma-separated colors for processes'
+complete -c numux -l config -rF -d 'Config file path'
 complete -c numux -s n -l name -r -d 'Named process (name=command)'
 complete -c numux -s p -l prefix -d 'Prefixed output mode'
 complete -c numux -l only -r -d 'Only run these processes'
