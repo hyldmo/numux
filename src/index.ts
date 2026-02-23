@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
 import { resolveDependencyTiers } from './config/resolver'
-import { validateConfig } from './config/validator'
+import { type ValidationWarning, validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
 import type { ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
@@ -82,7 +82,8 @@ async function main() {
 
 	if (parsed.validate) {
 		const raw = await loadConfig(parsed.configPath)
-		let config = validateConfig(raw)
+		const warnings: ValidationWarning[] = []
+		let config = validateConfig(raw, warnings)
 
 		if (parsed.only || parsed.exclude) {
 			config = filterConfig(config, parsed.only, parsed.exclude)
@@ -104,6 +105,7 @@ async function main() {
 				console.info(`  ${name}: ${proc.command}${suffix}`)
 			}
 		}
+		printWarnings(warnings)
 		process.exit(0)
 	}
 
@@ -112,12 +114,13 @@ async function main() {
 	}
 
 	let config: ResolvedNumuxConfig
+	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
 		config = buildConfigFromArgs(parsed.commands, parsed.named)
 	} else {
 		const raw = await loadConfig(parsed.configPath)
-		config = validateConfig(raw)
+		config = validateConfig(raw, warnings)
 	}
 
 	if (parsed.only || parsed.exclude) {
@@ -131,6 +134,8 @@ async function main() {
 		logWriter = new LogWriter(parsed.logDir)
 	}
 
+	printWarnings(warnings)
+
 	if (parsed.prefix) {
 		const display = new PrefixDisplay(manager, config, logWriter)
 		await display.start()
@@ -141,6 +146,12 @@ async function main() {
 		const app = new App(manager, config)
 		setupShutdownHandlers(app, logWriter)
 		await app.start()
+	}
+}
+
+function printWarnings(warnings: ValidationWarning[]): void {
+	for (const w of warnings) {
+		console.warn(`Warning: process "${w.process}": ${w.message}`)
 	}
 }
 

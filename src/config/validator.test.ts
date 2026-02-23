@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { validateConfig } from './validator'
+import { type ValidationWarning, validateConfig } from './validator'
 
 describe('validateConfig', () => {
 	test('accepts a valid config', () => {
@@ -233,5 +233,82 @@ describe('validateConfig', () => {
 
 	test('throws on empty string shorthand', () => {
 		expect(() => validateConfig({ processes: { web: '  ' } })).toThrow('non-empty "command" string')
+	})
+
+	test('accepts valid hex color', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', color: '#ff8800' }
+			}
+		})
+		expect(config.processes.web.color).toBe('#ff8800')
+	})
+
+	test('accepts hex color without hash', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', color: 'ff8800' }
+			}
+		})
+		expect(config.processes.web.color).toBe('ff8800')
+	})
+
+	test('throws on invalid hex color', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', color: 'red' }
+				}
+			})
+		).toThrow('valid hex color')
+	})
+
+	test('throws on short hex color', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', color: '#fff' }
+				}
+			})
+		).toThrow('valid hex color')
+	})
+
+	test('warns when readyPattern is set on non-persistent process', () => {
+		const warnings: ValidationWarning[] = []
+		const config = validateConfig(
+			{
+				processes: {
+					migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
+				}
+			},
+			warnings
+		)
+		expect(config.processes.migrate.readyPattern).toBe('done')
+		expect(warnings).toHaveLength(1)
+		expect(warnings[0].process).toBe('migrate')
+		expect(warnings[0].message).toContain('readyPattern is ignored')
+	})
+
+	test('no warning when readyPattern is set on persistent process', () => {
+		const warnings: ValidationWarning[] = []
+		validateConfig(
+			{
+				processes: {
+					web: { command: 'echo hi', readyPattern: 'ready' }
+				}
+			},
+			warnings
+		)
+		expect(warnings).toHaveLength(0)
+	})
+
+	test('no warning when warnings array is not provided', () => {
+		// Should not throw when warnings param is omitted
+		const config = validateConfig({
+			processes: {
+				migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
+			}
+		})
+		expect(config.processes.migrate.readyPattern).toBe('done')
 	})
 })

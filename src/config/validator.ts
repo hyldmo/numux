@@ -1,6 +1,9 @@
 import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
+import { HEX_COLOR_RE } from '../utils/color'
 
-export function validateConfig(raw: unknown): ResolvedNumuxConfig {
+export type ValidationWarning = { process: string; message: string }
+
+export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): ResolvedNumuxConfig {
 	if (!raw || typeof raw !== 'object') {
 		throw new Error('Config must be an object')
 	}
@@ -55,14 +58,27 @@ export function validateConfig(raw: unknown): ResolvedNumuxConfig {
 			}
 		}
 
+		// Validate color hex format
+		if (typeof p.color === 'string' && !HEX_COLOR_RE.test(p.color)) {
+			throw new Error(`Process "${name}".color must be a valid hex color (e.g. "#ff8800"), got "${p.color}"`)
+		}
+
+		const persistent = typeof p.persistent === 'boolean' ? p.persistent : true
+		const readyPattern = typeof p.readyPattern === 'string' ? p.readyPattern : undefined
+
+		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
+		if (readyPattern && !persistent) {
+			warnings?.push({ process: name, message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)' })
+		}
+
 		validated[name] = {
 			command: p.command,
 			cwd: typeof p.cwd === 'string' ? p.cwd : undefined,
 			env: p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined,
 			envFile: validateEnvFile(p.envFile),
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
-			readyPattern: typeof p.readyPattern === 'string' ? p.readyPattern : undefined,
-			persistent: typeof p.persistent === 'boolean' ? p.persistent : true,
+			readyPattern,
+			persistent,
 			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
 			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
 			stopSignal: validateStopSignal(p.stopSignal),
