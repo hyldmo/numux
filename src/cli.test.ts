@@ -81,6 +81,10 @@ describe('parseArgs', () => {
 		expect(result.named).toEqual([{ name: 'env', command: 'KEY=VALUE echo test' }])
 	})
 
+	test('--log-dir sets logDir', () => {
+		expect(parseArgs(argv('--log-dir', './logs')).logDir).toBe('./logs')
+	})
+
 	test('--only parses comma-separated names', () => {
 		const result = parseArgs(argv('--only', 'api,web'))
 		expect(result.only).toEqual(['api', 'web'])

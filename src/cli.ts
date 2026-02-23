@@ -5,6 +5,7 @@ export interface ParsedArgs {
 	version: boolean
 	debug: boolean
 	configPath?: string
+	logDir?: string
 	only?: string[]
 	exclude?: string[]
 	commands: string[]
@@ -35,6 +36,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.debug = true
 		} else if (arg === '-c' || arg === '--config') {
 			result.configPath = args[++i]
+		} else if (arg === '--log-dir') {
+			result.logDir = args[++i]
 		} else if (arg === '--only') {
 			result.only = args[++i]
 				?.split(',')

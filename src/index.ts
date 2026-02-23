@@ -5,6 +5,7 @@ import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
 import type { NumuxConfig } from './types'
 import { App } from './ui/app'
+import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { setupShutdownHandlers } from './utils/shutdown'
 
@@ -20,6 +21,7 @@ Options:
   -c, --config <path>        Config file path (default: auto-detect)
   --only <a,b,...>           Only run these processes (+ their dependencies)
   --exclude <a,b,...>        Exclude these processes
+  --log-dir <path>           Write per-process logs to directory
   --debug                    Enable debug logging to .numux/debug.log
   -h, --help                 Show this help
   -v, --version              Show version
@@ -60,9 +62,16 @@ async function main() {
 	}
 
 	const manager = new ProcessManager(config)
+
+	let logWriter: LogWriter | undefined
+	if (parsed.logDir) {
+		logWriter = new LogWriter(parsed.logDir)
+		manager.on(logWriter.handleEvent)
+	}
+
 	const app = new App(manager, config)
 
-	setupShutdownHandlers(app)
+	setupShutdownHandlers(app, logWriter)
 	await app.start()
 }
 

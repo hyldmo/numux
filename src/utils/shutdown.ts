@@ -1,7 +1,8 @@
 import type { App } from '../ui/app'
+import type { LogWriter } from './log-writer'
 import { log } from './logger'
 
-export function setupShutdownHandlers(app: App): void {
+export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	let shuttingDown = false
 
 	const shutdown = () => {
@@ -9,7 +10,7 @@ export function setupShutdownHandlers(app: App): void {
 			process.exit(1)
 		}
 		shuttingDown = true
-		app.shutdown()
+		app.shutdown().finally(() => logWriter?.close())
 	}
 
 	process.on('SIGINT', shutdown)
@@ -17,6 +18,7 @@ export function setupShutdownHandlers(app: App): void {
 	process.on('uncaughtException', err => {
 		log('Uncaught exception:', err?.message ?? err)
 		app.shutdown().finally(() => {
+			logWriter?.close()
 			process.exit(1)
 		})
 	})
