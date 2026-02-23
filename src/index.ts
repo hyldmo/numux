@@ -47,11 +47,17 @@ Config files (auto-detected):
 const INIT_TEMPLATE = `import { defineConfig } from 'numux'
 
 export default defineConfig({
+  // Global options (inherited by all processes):
+  // cwd: './packages/backend',
+  // env: { NODE_ENV: 'development' },
+  // envFile: '.env',
+
   processes: {
     // dev: 'npm run dev',
     // api: {
     //   command: 'npm run dev:api',
     //   readyPattern: 'listening on port',
+    //   watch: 'src/**/*.ts',
     // },
     // web: {
     //   command: 'npm run dev:web',
