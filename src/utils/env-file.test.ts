@@ -68,7 +68,7 @@ describe('loadEnvFiles', () => {
 		expect(result).toEqual({ A: '1', B: 'overridden', C: '3' })
 	})
 
-	test('throws on missing file', () => {
-		expect(() => loadEnvFiles('.env.missing', tmpDir)).toThrow()
+	test('throws with clear message on missing file', () => {
+		expect(() => loadEnvFiles('.env.missing', tmpDir)).toThrow('envFile not found')
 	})
 })

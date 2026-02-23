@@ -33,7 +33,16 @@ export function loadEnvFiles(envFile: string | string[], cwd: string): Record<st
 
 	for (const file of files) {
 		const path = resolve(cwd, file)
-		const content = readFileSync(path, 'utf-8')
+		let content: string
+		try {
+			content = readFileSync(path, 'utf-8')
+		} catch (err) {
+			const code = (err as NodeJS.ErrnoException).code
+			if (code === 'ENOENT') {
+				throw new Error(`envFile not found: ${path}`)
+			}
+			throw new Error(`Failed to read envFile "${path}": ${err instanceof Error ? err.message : err}`)
+		}
 		Object.assign(merged, parseEnvFile(content))
 	}
 
