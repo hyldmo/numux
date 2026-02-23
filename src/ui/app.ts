@@ -145,7 +145,9 @@ export class App {
 						this.exitSearch()
 						return
 					}
-					this.shutdown()
+					this.shutdown().then(() => {
+						process.exit(this.hasFailures() ? 1 : 0)
+					})
 					return
 				}
 
@@ -373,6 +375,10 @@ export class App {
 		if (!this.renderer.isDestroyed) {
 			this.renderer.destroy()
 		}
-		process.exit(0)
+	}
+
+	/** Check if any process ended in a failed state */
+	hasFailures(): boolean {
+		return this.manager.getAllStates().some(s => s.status === 'failed')
 	}
 }
