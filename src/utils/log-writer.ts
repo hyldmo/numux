@@ -1,6 +1,7 @@
 import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ProcessEvent } from '../types'
+import { stripAnsi } from './color'
 
 /** Writes process output to per-process log files in the given directory. */
 export class LogWriter {
@@ -44,12 +45,4 @@ export class LogWriter {
 		}
 		this.files.clear()
 	}
-}
-
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping requires matching control chars
-const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[()][0-9A-Za-z]/g
-
-/** Strip ANSI escape sequences from text */
-function stripAnsi(str: string): string {
-	return str.replace(ANSI_RE, '')
 }
