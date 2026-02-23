@@ -96,16 +96,18 @@ describe('HEX_COLOR_RE', () => {
 })
 
 describe('colorFromName', () => {
-	test('returns a hex color from the default palette', () => {
-		const color = colorFromName('api')
-		expect(color).toMatch(/^#[0-9a-f]{6}$/)
+	test('returns consistent colors for known names', () => {
+		expect(colorFromName('api')).toBe('#cc00cc')
+		expect(colorFromName('web')).toBe('#00cc00')
+		expect(colorFromName('db')).toBe('#ffff55')
+		expect(colorFromName('worker')).toBe('#cc00cc')
+		expect(colorFromName('redis')).toBe('#0000cc')
+		expect(colorFromName('migrate')).toBe('#0000cc')
+		expect(colorFromName('proxy')).toBe('#ffff55')
+		expect(colorFromName('cache')).toBe('#cc00cc')
 	})
 
-	test('same name always returns the same color', () => {
-		expect(colorFromName('web')).toBe(colorFromName('web'))
-	})
-
-	test('different names can return different colors', () => {
+	test('different names can produce different colors', () => {
 		const colors = new Set(['api', 'web', 'db', 'worker', 'redis'].map(colorFromName))
 		expect(colors.size).toBeGreaterThan(1)
 	})
