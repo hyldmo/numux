@@ -2,6 +2,10 @@ import { defineConfig } from '../src/config'
 
 export default defineConfig({
 	processes: {
+		debug: {
+			command: 'mkdir -p .numux && touch .numux/debug.log && tail -f .numux/debug.log',
+			color: '#888888'
+		},
 		db: {
 			command: 'bun servers/db.ts',
 			readyPattern: 'ready to accept connections',

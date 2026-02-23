@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 let enabled = false
 let logFile = ''
+let debugCallback: ((line: string) => void) | null = null
 
 export function enableDebugLog(dir?: string): void {
 	const logDir = dir ?? resolve(process.cwd(), '.numux')
@@ -13,12 +14,18 @@ export function enableDebugLog(dir?: string): void {
 	enabled = true
 }
 
-export function log(message: string, ...args: unknown[]): void {
+export function setDebugCallback(cb: ((line: string) => void) | null): void {
+	debugCallback = cb
+}
+export function log(...args: unknown[]): void {
 	if (!enabled) return
 	try {
 		const timestamp = new Date().toISOString()
-		const formatted = args.length > 0 ? `${message} ${args.map(a => JSON.stringify(a)).join(' ')}` : message
-		appendFileSync(logFile, `[${timestamp}] ${formatted}\n`)
+		const formatted =
+			args.length > 0 ? `${args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}` : ''
+		const line = `[${timestamp}] ${formatted}`
+		appendFileSync(logFile, `${line}\n`)
+		debugCallback?.(line)
 	} catch {
 		// Disk errors in debug logging should not crash the app
 		enabled = false
@@ -29,4 +36,5 @@ export function log(message: string, ...args: unknown[]): void {
 export function _resetLogger(): void {
 	enabled = false
 	logFile = ''
+	debugCallback = null
 }

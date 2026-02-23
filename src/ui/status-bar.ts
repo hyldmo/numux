@@ -34,7 +34,9 @@ export class StatusBar {
 		if (this._searchMode) {
 			return this.buildSearchContent()
 		}
-		return new StyledText([plain('')])
+		return new StyledText([
+			plain('\u2190\u2192/1-9: tabs  R: restart  S: stop/start  F: search  L: clear  Ctrl+C: quit')
+		])
 	}
 
 	private buildSearchContent(): StyledText {

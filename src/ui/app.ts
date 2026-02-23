@@ -2,6 +2,7 @@ import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/cor
 import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
+import { log } from '../utils/logger'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
@@ -149,6 +150,8 @@ export class App {
 		this.renderer.keyInput.on(
 			'keypress',
 			(key: { ctrl: boolean; shift: boolean; meta: boolean; name: string; sequence: string }) => {
+				log(key)
+
 				// Ctrl+C: quit (always works)
 				if (key.ctrl && key.name === 'c') {
 					if (this.searchMode) {
@@ -167,30 +170,34 @@ export class App {
 					return
 				}
 
-				// Alt+Shift combos
-				if (key.meta && key.shift && !key.ctrl) {
-					// Alt+Shift+R: restart all processes
-					if (key.name === 'r') {
+				if (!this.activePane) return
+
+				const isInteractive = this.config.processes[this.activePane]?.interactive === true
+
+				// Non-interactive panes: plain keys act as shortcuts
+				if (!isInteractive) {
+					const name = key.name.toLowerCase()
+
+					// Shift+R: restart all processes
+					if (key.shift && name === 'r') {
 						this.manager.restartAll(this.termCols, this.termRows)
 						return
 					}
-				}
 
-				if (key.meta && !key.ctrl && !key.shift) {
-					// Alt+F: enter search mode
-					if (key.name === 'f' && this.activePane) {
+					// F: enter search mode
+					if (name === 'f') {
 						this.enterSearch()
 						return
 					}
 
-					// Alt+R: restart active process
-					if (key.name === 'r' && this.activePane) {
+					// R: restart active process
+					if (name === 'r') {
 						this.manager.restart(this.activePane, this.termCols, this.termRows)
 						return
 					}
 
-					// Alt+S: stop/start active process
-					if (key.name === 's' && this.activePane) {
+					// S: stop/start active process
+					if (name === 's') {
 						const state = this.manager.getState(this.activePane)
 						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
 							this.manager.start(this.activePane, this.termCols, this.termRows)
@@ -200,69 +207,51 @@ export class App {
 						return
 					}
 
-					// Alt+L: clear active pane
-					if (key.name === 'l' && this.activePane) {
+					// L: clear active pane
+					if (name === 'l') {
 						this.panes.get(this.activePane)?.clear()
 						return
 					}
 
-					// Alt+1-9: jump to tab (uses display order from tab bar)
-					const num = Number.parseInt(key.name, 10)
+					// 1-9: jump to tab (uses display order from tab bar)
+					const num = Number.parseInt(name, 10)
 					if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
 						this.tabBar.setSelectedIndex(num - 1)
 						this.switchPane(this.tabBar.getNameAtIndex(num - 1))
 						return
 					}
 
-					// Alt+Left/Right: cycle tabs
-					if (key.name === 'left' || key.name === 'right') {
+					// Left/Right: cycle tabs
+					if (name === 'left' || name === 'right') {
 						const current = this.tabBar.getSelectedIndex()
 						const count = this.tabBar.count
-						const next = key.name === 'right' ? (current + 1) % count : (current - 1 + count) % count
+						const next = name === 'right' ? (current + 1) % count : (current - 1 + count) % count
 						this.tabBar.setSelectedIndex(next)
 						this.switchPane(this.tabBar.getNameAtIndex(next))
 						return
 					}
 
-					// Alt+PageUp/PageDown: scroll output
-					if (this.activePane && (key.name === 'pageup' || key.name === 'pagedown')) {
+					// PageUp/PageDown: scroll by page
+					if (name === 'pageup' || name === 'pagedown') {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
-						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
+						pane?.scrollBy(name === 'pageup' ? -delta : delta)
 						return
 					}
 
-					// Alt+Home/End: scroll to top/bottom
-					if (this.activePane && key.name === 'home') {
+					// Home/End: scroll to top/bottom
+					if (name === 'home') {
 						this.panes.get(this.activePane)?.scrollToTop()
 						return
 					}
-					if (this.activePane && key.name === 'end') {
+					if (name === 'end') {
 						this.panes.get(this.activePane)?.scrollToBottom()
 						return
-					}
-				}
-
-				if (!this.activePane) return
-
-				const isInteractive = this.config.processes[this.activePane]?.interactive === true
-
-				// Non-interactive panes: PageUp/PageDown/Home/End scroll output,
-				// up/down arrows are handled by the tab sidebar for navigation
-				if (!isInteractive) {
-					if (key.name === 'pageup' || key.name === 'pagedown') {
-						const pane = this.panes.get(this.activePane)
-						const delta = this.termRows - 2
-						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
-					} else if (key.name === 'home') {
-						this.panes.get(this.activePane)?.scrollToTop()
-					} else if (key.name === 'end') {
-						this.panes.get(this.activePane)?.scrollToBottom()
 					}
 					return
 				}
 
-				// Forward all other input to the active process
+				// Forward all other input to the active process (interactive mode)
 				if (key.sequence) {
 					this.manager.write(this.activePane, key.sequence)
 				}
