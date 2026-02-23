@@ -50,13 +50,20 @@ const DEFAULT_ANSI_COLORS = [
 /** Default palette as hex colors (for styled text rendering) */
 const DEFAULT_HEX_COLORS = ['#00cccc', '#cccc00', '#cc00cc', '#0000cc', '#00cc00', '#ff5555', '#ffff55', '#ff55ff']
 
+/** Resolve a color value (string or array) to a single hex string, or undefined. */
+function resolveColor(color: string | string[] | undefined): string | undefined {
+	if (typeof color === 'string') return color
+	if (Array.isArray(color) && color.length > 0) return color[0]
+	return undefined
+}
+
 /** Build a map of process names to ANSI color codes, using explicit config colors or a default palette. */
 export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
 	const map = new Map<string, string>()
 	if ('NO_COLOR' in process.env) return map
 	let paletteIndex = 0
 	for (const name of names) {
-		const explicit = config.processes[name]?.color
+		const explicit = resolveColor(config.processes[name]?.color)
 		if (explicit) {
 			map.set(name, hexToAnsi(explicit))
 		} else {
@@ -73,7 +80,7 @@ export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxCo
 	if ('NO_COLOR' in process.env) return map
 	let paletteIndex = 0
 	for (const name of names) {
-		const explicit = config.processes[name]?.color
+		const explicit = resolveColor(config.processes[name]?.color)
 		if (explicit) {
 			map.set(name, explicit.startsWith('#') ? explicit : `#${explicit}`)
 		} else {

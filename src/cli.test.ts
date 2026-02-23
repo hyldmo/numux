@@ -71,12 +71,20 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).timestamps).toBe(false)
 	})
 
-	test('-c sets config path', () => {
-		expect(parseArgs(argv('-c', 'my.config.ts')).configPath).toBe('my.config.ts')
+	test('--config sets config path', () => {
+		expect(parseArgs(argv('--config', 'my.config.ts')).configPath).toBe('my.config.ts')
 	})
 
-	test('--config sets config path', () => {
-		expect(parseArgs(argv('--config', 'path/to/config.json')).configPath).toBe('path/to/config.json')
+	test('-c sets colors', () => {
+		expect(parseArgs(argv('-c', '#ff0000,#00ff00')).colors).toEqual(['#ff0000', '#00ff00'])
+	})
+
+	test('--color sets colors', () => {
+		expect(parseArgs(argv('--color', '#ff0000')).colors).toEqual(['#ff0000'])
+	})
+
+	test('--color trims whitespace', () => {
+		expect(parseArgs(argv('--color', '#ff0 , #0f0')).colors).toEqual(['#ff0', '#0f0'])
 	})
 
 	test('positional args become commands', () => {
@@ -102,7 +110,7 @@ describe('parseArgs', () => {
 	})
 
 	test('mixed flags, commands, and named processes', () => {
-		const result = parseArgs(argv('--debug', '-n', 'db=docker compose up', 'echo hello', '-c', 'custom.json'))
+		const result = parseArgs(argv('--debug', '-n', 'db=docker compose up', 'echo hello', '--config', 'custom.json'))
 		expect(result.debug).toBe(true)
 		expect(result.configPath).toBe('custom.json')
 		expect(result.commands).toEqual(['echo hello'])
@@ -155,8 +163,8 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).validate).toBe(false)
 	})
 
-	test('validate with -c config path', () => {
-		const result = parseArgs(argv('validate', '-c', 'custom.json'))
+	test('validate with --config path', () => {
+		const result = parseArgs(argv('validate', '--config', 'custom.json'))
 		expect(result.validate).toBe(true)
 		expect(result.configPath).toBe('custom.json')
 	})
@@ -209,20 +217,20 @@ describe('parseArgs', () => {
 		expect(() => parseArgs(argv('exec', 'api'))).toThrow('exec requires a command')
 	})
 
-	test('exec with -c config flag', () => {
-		const result = parseArgs(argv('-c', 'custom.json', 'exec', 'api', 'echo', 'hi'))
+	test('exec with --config flag', () => {
+		const result = parseArgs(argv('--config', 'custom.json', 'exec', 'api', 'echo', 'hi'))
 		expect(result.exec).toBe(true)
 		expect(result.configPath).toBe('custom.json')
 		expect(result.execName).toBe('api')
 		expect(result.execCommand).toBe('echo hi')
 	})
 
-	test('throws on missing value for -c', () => {
-		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
-	})
-
 	test('throws on missing value for --config', () => {
 		expect(() => parseArgs(argv('--config'))).toThrow('Missing value for --config')
+	})
+
+	test('throws on missing value for -c', () => {
+		expect(() => parseArgs(argv('-c'))).toThrow('Missing value for -c')
 	})
 
 	test('throws on missing value for --log-dir', () => {
@@ -238,7 +246,7 @@ describe('parseArgs', () => {
 	})
 
 	test('accepts values starting with - for flag arguments', () => {
-		expect(parseArgs(argv('-c', '-my-config.ts')).configPath).toBe('-my-config.ts')
+		expect(parseArgs(argv('--config', '-my-config.ts')).configPath).toBe('-my-config.ts')
 		expect(parseArgs(argv('--log-dir', '-logs')).logDir).toBe('-logs')
 	})
 
