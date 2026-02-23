@@ -144,4 +144,33 @@ describe('loadConfig — auto-detect', () => {
 		const dir = setupDir('empty', {})
 		await expect(loadConfig(undefined, dir)).rejects.toThrow('No numux config found')
 	})
+
+	test('auto-detects numux.config.yaml', async () => {
+		const yaml = `processes:\n  api:\n    command: echo api\n`
+		const dir = setupDir('auto-yaml', { 'numux.config.yaml': yaml })
+		const config = await loadConfig(undefined, dir)
+		expect(proc(config.processes.api).command).toBe('echo api')
+	})
+
+	test('auto-detects numux.config.yml', async () => {
+		const yml = `processes:\n  web:\n    command: echo web\n`
+		const dir = setupDir('auto-yml', { 'numux.config.yml': yml })
+		const config = await loadConfig(undefined, dir)
+		expect(proc(config.processes.web).command).toBe('echo web')
+	})
+
+	test('loads explicit .yaml config', async () => {
+		const yaml = `processes:\n  db:\n    command: echo db\n    readyPattern: ready\n`
+		const dir = setupDir('explicit-yaml', { 'custom.yaml': yaml })
+		const config = await loadConfig(join(dir, 'custom.yaml'))
+		expect(proc(config.processes.db).command).toBe('echo db')
+		expect(proc(config.processes.db).readyPattern).toBe('ready')
+	})
+
+	test('yaml supports string shorthand', async () => {
+		const yaml = `processes:\n  web: bun dev\n`
+		const dir = setupDir('yaml-shorthand', { 'numux.config.yaml': yaml })
+		const config = await loadConfig(undefined, dir)
+		expect(config.processes.web).toBe('bun dev')
+	})
 })

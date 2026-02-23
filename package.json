@@ -38,7 +38,8 @@
   ],
   "dependencies": {
     "@opentui/core": "^0.1.81",
-    "ghostty-opentui": "^1.4.3"
+    "ghostty-opentui": "^1.4.3",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",

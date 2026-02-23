@@ -22,7 +22,7 @@ This creates a starter `numux.config.ts` with commented-out examples. Edit it, t
 
 ### Config file
 
-Create `numux.config.ts` (or `.js`, `.json`, or a `"numux"` key in `package.json`):
+Create `numux.config.ts` (or `.js`, `.yaml`, `.yml`, `.json`, or a `"numux"` key in `package.json`):
 
 ```ts
 import { defineConfig } from 'numux'

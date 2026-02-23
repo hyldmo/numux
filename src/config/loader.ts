@@ -1,9 +1,16 @@
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { extname, resolve } from 'node:path'
+import { parse as parseYaml } from 'yaml'
 import type { NumuxConfig } from '../types'
 import { log } from '../utils/logger'
 
-const CONFIG_FILES = ['numux.config.ts', 'numux.config.js', 'numux.config.json'] as const
+const CONFIG_FILES = [
+	'numux.config.ts',
+	'numux.config.js',
+	'numux.config.yaml',
+	'numux.config.yml',
+	'numux.config.json'
+] as const
 
 export async function loadConfig(configPath?: string, cwd?: string): Promise<NumuxConfig> {
 	if (configPath) {
@@ -12,14 +19,23 @@ export async function loadConfig(configPath?: string, cwd?: string): Promise<Num
 	return autoDetectConfig(cwd ?? process.cwd())
 }
 
+async function loadFile(path: string): Promise<NumuxConfig> {
+	const ext = extname(path)
+	if (ext === '.yaml' || ext === '.yml') {
+		const content = readFileSync(path, 'utf-8')
+		return parseYaml(content) as NumuxConfig
+	}
+	const mod = await import(path)
+	return mod.default ?? mod
+}
+
 async function loadExplicitConfig(configPath: string): Promise<NumuxConfig> {
 	const path = resolve(configPath)
 	if (!existsSync(path)) {
 		throw new Error(`Config file not found: ${path}`)
 	}
 	log(`Loading explicit config: ${path}`)
-	const mod = await import(path)
-	return mod.default ?? mod
+	return loadFile(path)
 }
 
 async function autoDetectConfig(cwd: string): Promise<NumuxConfig> {
@@ -27,8 +43,7 @@ async function autoDetectConfig(cwd: string): Promise<NumuxConfig> {
 		const path = resolve(cwd, file)
 		if (existsSync(path)) {
 			log(`Found config file: ${path}`)
-			const mod = await import(path)
-			return mod.default ?? mod
+			return loadFile(path)
 		}
 	}
 

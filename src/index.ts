@@ -30,7 +30,8 @@ Options:
   -v, --version              Show version
 
 Config files (auto-detected):
-  numux.config.ts, numux.config.js, numux.config.json,
+  numux.config.ts, numux.config.js, numux.config.yaml,
+  numux.config.yml, numux.config.json,
   or "numux" key in package.json`
 
 const INIT_TEMPLATE = `import { defineConfig } from 'numux'
