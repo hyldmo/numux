@@ -1,6 +1,6 @@
 {
   "name": "numux",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Terminal multiplexer with dependency orchestration",
   "type": "module",
   "license": "MIT",
