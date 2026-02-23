@@ -184,6 +184,7 @@ export class PrefixDisplay {
 			this.flushBuffer(name)
 		}
 		this.logWriter?.close()
-		process.exit(0)
+		const anyFailed = this.manager.getAllStates().some(s => s.status === 'failed')
+		process.exit(anyFailed ? 1 : 0)
 	}
 }
