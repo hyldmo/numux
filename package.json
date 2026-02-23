@@ -34,7 +34,8 @@
     "fix": "biome check . --fix --unsafe"
   },
   "files": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "!src/**/*.test.ts"
   ],
   "dependencies": {
     "@opentui/core": "^0.1.81",
