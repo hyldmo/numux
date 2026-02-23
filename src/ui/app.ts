@@ -122,6 +122,8 @@ export class App {
 				if (this.config.processes[event.name]?.interactive) {
 					this.checkInputWaiting(event.name, event.data)
 				}
+			} else if (event.type === 'error') {
+				this.tabBar.setError(event.name, true)
 			} else if (event.type === 'status') {
 				const state = this.manager.getState(event.name)
 				this.tabBar.updateStatus(event.name, event.status, state?.exitCode, state?.restartCount)

@@ -25,6 +25,9 @@ function createHandler(): RunnerEventHandler & {
 		},
 		onReady() {
 			handler.readyCount++
+		},
+		onError() {
+			// noop in test handler
 		}
 	}
 	return handler

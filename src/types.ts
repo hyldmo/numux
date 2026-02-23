@@ -14,6 +14,7 @@ export interface NumuxProcessConfig {
 	color?: string | string[]
 	watch?: string | string[] // Glob patterns — restart process when matching files change
 	interactive?: boolean // default false — when true, keyboard input is forwarded to the process
+	errorMatcher?: boolean | string // true = detect ANSI red, string = regex pattern
 }
 
 /** Config for npm: wildcard entries — command is derived from package.json scripts */
@@ -55,3 +56,4 @@ export type ProcessEvent =
 	| { type: 'status'; name: string; status: ProcessStatus }
 	| { type: 'output'; name: string; data: Uint8Array }
 	| { type: 'exit'; name: string; code: number | null }
+	| { type: 'error'; name: string }

@@ -153,7 +153,8 @@ export class ProcessManager {
 					readyResolved = true
 					onInitialReady!()
 				}
-			}
+			},
+			onError: () => this.emit({ type: 'error', name })
 		})
 		this.runners.set(name, runner)
 	}

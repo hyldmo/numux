@@ -127,7 +127,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			stopSignal: validateStopSignal(p.stopSignal),
 			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
 			watch: validateStringOrStringArray(p.watch),
-			interactive: typeof p.interactive === 'boolean' ? p.interactive : false
+			interactive: typeof p.interactive === 'boolean' ? p.interactive : false,
+			errorMatcher: validateErrorMatcher(name, p.errorMatcher)
 		}
 	}
 
@@ -141,6 +142,22 @@ function validateStringOrStringArray(value: unknown): string | string[] | undefi
 }
 
 const validateEnvFile = validateStringOrStringArray
+
+function validateErrorMatcher(name: string, value: unknown): boolean | string | undefined {
+	if (value === true) return true
+	if (typeof value === 'string' && value.trim()) {
+		try {
+			new RegExp(value)
+		} catch (err) {
+			throw new Error(`Process "${name}".errorMatcher is not a valid regex: "${value}"`, { cause: err })
+		}
+		return value
+	}
+	if (value !== undefined && value !== false) {
+		throw new Error(`Process "${name}".errorMatcher must be true or a regex string`)
+	}
+	return undefined
+}
 
 const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])
 
