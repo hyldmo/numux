@@ -223,6 +223,39 @@ describe('ProcessRunner — readyTimeout', () => {
 	}, 5000)
 })
 
+describe('ProcessRunner — spawn errors', () => {
+	test('shows hint on exit code 127 (command not found)', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('bad', { command: 'nonexistent_cmd_xyz', persistent: true }, handler)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		expect(handler.exits[0]).toBe(127)
+		expect(handler.statuses).toContain('failed')
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).toContain('command not found')
+	}, 5000)
+
+	test('handles invalid cwd gracefully', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner(
+			'bad',
+			{ command: 'echo hello', persistent: true, cwd: '/nonexistent_dir_xyz' },
+			handler
+		)
+
+		runner.start(80, 24)
+
+		// Either Bun.spawn throws (caught) or process exits with error
+		await new Promise(r => setTimeout(r, 500))
+
+		const allOutput = handler.outputs.join('')
+		expect(handler.statuses).toContain('failed')
+		expect(allOutput.length).toBeGreaterThan(0)
+	}, 5000)
+})
+
 describe('ProcessRunner — output', () => {
 	test('captures process output', async () => {
 		const handler = createHandler()

@@ -55,19 +55,29 @@ export class ProcessRunner {
 			...this.config.env
 		}
 
-		this.proc = Bun.spawn(['sh', '-c', this.config.command], {
-			cwd,
-			env,
-			terminal: {
-				cols,
-				rows,
-				data: (_terminal, data) => {
-					if (this.generation !== gen) return
-					this.handler.onOutput(data)
-					this.checkReadiness(data)
+		try {
+			this.proc = Bun.spawn(['sh', '-c', this.config.command], {
+				cwd,
+				env,
+				terminal: {
+					cols,
+					rows,
+					data: (_terminal, data) => {
+						if (this.generation !== gen) return
+						this.handler.onOutput(data)
+						this.checkReadiness(data)
+					}
 				}
-			}
-		})
+			})
+		} catch (err) {
+			log(`[${this.name}] Spawn failed: ${err}`)
+			const encoder = new TextEncoder()
+			const msg = `\r\n\x1b[31m[numux] failed to start: ${err instanceof Error ? err.message : err}\x1b[0m\r\n`
+			this.handler.onOutput(encoder.encode(msg))
+			this.handler.onStatus('failed')
+			this.handler.onExit(null)
+			return
+		}
 
 		this.handler.onStatus(this.config.persistent !== false ? 'running' : 'starting')
 
@@ -83,6 +93,13 @@ export class ProcessRunner {
 
 			if (this.readiness.dependsOnExit && code === 0) {
 				this.markReady()
+			}
+
+			if (code === 127 || code === 126) {
+				const encoder = new TextEncoder()
+				const hint = code === 127 ? 'command not found' : 'permission denied'
+				const msg = `\r\n\x1b[31m[numux] exit ${code}: ${hint}\x1b[0m\r\n`
+				this.handler.onOutput(encoder.encode(msg))
 			}
 
 			const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
