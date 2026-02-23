@@ -170,6 +170,32 @@ describe('ProcessRunner — readyTimeout', () => {
 		await runner.stop()
 	}, 5000)
 
+	test('does not emit duplicate failed status when timed-out process exits', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner(
+			'srv',
+			{
+				command: 'sleep 0.5',
+				persistent: true,
+				readyPattern: 'will_never_match',
+				readyTimeout: 200
+			},
+			handler
+		)
+
+		runner.start(80, 24)
+
+		// Wait for readyTimeout to fire AND for the process to exit
+		await new Promise(r => setTimeout(r, 1500))
+
+		// Only one 'failed' status should be emitted (from readyTimeout, not from exit)
+		const failedCount = handler.statuses.filter(s => s === 'failed').length
+		expect(failedCount).toBe(1)
+
+		// No exit event should be emitted after readyTimeout
+		expect(handler.exits).toHaveLength(0)
+	}, 5000)
+
 	test('does not fire timeout if readyPattern matches in time', async () => {
 		const handler = createHandler()
 		const runner = new ProcessRunner(

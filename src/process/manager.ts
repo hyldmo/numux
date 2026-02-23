@@ -281,14 +281,18 @@ export class ProcessManager {
 			this.restartTimers.delete(name)
 		}
 
-		// If the process already exited (failed), just mark as stopped
+		const runner = this.runners.get(name)
+		if (!runner) return
+
+		// Always try to stop via runner — the process may still be alive even if
+		// status is 'failed' (e.g. readyTimeout fired but process didn't exit).
+		// runner.stop() is a no-op if proc is null (already exited).
 		if (state.status === 'failed') {
+			await runner.stop()
 			this.updateStatus(name, 'stopped')
 			return
 		}
 
-		const runner = this.runners.get(name)
-		if (!runner) return
 		await runner.stop()
 	}
 

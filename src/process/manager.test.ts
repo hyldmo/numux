@@ -378,6 +378,31 @@ describe('ProcessManager — stop (individual)', () => {
 		expect(mgr.getState('server')?.status).toBe('stopped')
 	}, 10000)
 
+	test('kills process that is still alive after readyTimeout', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: {
+					command: 'sleep 60',
+					persistent: true,
+					readyPattern: 'will_never_match',
+					readyTimeout: 200
+				}
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+
+		// Wait for readyTimeout to mark it as failed
+		await new Promise(r => setTimeout(r, 500))
+		expect(mgr.getState('server')?.status).toBe('failed')
+
+		// Stop should kill the still-running process
+		await mgr.stop('server')
+		expect(mgr.getState('server')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 10000)
+
 	test('no-op for already stopped process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {

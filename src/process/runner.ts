@@ -23,6 +23,7 @@ export class ProcessRunner {
 	private generation = 0
 	private readyTimer: ReturnType<typeof setTimeout> | null = null
 	private restarting = false
+	private readyTimedOut = false
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -105,9 +106,14 @@ export class ProcessRunner {
 					this.handler.onOutput(encoder.encode(msg))
 				}
 
-				const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
-				this.handler.onStatus(status)
-				this.handler.onExit(code)
+					// When readyTimeout already marked the process as failed, suppress
+				// duplicate status/exit events to avoid double onStatus('failed')
+				// and unintended auto-restart scheduling.
+				if (!this.readyTimedOut) {
+					const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
+					this.handler.onStatus(status)
+					this.handler.onExit(code)
+				}
 			})
 			.catch(err => {
 				if (this.generation !== gen) return
@@ -132,6 +138,7 @@ export class ProcessRunner {
 		this.readyTimer = setTimeout(() => {
 			this.readyTimer = null
 			if (this.generation !== gen || this._ready) return
+			this.readyTimedOut = true
 			log(`[${this.name}] Ready timeout after ${timeout}ms`)
 			const encoder = new TextEncoder()
 			const msg = `\r\n\x1b[31m[numux] readyPattern not matched within ${(timeout / 1000).toFixed(0)}s — marking as failed\x1b[0m\r\n`
@@ -178,6 +185,7 @@ export class ProcessRunner {
 		this.proc = null
 		this._ready = false
 		this.restarting = false
+		this.readyTimedOut = false
 		this.readiness = createReadinessChecker(this.config)
 		this.start(cols, rows)
 	}
