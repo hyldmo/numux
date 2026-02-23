@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BASIC_COLORS, HEX_COLOR_RE, hexToAnsi, isValidColor, resolveToHex, stripAnsi } from './color'
+import { BASIC_COLORS, colorFromName, HEX_COLOR_RE, hexToAnsi, isValidColor, resolveToHex, stripAnsi } from './color'
 
 describe('hexToAnsi', () => {
 	test('converts #rrggbb to ANSI true-color sequence', () => {
@@ -92,6 +92,22 @@ describe('HEX_COLOR_RE', () => {
 		expect(HEX_COLOR_RE.test('#gggggg')).toBe(false)
 		expect(HEX_COLOR_RE.test('#ff88001')).toBe(false)
 		expect(HEX_COLOR_RE.test('')).toBe(false)
+	})
+})
+
+describe('colorFromName', () => {
+	test('returns a hex color from the default palette', () => {
+		const color = colorFromName('api')
+		expect(color).toMatch(/^#[0-9a-f]{6}$/)
+	})
+
+	test('same name always returns the same color', () => {
+		expect(colorFromName('web')).toBe(colorFromName('web'))
+	})
+
+	test('different names can return different colors', () => {
+		const colors = new Set(['api', 'web', 'db', 'worker', 'redis'].map(colorFromName))
+		expect(colors.size).toBeGreaterThan(1)
 	})
 })
 

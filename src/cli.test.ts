@@ -195,6 +195,14 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).noWatch).toBe(false)
 	})
 
+	test('--colors sets autoColors flag', () => {
+		expect(parseArgs(argv('--colors')).autoColors).toBe(true)
+	})
+
+	test('autoColors is false by default', () => {
+		expect(parseArgs(argv()).autoColors).toBe(false)
+	})
+
 	test('exec parses process name and command', () => {
 		const result = parseArgs(argv('exec', 'api', 'npx', 'prisma', 'migrate'))
 		expect(result.exec).toBe(true)

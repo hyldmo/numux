@@ -80,6 +80,15 @@ const DEFAULT_ANSI_COLORS = [
 /** Default palette as hex colors (for styled text rendering) */
 const DEFAULT_HEX_COLORS = ['#00cccc', '#cccc00', '#cc00cc', '#0000cc', '#00cc00', '#ff5555', '#ffff55', '#ff55ff']
 
+/** Pick a deterministic color from the default palette based on the process name */
+export function colorFromName(name: string): string {
+	let hash = 0
+	for (let i = 0; i < name.length; i++) {
+		hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
+	}
+	return DEFAULT_HEX_COLORS[Math.abs(hash) % DEFAULT_HEX_COLORS.length]
+}
+
 /** Resolve a color value (string or array) to a single hex string, or undefined. */
 function resolveColor(color: string | string[] | undefined): string | undefined {
 	if (typeof color === 'string') return color
