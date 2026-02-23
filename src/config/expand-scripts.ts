@@ -24,16 +24,21 @@ export function detectPackageManager(pkgJson: Record<string, unknown>, cwd: stri
 	return 'npm'
 }
 
+/** Check whether a process name contains glob metacharacters (*, ?, [) */
+function isGlobPattern(name: string): boolean {
+	return /[*?[]/.test(name)
+}
+
 export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxConfig {
 	const entries = Object.entries(config.processes)
-	const hasWildcard = entries.some(([name]) => name.startsWith('npm:'))
+	const hasWildcard = entries.some(([name]) => name.startsWith('npm:') || isGlobPattern(name))
 	if (!hasWildcard) return config
 
 	const dir = config.cwd ?? cwd ?? process.cwd()
 	const pkgPath = resolve(dir, 'package.json')
 
 	if (!existsSync(pkgPath)) {
-		throw new Error(`npm: patterns require a package.json (looked in ${dir})`)
+		throw new Error(`Wildcard patterns require a package.json (looked in ${dir})`)
 	}
 
 	const pkgJson = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
@@ -48,12 +53,12 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 	const expanded: Record<string, NumuxProcessConfig | string> = {}
 
 	for (const [name, value] of entries) {
-		if (!name.startsWith('npm:')) {
+		if (!(name.startsWith('npm:') || isGlobPattern(name))) {
 			expanded[name] = value as NumuxProcessConfig | string
 			continue
 		}
 
-		const pattern = name.slice(4) // strip "npm:"
+		const pattern = name.startsWith('npm:') ? name.slice(4) : name
 		const template = (value ?? {}) as Partial<NumuxProcessConfig>
 
 		if (template.command) {
