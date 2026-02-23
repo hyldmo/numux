@@ -123,6 +123,9 @@ Persistent processes that crash are auto-restarted with exponential backoff (1sâ
 | `Alt+Left/Right` | Cycle tabs |
 | `Alt+PageUp/PageDown` | Scroll output up/down |
 | `Alt+Home/End` | Scroll to top/bottom |
+| `Alt+F` | Search in active pane output |
+
+While searching: type to filter, `Enter`/`Shift+Enter` to navigate matches, `Escape` to close.
 
 All other input is forwarded to the active process.
 

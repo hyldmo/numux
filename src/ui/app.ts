@@ -1,7 +1,7 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
 import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
-import { Pane } from './pane'
+import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
 
@@ -21,6 +21,12 @@ export class App {
 	private termRows = 24
 
 	private processColors: Map<string, string>
+
+	// Search state
+	private searchMode = false
+	private searchQuery = ''
+	private searchMatches: SearchMatch[] = []
+	private searchIndex = -1
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
@@ -125,13 +131,29 @@ export class App {
 		this.renderer.keyInput.on(
 			'keypress',
 			(key: { ctrl: boolean; shift: boolean; meta: boolean; name: string; sequence: string }) => {
-				// Ctrl+C: quit
+				// Ctrl+C: quit (always works)
 				if (key.ctrl && key.name === 'c') {
+					if (this.searchMode) {
+						this.exitSearch()
+						return
+					}
 					this.shutdown()
 					return
 				}
 
+				// Search mode input handling
+				if (this.searchMode) {
+					this.handleSearchInput(key)
+					return
+				}
+
 				if (key.meta && !key.ctrl && !key.shift) {
+					// Alt+F: enter search mode
+					if (key.name === 'f' && this.activePane) {
+						this.enterSearch()
+						return
+					}
+
 					// Alt+R: restart active process
 					if (key.name === 'r' && this.activePane) {
 						this.manager.restart(this.activePane, this.termCols, this.termRows)
@@ -204,6 +226,10 @@ export class App {
 
 	private switchPane(name: string): void {
 		if (this.activePane === name) return
+		// Clear search when switching panes
+		if (this.searchMode) {
+			this.exitSearch()
+		}
 		if (this.activePane) {
 			this.panes.get(this.activePane)?.hide()
 		}
@@ -217,6 +243,101 @@ export class App {
 		const pane = this.panes.get(this.activePane)
 		if (!pane) return
 		this.statusBar.setScrollIndicator(!pane.isAtBottom)
+	}
+
+	private enterSearch(): void {
+		this.searchMode = true
+		this.searchQuery = ''
+		this.searchMatches = []
+		this.searchIndex = -1
+		this.statusBar.setSearchMode(true)
+	}
+
+	private exitSearch(): void {
+		this.searchMode = false
+		this.searchQuery = ''
+		this.searchMatches = []
+		this.searchIndex = -1
+		if (this.activePane) {
+			this.panes.get(this.activePane)?.clearHighlights()
+		}
+		this.statusBar.setSearchMode(false)
+	}
+
+	private handleSearchInput(key: {
+		ctrl: boolean
+		shift: boolean
+		meta: boolean
+		name: string
+		sequence: string
+	}): void {
+		if (key.name === 'escape') {
+			this.exitSearch()
+			return
+		}
+
+		if (key.name === 'return') {
+			// Enter: next match, Shift+Enter: previous match
+			if (this.searchMatches.length === 0) return
+			if (key.shift) {
+				this.searchIndex = (this.searchIndex - 1 + this.searchMatches.length) % this.searchMatches.length
+			} else {
+				this.searchIndex = (this.searchIndex + 1) % this.searchMatches.length
+			}
+			this.scrollToCurrentMatch()
+			this.updateSearchHighlights()
+			return
+		}
+
+		if (key.name === 'backspace') {
+			if (this.searchQuery.length > 0) {
+				this.searchQuery = this.searchQuery.slice(0, -1)
+				this.runSearch()
+			}
+			return
+		}
+
+		// Printable character
+		if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
+			this.searchQuery += key.sequence
+			this.runSearch()
+		}
+	}
+
+	private runSearch(): void {
+		if (!this.activePane) return
+		const pane = this.panes.get(this.activePane)
+		if (!pane) return
+
+		this.searchMatches = pane.search(this.searchQuery)
+		this.searchIndex = this.searchMatches.length > 0 ? 0 : -1
+
+		this.updateSearchHighlights()
+		if (this.searchIndex >= 0) {
+			this.scrollToCurrentMatch()
+		}
+	}
+
+	private updateSearchHighlights(): void {
+		if (!this.activePane) return
+		const pane = this.panes.get(this.activePane)
+		if (!pane) return
+
+		if (this.searchMatches.length > 0) {
+			pane.setHighlights(this.searchMatches, this.searchIndex)
+		} else {
+			pane.clearHighlights()
+		}
+		this.statusBar.setSearchMode(true, this.searchQuery, this.searchMatches.length, this.searchIndex)
+	}
+
+	private scrollToCurrentMatch(): void {
+		if (!this.activePane || this.searchIndex < 0) return
+		const pane = this.panes.get(this.activePane)
+		if (!pane) return
+		const match = this.searchMatches[this.searchIndex]
+		pane.scrollToLine(match.line)
+		this.updateScrollIndicator()
 	}
 
 	async shutdown(): Promise<void> {

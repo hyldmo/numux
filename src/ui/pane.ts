@@ -1,5 +1,11 @@
 import { type CliRenderer, ScrollBoxRenderable } from '@opentui/core'
-import { GhosttyTerminalRenderable } from 'ghostty-opentui/terminal-buffer'
+import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+
+export interface SearchMatch {
+	line: number
+	start: number
+	end: number
+}
 
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
@@ -69,6 +75,44 @@ export class Pane {
 
 	hide(): void {
 		this.scrollBox.visible = false
+	}
+
+	search(query: string): SearchMatch[] {
+		if (!query) return []
+		const text = this.terminal.getText()
+		const lines = text.split('\n')
+		const matches: SearchMatch[] = []
+		const lowerQuery = query.toLowerCase()
+		for (let line = 0; line < lines.length; line++) {
+			const lowerLine = lines[line].toLowerCase()
+			let pos = 0
+			while (true) {
+				const idx = lowerLine.indexOf(lowerQuery, pos)
+				if (idx === -1) break
+				matches.push({ line, start: idx, end: idx + query.length })
+				pos = idx + 1
+			}
+		}
+		return matches
+	}
+
+	setHighlights(matches: SearchMatch[], currentIndex: number): void {
+		const regions: HighlightRegion[] = matches.map((m, i) => ({
+			line: m.line,
+			start: m.start,
+			end: m.end,
+			backgroundColor: i === currentIndex ? '#b58900' : '#073642'
+		}))
+		this.terminal.highlights = regions
+	}
+
+	clearHighlights(): void {
+		this.terminal.highlights = undefined
+	}
+
+	scrollToLine(line: number): void {
+		const pos = this.terminal.getScrollPositionForLine(line)
+		this.scrollBox.scrollTo(pos)
 	}
 
 	clear(): void {
