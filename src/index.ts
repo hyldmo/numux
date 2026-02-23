@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { loadConfig } from './config/loader'
+import { resolveDependencyTiers } from './config/resolver'
 import { validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
 import type { ResolvedNumuxConfig } from './types'
@@ -18,6 +19,7 @@ Usage:
   numux <cmd1> <cmd2> ...        Run ad-hoc commands in parallel
   numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
   numux init                     Create a starter config file
+  numux validate                 Validate config and show process graph
 
 Options:
   -n, --name <name=command>  Add a named process
@@ -73,6 +75,27 @@ async function main() {
 		}
 		writeFileSync(target, INIT_TEMPLATE)
 		console.info(`Created ${target}`)
+		process.exit(0)
+	}
+
+	if (parsed.validate) {
+		const raw = await loadConfig(parsed.configPath)
+		const config = validateConfig(raw)
+		const tiers = resolveDependencyTiers(config)
+		const names = Object.keys(config.processes)
+		console.info(`Config valid: ${names.length} process${names.length === 1 ? '' : 'es'}\n`)
+		for (let i = 0; i < tiers.length; i++) {
+			console.info(`Tier ${i}:`)
+			for (const name of tiers[i]) {
+				const proc = config.processes[name]
+				const flags: string[] = []
+				if (proc.dependsOn?.length) flags.push(`depends on: ${proc.dependsOn.join(', ')}`)
+				if (proc.readyPattern) flags.push(`ready: /${proc.readyPattern}/`)
+				if (proc.persistent === false) flags.push('one-shot')
+				const suffix = flags.length > 0 ? `  (${flags.join(', ')})` : ''
+				console.info(`  ${name}: ${proc.command}${suffix}`)
+			}
+		}
 		process.exit(0)
 	}
 

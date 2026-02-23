@@ -113,6 +113,20 @@ describe('parseArgs', () => {
 	test('init is false by default', () => {
 		expect(parseArgs(argv()).init).toBe(false)
 	})
+
+	test('validate sets validate flag', () => {
+		expect(parseArgs(argv('validate')).validate).toBe(true)
+	})
+
+	test('validate is false by default', () => {
+		expect(parseArgs(argv()).validate).toBe(false)
+	})
+
+	test('validate with -c config path', () => {
+		const result = parseArgs(argv('validate', '-c', 'custom.json'))
+		expect(result.validate).toBe(true)
+		expect(result.configPath).toBe('custom.json')
+	})
 })
 
 describe('buildConfigFromArgs', () => {
