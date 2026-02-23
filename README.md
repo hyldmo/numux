@@ -136,6 +136,7 @@ Each process accepts:
 | `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
 | `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
 | `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
+| `delay` | `number` | — | Milliseconds to wait before starting the process |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 

@@ -550,6 +550,78 @@ describe('ProcessManager — start (individual)', () => {
 	}, 10000)
 })
 
+describe('ProcessManager — delay', () => {
+	test('delays process start by the configured amount', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				fast: { command: 'true', persistent: false },
+				slow: { command: 'true', persistent: false, delay: 500 }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const startTimes: Record<string, number> = {}
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') {
+				startTimes[e.name] = Date.now()
+			}
+		})
+
+		await mgr.startAll(80, 24)
+
+		// slow should have started at least 400ms after fast (allowing 100ms tolerance)
+		expect(startTimes.slow - startTimes.fast).toBeGreaterThanOrEqual(400)
+		await mgr.stopAll()
+	}, 10000)
+
+	test('delay does not block other processes in the same tier', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				a: { command: 'true', persistent: false, delay: 500 },
+				b: { command: 'true', persistent: false }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const startTimes: Record<string, number> = {}
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') {
+				startTimes[e.name] = Date.now()
+			}
+		})
+
+		const before = Date.now()
+		await mgr.startAll(80, 24)
+
+		// b should start nearly immediately (not blocked by a's delay)
+		expect(startTimes.b - before).toBeLessThan(200)
+		// a should be delayed
+		expect(startTimes.a - before).toBeGreaterThanOrEqual(400)
+		await mgr.stopAll()
+	}, 10000)
+
+	test('stopAll cancels pending delay timer', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				delayed: { command: 'sleep 60', persistent: true, delay: 2000 }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		// Start in background — don't await since the delay means it won't resolve quickly
+		const startPromise = mgr.startAll(80, 24)
+
+		// Stop before the delay completes
+		await new Promise(r => setTimeout(r, 100))
+		await mgr.stopAll()
+
+		// Process should never have started (still pending since we stopped during delay)
+		const status = mgr.getState('delayed')?.status
+		expect(status === 'pending' || status === 'stopped').toBe(true)
+
+		// Clean up the startAll promise
+		await startPromise
+	}, 5000)
+})
+
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {

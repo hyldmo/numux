@@ -21,6 +21,7 @@ export class ProcessManager {
 	private restartAttempts = new Map<string, number>()
 	private restartTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private startTimes = new Map<string, number>()
+	private pendingReadyResolvers = new Map<string, () => void>()
 
 	constructor(config: ResolvedNumuxConfig) {
 		this.config = config
@@ -86,15 +87,35 @@ export class ProcessManager {
 				const { promise, resolve } = Promise.withResolvers<void>()
 				readyPromises.push(promise)
 
-				this.createRunner(name, resolve)
-				this.startTimes.set(name, Date.now())
-				this.runners.get(name)!.start(cols, rows)
+				this.pendingReadyResolvers.set(name, resolve)
+				this.createRunner(name, () => {
+					this.pendingReadyResolvers.delete(name)
+					resolve()
+				})
+				this.startProcess(name, cols, rows)
 			}
 
 			// Wait for all processes in this tier to become ready
 			if (readyPromises.length > 0) {
 				await Promise.all(readyPromises)
 			}
+		}
+	}
+
+	private startProcess(name: string, cols: number, rows: number): void {
+		const delay = this.config.processes[name].delay
+		if (delay) {
+			log(`[${name}] Delaying start by ${delay}ms`)
+			const timer = setTimeout(() => {
+				this.restartTimers.delete(name)
+				if (this.stopping) return
+				this.startTimes.set(name, Date.now())
+				this.runners.get(name)!.start(cols, rows)
+			}, delay)
+			this.restartTimers.set(name, timer)
+		} else {
+			this.startTimes.set(name, Date.now())
+			this.runners.get(name)!.start(cols, rows)
 		}
 	}
 
@@ -275,11 +296,16 @@ export class ProcessManager {
 	async stopAll(): Promise<void> {
 		log('Stopping all processes')
 		this.stopping = true
-		// Cancel all pending auto-restart timers
+		// Cancel all pending auto-restart and delay timers
 		for (const timer of this.restartTimers.values()) {
 			clearTimeout(timer)
 		}
 		this.restartTimers.clear()
+		// Resolve any pending ready promises (e.g. processes waiting on delay)
+		for (const resolve of this.pendingReadyResolvers.values()) {
+			resolve()
+		}
+		this.pendingReadyResolvers.clear()
 		// Stop in reverse tier order — use allSettled so one failure doesn't skip remaining tiers
 		const reversed = [...this.tiers].reverse()
 		for (const tier of reversed) {

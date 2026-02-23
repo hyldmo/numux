@@ -149,6 +149,33 @@ describe('validateConfig', () => {
 		expect(config.processes.web.readyTimeout).toBeUndefined()
 	})
 
+	test('preserves explicit delay', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', delay: 2000 }
+			}
+		})
+		expect(config.processes.web.delay).toBe(2000)
+	})
+
+	test('ignores non-positive delay', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', delay: 0 }
+			}
+		})
+		expect(config.processes.web.delay).toBeUndefined()
+	})
+
+	test('ignores non-number delay', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', delay: 'abc' }
+			}
+		})
+		expect(config.processes.web.delay).toBeUndefined()
+	})
+
 	test('preserves valid stopSignal', () => {
 		for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
 			const config = validateConfig({

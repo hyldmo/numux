@@ -111,6 +111,7 @@ async function main() {
 				if (proc.dependsOn?.length) flags.push(`depends on: ${proc.dependsOn.join(', ')}`)
 				if (proc.readyPattern) flags.push(`ready: /${proc.readyPattern}/`)
 				if (proc.persistent === false) flags.push('one-shot')
+				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
 				const suffix = flags.length > 0 ? `  (${flags.join(', ')})` : ''
 				console.info(`  ${name}: ${proc.command}${suffix}`)
 			}
