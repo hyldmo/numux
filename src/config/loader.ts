@@ -5,11 +5,11 @@ import { log } from '../utils/logger'
 
 const CONFIG_FILES = ['numux.config.ts', 'numux.config.js', 'numux.config.json'] as const
 
-export async function loadConfig(configPath?: string): Promise<NumuxConfig> {
+export async function loadConfig(configPath?: string, cwd?: string): Promise<NumuxConfig> {
 	if (configPath) {
 		return loadExplicitConfig(configPath)
 	}
-	return autoDetectConfig(process.cwd())
+	return autoDetectConfig(cwd ?? process.cwd())
 }
 
 async function loadExplicitConfig(configPath: string): Promise<NumuxConfig> {
