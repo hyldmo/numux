@@ -101,8 +101,8 @@ export class App {
 					return
 				}
 
-				// Number keys 1-9: jump to tab (no modifiers)
-				if (!(key.ctrl || key.meta || key.shift)) {
+				// Alt+1-9: jump to tab
+				if (key.meta && !key.ctrl && !key.shift) {
 					const num = Number.parseInt(key.name, 10)
 					if (num >= 1 && num <= 9 && num <= this.names.length) {
 						this.tabBar.setSelectedIndex(num - 1)
