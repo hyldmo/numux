@@ -22,6 +22,7 @@ export class ProcessRunner {
 	private decoder = new TextDecoder()
 	private generation = 0
 	private readyTimer: ReturnType<typeof setTimeout> | null = null
+	private restarting = false
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -45,18 +46,18 @@ export class ProcessRunner {
 		this.handler.onStatus('starting')
 
 		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
-		const envFromFile = this.config.envFile ? loadEnvFiles(this.config.envFile, cwd) : {}
-
-		const noColor = 'NO_COLOR' in process.env
-		const env: Record<string, string> = {
-			...(process.env as Record<string, string>),
-			...(noColor ? {} : { FORCE_COLOR: '1' }),
-			TERM: 'xterm-256color',
-			...envFromFile,
-			...this.config.env
-		}
 
 		try {
+			const envFromFile = this.config.envFile ? loadEnvFiles(this.config.envFile, cwd) : {}
+			const noColor = 'NO_COLOR' in process.env
+			const env: Record<string, string> = {
+				...(process.env as Record<string, string>),
+				...(noColor ? {} : { FORCE_COLOR: '1' }),
+				TERM: 'xterm-256color',
+				...envFromFile,
+				...this.config.env
+			}
+
 			this.proc = Bun.spawn(['sh', '-c', this.config.command], {
 				cwd,
 				env,
@@ -157,6 +158,8 @@ export class ProcessRunner {
 	}
 
 	async restart(cols: number, rows: number): Promise<void> {
+		if (this.restarting) return
+		this.restarting = true
 		log(`[${this.name}] Restarting`)
 		this.clearReadyTimeout()
 		if (this.proc) {
@@ -174,6 +177,7 @@ export class ProcessRunner {
 		}
 		this.proc = null
 		this._ready = false
+		this.restarting = false
 		this.readiness = createReadinessChecker(this.config)
 		this.start(cols, rows)
 	}
