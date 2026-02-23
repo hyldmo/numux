@@ -102,7 +102,7 @@ describe('ProcessRunner — persistent process', () => {
 		expect(handler.statuses).toContain('failed')
 	}, 5000)
 
-	test('reports stopped status on clean exit', async () => {
+	test('reports finished status on clean exit', async () => {
 		const handler = createHandler()
 		const runner = new ProcessRunner('ok', { command: 'true', persistent: true }, handler)
 
@@ -110,7 +110,7 @@ describe('ProcessRunner — persistent process', () => {
 		await waitForExit(handler)
 
 		expect(handler.exits[0]).toBe(0)
-		expect(handler.statuses).toContain('stopped')
+		expect(handler.statuses).toContain('finished')
 	}, 5000)
 })
 
@@ -125,7 +125,7 @@ describe('ProcessRunner — non-persistent process', () => {
 		expect(runner.isReady).toBe(true)
 		expect(handler.readyCount).toBe(1)
 		expect(handler.statuses).toContain('ready')
-		expect(handler.statuses).toContain('stopped')
+		expect(handler.statuses).toContain('finished')
 	}, 5000)
 
 	test('does not become ready on non-zero exit', async () => {

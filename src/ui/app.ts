@@ -30,6 +30,10 @@ export class App {
 	private searchMatches: SearchMatch[] = []
 	private searchIndex = -1
 
+	// Input-waiting detection for interactive processes
+	private inputWaitTimers = new Map<string, ReturnType<typeof setTimeout>>()
+	private awaitingInput = new Set<string>()
+
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
 		this.config = config
@@ -120,10 +124,18 @@ export class App {
 				if (event.name === this.activePane) {
 					this.updateScrollIndicator()
 				}
+				// Detect input-waiting for interactive processes
+				if (this.config.processes[event.name]?.interactive) {
+					this.checkInputWaiting(event.name, event.data)
+				}
 			} else if (event.type === 'status') {
 				const state = this.manager.getState(event.name)
 				this.tabBar.updateStatus(event.name, event.status, state?.exitCode, state?.restartCount)
 				this.statusBar.updateStatus(event.name, event.status)
+				// Clear input-waiting on non-active statuses
+				if (event.status !== 'running' && event.status !== 'ready') {
+					this.clearInputWaiting(event.name)
+				}
 			}
 		})
 
@@ -188,7 +200,7 @@ export class App {
 					// Alt+S: stop/start active process
 					if (key.name === 's' && this.activePane) {
 						const state = this.manager.getState(this.activePane)
-						if (state?.status === 'stopped' || state?.status === 'failed') {
+						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
 							this.manager.start(this.activePane, this.termCols, this.termRows)
 						} else {
 							this.manager.stop(this.activePane)
@@ -202,23 +214,21 @@ export class App {
 						return
 					}
 
-					// Alt+1-9: jump to tab
+					// Alt+1-9: jump to tab (uses display order from tab bar)
 					const num = Number.parseInt(key.name, 10)
-					if (num >= 1 && num <= 9 && num <= this.names.length) {
+					if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
 						this.tabBar.setSelectedIndex(num - 1)
-						this.switchPane(this.names[num - 1])
+						this.switchPane(this.tabBar.getNameAtIndex(num - 1))
 						return
 					}
 
 					// Alt+Left/Right: cycle tabs
 					if (key.name === 'left' || key.name === 'right') {
 						const current = this.tabBar.getSelectedIndex()
-						const next =
-							key.name === 'right'
-								? (current + 1) % this.names.length
-								: (current - 1 + this.names.length) % this.names.length
+						const count = this.tabBar.count
+						const next = key.name === 'right' ? (current + 1) % count : (current - 1 + count) % count
 						this.tabBar.setSelectedIndex(next)
-						this.switchPane(this.names[next])
+						this.switchPane(this.tabBar.getNameAtIndex(next))
 						return
 					}
 
@@ -304,6 +314,45 @@ export class App {
 		const pane = this.panes.get(this.activePane)
 		if (!pane) return
 		this.statusBar.setScrollIndicator(!pane.isAtBottom)
+	}
+
+	/** Detect when an interactive process is likely waiting for user input */
+	private checkInputWaiting(name: string, data: Uint8Array): void {
+		// Clear existing timer
+		const existing = this.inputWaitTimers.get(name)
+		if (existing) clearTimeout(existing)
+
+		// If we were showing awaiting input, clear it since new output arrived
+		if (this.awaitingInput.has(name)) {
+			this.awaitingInput.delete(name)
+			this.tabBar.setInputWaiting(name, false)
+		}
+
+		// If the last byte is not a newline, the process may be showing a prompt
+		const lastByte = data[data.length - 1]
+		if (lastByte !== 0x0a && lastByte !== 0x0d) {
+			const timer = setTimeout(() => {
+				this.inputWaitTimers.delete(name)
+				const state = this.manager.getState(name)
+				if (state && (state.status === 'running' || state.status === 'ready')) {
+					this.awaitingInput.add(name)
+					this.tabBar.setInputWaiting(name, true)
+				}
+			}, 200)
+			this.inputWaitTimers.set(name, timer)
+		}
+	}
+
+	private clearInputWaiting(name: string): void {
+		const timer = this.inputWaitTimers.get(name)
+		if (timer) {
+			clearTimeout(timer)
+			this.inputWaitTimers.delete(name)
+		}
+		if (this.awaitingInput.has(name)) {
+			this.awaitingInput.delete(name)
+			this.tabBar.setInputWaiting(name, false)
+		}
 	}
 
 	private enterSearch(): void {
@@ -408,6 +457,11 @@ export class App {
 			clearTimeout(this.resizeTimer)
 			this.resizeTimer = null
 		}
+		// Clear all input-waiting timers
+		for (const timer of this.inputWaitTimers.values()) {
+			clearTimeout(timer)
+		}
+		this.inputWaitTimers.clear()
 		await this.manager.stopAll()
 		for (const pane of this.panes.values()) {
 			pane.destroy()

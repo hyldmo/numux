@@ -29,7 +29,16 @@ export interface ResolvedNumuxConfig {
 	processes: Record<string, NumuxProcessConfig>
 }
 
-export type ProcessStatus = 'pending' | 'starting' | 'ready' | 'running' | 'stopping' | 'stopped' | 'failed' | 'skipped'
+export type ProcessStatus =
+	| 'pending'
+	| 'starting'
+	| 'ready'
+	| 'running'
+	| 'stopping'
+	| 'stopped'
+	| 'finished'
+	| 'failed'
+	| 'skipped'
 
 export interface ProcessState {
 	name: string

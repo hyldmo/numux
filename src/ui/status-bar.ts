@@ -15,6 +15,7 @@ import type { ProcessStatus } from '../types'
 const STATUS_STYLE: Partial<Record<ProcessStatus, (input: string) => TextChunk>> = {
 	ready: green,
 	running: cyan,
+	finished: green,
 	failed: red,
 	stopped: fg('#888'),
 	skipped: fg('#888')

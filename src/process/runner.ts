@@ -110,7 +110,7 @@ export class ProcessRunner {
 				// duplicate status/exit events to avoid double onStatus('failed')
 				// and unintended auto-restart scheduling.
 				if (!this.readyTimedOut) {
-					const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
+					const status: ProcessStatus = this.stopping ? 'stopped' : code === 0 ? 'finished' : 'failed'
 					this.handler.onStatus(status)
 					this.handler.onExit(code)
 				}
