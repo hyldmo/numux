@@ -3,6 +3,7 @@ import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import { log } from '../utils/logger'
+import { SHORTCUTS } from './keybindings'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
@@ -179,32 +180,27 @@ export class App {
 				if (!isInteractive) {
 					const name = key.name.toLowerCase()
 
-					// Shift+R: restart all processes
-					if (key.shift && name === 'r') {
+					if (key.shift && name === SHORTCUTS.restartAll.key) {
 						this.manager.restartAll(this.termCols, this.termRows)
 						return
 					}
 
-					// Y: copy selected text (yank)
-					if (name === 'y') {
+					if (name === SHORTCUTS.copy.key) {
 						this.copySelection()
 						return
 					}
 
-					// F: enter search mode
-					if (name === 'f') {
+					if (name === SHORTCUTS.search.key) {
 						this.enterSearch()
 						return
 					}
 
-					// R: restart active process
-					if (name === 'r') {
+					if (name === SHORTCUTS.restart.key) {
 						this.manager.restart(this.activePane, this.termCols, this.termRows)
 						return
 					}
 
-					// S: stop/start active process
-					if (name === 's') {
+					if (name === SHORTCUTS.stopStart.key) {
 						const state = this.manager.getState(this.activePane)
 						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
 							this.manager.start(this.activePane, this.termCols, this.termRows)
@@ -214,8 +210,7 @@ export class App {
 						return
 					}
 
-					// L: clear active pane
-					if (name === 'l') {
+					if (name === SHORTCUTS.clear.key) {
 						this.panes.get(this.activePane)?.clear()
 						return
 					}

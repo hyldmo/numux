@@ -1,5 +1,5 @@
 import { type CliRenderer, cyan, red, reverse, StyledText, type TextChunk, TextRenderable, yellow } from '@opentui/core'
-import { formatKeyHints, KEYBINDINGS } from './keybindings'
+import { STATUS_BAR_TEXT } from './keybindings'
 
 function plain(text: string): TextChunk {
 	return { __isChunk: true, text } as TextChunk
@@ -51,7 +51,7 @@ export class StatusBar {
 		if (this._searchMode) {
 			return this.buildSearchContent()
 		}
-		return new StyledText([plain(formatKeyHints(KEYBINDINGS))])
+		return new StyledText([plain(STATUS_BAR_TEXT)])
 	}
 
 	private buildSearchContent(): StyledText {
