@@ -430,3 +430,91 @@ describe('validateConfig', () => {
 		expect(config.processes.web.watch).toBeUndefined()
 	})
 })
+
+describe('validateConfig — global options', () => {
+	test('global cwd is inherited by all processes', () => {
+		const config = validateConfig({
+			cwd: '/tmp/project',
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.cwd).toBe('/tmp/project')
+		expect(config.processes.b.cwd).toBe('/tmp/project')
+	})
+
+	test('process cwd overrides global cwd', () => {
+		const config = validateConfig({
+			cwd: '/tmp/project',
+			processes: {
+				a: { command: 'echo a', cwd: '/tmp/other' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.cwd).toBe('/tmp/other')
+		expect(config.processes.b.cwd).toBe('/tmp/project')
+	})
+
+	test('global env is merged into all processes', () => {
+		const config = validateConfig({
+			env: { NODE_ENV: 'development', DEBUG: '1' },
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.env).toEqual({ NODE_ENV: 'development', DEBUG: '1' })
+		expect(config.processes.b.env).toEqual({ NODE_ENV: 'development', DEBUG: '1' })
+	})
+
+	test('process env overrides global env per key', () => {
+		const config = validateConfig({
+			env: { NODE_ENV: 'development', DEBUG: '1' },
+			processes: {
+				a: { command: 'echo a', env: { NODE_ENV: 'production', PORT: '3000' } }
+			}
+		})
+		expect(config.processes.a.env).toEqual({ NODE_ENV: 'production', DEBUG: '1', PORT: '3000' })
+	})
+
+	test('global envFile is inherited by processes without envFile', () => {
+		const config = validateConfig({
+			envFile: '.env',
+			processes: {
+				a: { command: 'echo a' },
+				b: { command: 'echo b', envFile: '.env.local' }
+			}
+		})
+		expect(config.processes.a.envFile).toBe('.env')
+		expect(config.processes.b.envFile).toBe('.env.local')
+	})
+
+	test('global envFile array is inherited', () => {
+		const config = validateConfig({
+			envFile: ['.env', '.env.shared'],
+			processes: {
+				a: { command: 'echo a' }
+			}
+		})
+		expect(config.processes.a.envFile).toEqual(['.env', '.env.shared'])
+	})
+
+	test('throws on non-string global env values', () => {
+		expect(() =>
+			validateConfig({
+				env: { PORT: 3000 },
+				processes: { a: { command: 'echo a' } }
+			})
+		).toThrow('env.PORT must be a string, got number')
+	})
+
+	test('global options are optional', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.cwd).toBeUndefined()
+		expect(config.processes.a.env).toBeUndefined()
+		expect(config.processes.a.envFile).toBeUndefined()
+	})
+})

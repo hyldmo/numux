@@ -123,6 +123,30 @@ Auto-exits when all processes finish. Exit code 1 if any process failed.
 
 ## Config reference
 
+### Global options
+
+Top-level options apply to all processes (process-level settings override):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cwd` | `string` | Working directory for all processes (process `cwd` overrides) |
+| `env` | `Record<string, string>` | Environment variables merged into all processes (process `env` overrides per key) |
+| `envFile` | `string \| string[]` | `.env` file(s) for all processes (process `envFile` replaces if set) |
+
+```ts
+export default defineConfig({
+  cwd: './packages/backend',
+  env: { NODE_ENV: 'development' },
+  envFile: '.env',
+  processes: {
+    api: { command: 'node server.js' },           // inherits cwd, env, envFile
+    web: { command: 'vite', cwd: './packages/web' }, // overrides cwd
+  },
+})
+```
+
+### Process options
+
 Each process accepts:
 
 | Field | Type | Default | Description |

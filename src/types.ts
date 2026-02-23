@@ -17,6 +17,9 @@ export interface NumuxProcessConfig {
 
 /** Raw config as authored — processes can be string shorthand or full objects */
 export interface NumuxConfig {
+	cwd?: string // Global working directory, inherited by all processes
+	env?: Record<string, string> // Global env vars, merged into each process (process-level overrides)
+	envFile?: string | string[] // Global .env file(s), inherited by processes without their own envFile
 	processes: Record<string, NumuxProcessConfig | string>
 }
 

@@ -20,6 +20,19 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		throw new Error('Config must define at least one process')
 	}
 
+	// Extract global options
+	const globalCwd = typeof config.cwd === 'string' ? config.cwd : undefined
+	const globalEnvFile = validateStringOrStringArray(config.envFile)
+	let globalEnv: Record<string, string> | undefined
+	if (config.env && typeof config.env === 'object') {
+		for (const [k, v] of Object.entries(config.env as Record<string, unknown>)) {
+			if (typeof v !== 'string') {
+				throw new Error(`env.${k} must be a string, got ${typeof v}`)
+			}
+		}
+		globalEnv = config.env as Record<string, string>
+	}
+
 	const validated: Record<string, NumuxProcessConfig> = {}
 
 	for (const name of names) {
@@ -83,11 +96,15 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
+		const processCwd = typeof p.cwd === 'string' ? p.cwd : undefined
+		const processEnv = p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined
+		const processEnvFile = validateEnvFile(p.envFile)
+
 		validated[name] = {
 			command: p.command,
-			cwd: typeof p.cwd === 'string' ? p.cwd : undefined,
-			env: p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined,
-			envFile: validateEnvFile(p.envFile),
+			cwd: processCwd ?? globalCwd,
+			env: globalEnv || processEnv ? { ...globalEnv, ...processEnv } : undefined,
+			envFile: processEnvFile ?? globalEnvFile,
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern,
 			persistent,
