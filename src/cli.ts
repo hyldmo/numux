@@ -47,7 +47,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	/** Consume the next argument as a value for the given flag, erroring if missing */
 	const consumeValue = (flag: string): string => {
 		const next = args[++i]
-		if (next === undefined || next.startsWith('-')) {
+		if (next === undefined) {
 			throw new Error(`Missing value for ${flag}`)
 		}
 		return next

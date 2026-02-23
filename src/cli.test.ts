@@ -237,8 +237,9 @@ describe('parseArgs', () => {
 		expect(() => parseArgs(argv('-n'))).toThrow('Missing value for -n')
 	})
 
-	test('throws on flag-like value for -c', () => {
-		expect(() => parseArgs(argv('-c', '--debug'))).toThrow('Missing value for -c')
+	test('accepts values starting with - for flag arguments', () => {
+		expect(parseArgs(argv('-c', '-my-config.ts')).configPath).toBe('-my-config.ts')
+		expect(parseArgs(argv('--log-dir', '-logs')).logDir).toBe('-logs')
 	})
 
 	test('throws on invalid --name format (no equals)', () => {
