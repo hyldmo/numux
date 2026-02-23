@@ -11,17 +11,18 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "test": "bun test",
+    "lint": "biome check .",
     "fix": "biome check . --fix --unsafe"
   },
   "files": [
     "src/**/*.ts"
   ],
   "dependencies": {
-    "@opentui/core": "latest",
-    "ghostty-opentui": "latest"
+    "@opentui/core": "^0.1.81",
+    "ghostty-opentui": "^1.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "latest",
-    "@types/bun": "latest"
+    "@biomejs/biome": "^2.4.4",
+    "@types/bun": "^1.3.9"
   }
 }
