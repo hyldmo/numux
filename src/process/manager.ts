@@ -32,7 +32,8 @@ export class ProcessManager {
 				name,
 				config: proc,
 				status: 'pending',
-				exitCode: null
+				exitCode: null,
+				restartCount: 0
 			})
 		}
 	}
@@ -161,6 +162,8 @@ export class ProcessManager {
 			if (this.stopping) return
 			const runner = this.runners.get(name)
 			if (!runner) return
+			const state = this.states.get(name)
+			if (state) state.restartCount++
 			this.startTimes.set(name, Date.now())
 			runner.restart(this.lastCols, this.lastRows)
 		}, delay)
@@ -190,6 +193,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
+		state.restartCount++
 		this.startTimes.set(name, Date.now())
 		runner.restart(cols, rows)
 	}
@@ -239,6 +243,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
+		state.restartCount++
 		this.startTimes.set(name, Date.now())
 		this.runners.get(name)?.restart(cols, rows)
 	}

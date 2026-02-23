@@ -61,13 +61,25 @@ export class TabBar {
 		})
 	}
 
-	updateStatus(name: string, status: ProcessStatus): void {
+	updateStatus(name: string, status: ProcessStatus, exitCode?: number | null, restartCount?: number): void {
 		this.statuses.set(name, status)
 		const options = this.names.map(n => {
 			const s = this.statuses.get(n)!
-			return { name: this.formatTab(n, s), description: s }
+			const desc: string = n === name ? this.formatDescription(status, exitCode, restartCount) : s
+			return { name: this.formatTab(n, s), description: desc }
 		})
 		this.renderable.setOptions(options)
+	}
+
+	private formatDescription(status: ProcessStatus, exitCode?: number | null, restartCount?: number): string {
+		let desc: string = status
+		if ((status === 'failed' || status === 'stopped') && exitCode != null && exitCode !== 0) {
+			desc = `exit ${exitCode}`
+		}
+		if (restartCount && restartCount > 0) {
+			desc += ` ×${restartCount}`
+		}
+		return desc
 	}
 
 	private formatTab(name: string, status: ProcessStatus): string {

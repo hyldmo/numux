@@ -115,7 +115,8 @@ export class App {
 					this.updateScrollIndicator()
 				}
 			} else if (event.type === 'status') {
-				this.tabBar.updateStatus(event.name, event.status)
+				const state = this.manager.getState(event.name)
+				this.tabBar.updateStatus(event.name, event.status, state?.exitCode, state?.restartCount)
 				this.statusBar.updateStatus(event.name, event.status)
 			}
 		})

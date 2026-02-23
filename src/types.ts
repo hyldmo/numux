@@ -29,6 +29,7 @@ export interface ProcessState {
 	config: NumuxProcessConfig
 	status: ProcessStatus
 	exitCode: number | null
+	restartCount: number
 }
 
 export type ProcessEvent =
