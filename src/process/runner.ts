@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import type { NumuxProcessConfig, ProcessStatus } from '../types'
+import { log } from '../utils/logger'
 import { createReadinessChecker } from './ready'
 
 export type RunnerEventHandler = {
@@ -30,6 +31,7 @@ export class ProcessRunner {
 	}
 
 	start(cols: number, rows: number): void {
+		log(`[${this.name}] Starting: ${this.config.command}`)
 		this.handler.onStatus('starting')
 
 		const env: Record<string, string> = {
@@ -60,8 +62,9 @@ export class ProcessRunner {
 			this.markReady()
 		}
 
-		// Watch for exit
 		this.proc.exited.then(code => {
+			log(`[${this.name}] Exited with code ${code}`)
+
 			if (this.readiness.dependsOnExit && code === 0) {
 				this.markReady()
 			}
@@ -83,17 +86,16 @@ export class ProcessRunner {
 	private markReady(): void {
 		if (this._ready) return
 		this._ready = true
+		log(`[${this.name}] Ready`)
 		this.handler.onStatus('ready')
 		this.handler.onReady()
 	}
 
 	async restart(cols: number, rows: number): Promise<void> {
+		log(`[${this.name}] Restarting`)
 		if (this.proc) {
 			this.proc.kill('SIGTERM')
-			await Promise.race([
-				this.proc.exited,
-				new Promise<void>(r => setTimeout(r, 2000))
-			])
+			await Promise.race([this.proc.exited, new Promise<void>(r => setTimeout(r, 2000))])
 			if (this.proc) {
 				this.proc.kill('SIGKILL')
 			}
@@ -107,6 +109,7 @@ export class ProcessRunner {
 	async stop(timeoutMs = 5000): Promise<void> {
 		if (!this.proc) return
 
+		log(`[${this.name}] Stopping (timeout: ${timeoutMs}ms)`)
 		this.handler.onStatus('stopping')
 		this.proc.kill('SIGTERM')
 

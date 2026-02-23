@@ -1,5 +1,6 @@
 import { resolveDependencyTiers } from '../config/resolver'
 import type { NumuxConfig, ProcessEvent, ProcessState, ProcessStatus } from '../types'
+import { log } from '../utils/logger'
 import { ProcessRunner } from './runner'
 
 type EventListener = (event: ProcessEvent) => void
@@ -24,6 +25,7 @@ export class ProcessManager {
 	constructor(config: NumuxConfig) {
 		this.config = config
 		this.tiers = resolveDependencyTiers(config)
+		log(`Resolved ${this.tiers.length} dependency tiers:`, this.tiers)
 
 		for (const [name, proc] of Object.entries(config.processes)) {
 			this.states.set(name, {
@@ -59,6 +61,7 @@ export class ProcessManager {
 	}
 
 	async startAll(cols: number, rows: number): Promise<void> {
+		log('Starting all processes')
 		this.lastCols = cols
 		this.lastRows = rows
 
@@ -74,6 +77,7 @@ export class ProcessManager {
 				})
 
 				if (failedDep) {
+					log(`Skipping ${name}: dependency ${failedDep} failed`)
 					this.updateStatus(name, 'skipped')
 					continue
 				}
@@ -123,6 +127,7 @@ export class ProcessManager {
 		const proc = this.config.processes[name]
 		if (proc.persistent === false) return
 		if (exitCode === 0) return
+		log(`Scheduling auto-restart for ${name} (exit code: ${exitCode})`)
 
 		// Reset backoff if the process ran long enough
 		const startTime = this.startTimes.get(name) ?? 0
@@ -193,6 +198,7 @@ export class ProcessManager {
 	}
 
 	async stopAll(): Promise<void> {
+		log('Stopping all processes')
 		this.stopping = true
 		// Cancel all pending auto-restart timers
 		for (const timer of this.restartTimers.values()) {
