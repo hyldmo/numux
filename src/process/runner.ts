@@ -17,6 +17,7 @@ export class ProcessRunner {
 	private proc: ReturnType<typeof Bun.spawn> | null = null
 	private readiness: ReturnType<typeof createReadinessChecker>
 	private _ready = false
+	private stopping = false
 	private decoder = new TextDecoder()
 	private generation = 0
 
@@ -33,6 +34,7 @@ export class ProcessRunner {
 
 	start(cols: number, rows: number): void {
 		const gen = ++this.generation
+		this.stopping = false
 		log(`[${this.name}] Starting (gen ${gen}): ${this.config.command}`)
 		this.handler.onStatus('starting')
 
@@ -73,7 +75,7 @@ export class ProcessRunner {
 				this.markReady()
 			}
 
-			const status: ProcessStatus = code === 0 ? 'stopped' : 'failed'
+			const status: ProcessStatus = this.stopping || code === 0 ? 'stopped' : 'failed'
 			this.handler.onStatus(status)
 			this.handler.onExit(code)
 		})
@@ -98,11 +100,16 @@ export class ProcessRunner {
 	async restart(cols: number, rows: number): Promise<void> {
 		log(`[${this.name}] Restarting`)
 		if (this.proc) {
+			this.stopping = true
 			this.handler.onStatus('stopping')
 			this.proc.kill('SIGTERM')
-			await Promise.race([this.proc.exited, new Promise<void>(r => setTimeout(r, 2000))])
-			if (this.proc) {
+			const result = await Promise.race([
+				this.proc.exited.then(() => 'exited' as const),
+				new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 2000))
+			])
+			if (result === 'timeout' && this.proc) {
 				this.proc.kill('SIGKILL')
+				await this.proc.exited
 			}
 		}
 		this.proc = null
@@ -114,6 +121,7 @@ export class ProcessRunner {
 	async stop(timeoutMs = 5000): Promise<void> {
 		if (!this.proc) return
 
+		this.stopping = true
 		log(`[${this.name}] Stopping (timeout: ${timeoutMs}ms)`)
 		this.handler.onStatus('stopping')
 		this.proc.kill('SIGTERM')
