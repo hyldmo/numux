@@ -87,6 +87,7 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 | `-p, --prefix` | Prefixed output mode (no TUI, for CI/scripts) |
 | `--only <a,b,...>` | Only run these processes (+ their dependencies) |
 | `--exclude <a,b,...>` | Exclude these processes |
+| `--kill-others` | Kill all processes when any exits |
 | `--log-dir <path>` | Write per-process output to `<path>/<name>.log` |
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |

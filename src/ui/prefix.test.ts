@@ -21,8 +21,11 @@ function writeConfig(name: string, content: string): string {
 	return path
 }
 
-async function runPrefix(configPath: string): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['bun', INDEX, '--prefix', '-c', configPath], {
+async function runPrefix(
+	configPath: string,
+	extraArgs: string[] = []
+): Promise<{ stdout: string; exitCode: number }> {
+	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '-c', configPath], {
 		stdout: 'pipe',
 		stderr: 'pipe',
 		env: { ...process.env, FORCE_COLOR: '0' }
@@ -111,6 +114,35 @@ describe('PrefixDisplay (integration)', () => {
 		expect(firstStopped).toBeLessThan(secondOutput)
 		expect(exitCode).toBe(0)
 	}, 10000)
+
+	test('--kill-others exits when first process exits', async () => {
+		const config = writeConfig(
+			'kill-others.json',
+			JSON.stringify({
+				processes: {
+					quick: { command: "echo 'done'", persistent: false },
+					slow: { command: 'sleep 60' }
+				}
+			})
+		)
+		const { exitCode } = await runPrefix(config, ['--kill-others'])
+		// Should exit quickly (not wait for sleep 60) because "quick" exited
+		expect(exitCode).toBe(0)
+	}, 15000)
+
+	test('--kill-others exits 1 when process fails', async () => {
+		const config = writeConfig(
+			'kill-others-fail.json',
+			JSON.stringify({
+				processes: {
+					bad: { command: "sh -c 'exit 42'", persistent: false },
+					slow: { command: 'sleep 60' }
+				}
+			})
+		)
+		const { exitCode } = await runPrefix(config, ['--kill-others'])
+		expect(exitCode).toBe(1)
+	}, 15000)
 
 	test('skips dependents of failed processes', async () => {
 		const config = writeConfig(

@@ -1,6 +1,6 @@
 import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
-import { ANSI_RESET, STATUS_ANSI, buildProcessColorMap } from '../utils/color'
+import { ANSI_RESET, buildProcessColorMap, STATUS_ANSI } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 
 const RESET = ANSI_RESET
@@ -10,6 +10,11 @@ const DIM = '\x1b[90m'
  * Concurrently-style prefixed output mode for CI and headless environments.
  * Prints all process output interleaved with colored [name] prefixes.
  */
+export interface PrefixDisplayOptions {
+	logWriter?: LogWriter
+	killOthers?: boolean
+}
+
 export class PrefixDisplay {
 	private manager: ProcessManager
 	private colors: Map<string, string>
@@ -18,11 +23,13 @@ export class PrefixDisplay {
 	private buffers = new Map<string, string>()
 	private maxNameLen: number
 	private logWriter?: LogWriter
+	private killOthers: boolean
 	private stopping = false
 
-	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, logWriter?: LogWriter) {
+	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, options: PrefixDisplayOptions = {}) {
 		this.manager = manager
-		this.logWriter = logWriter
+		this.logWriter = options.logWriter
+		this.killOthers = options.killOthers ?? false
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.maxNameLen = Math.max(...names.map(n => n.length))
@@ -60,7 +67,11 @@ export class PrefixDisplay {
 		} else if (event.type === 'exit') {
 			// Flush remaining buffer
 			this.flushBuffer(event.name)
-			this.checkAllDone()
+			if (this.killOthers) {
+				this.killAllAndExit(event.name)
+			} else {
+				this.checkAllDone()
+			}
 		}
 	}
 
@@ -116,6 +127,21 @@ export class PrefixDisplay {
 			const anyFailed = states.some(s => s.status === 'failed')
 			process.exit(anyFailed ? 1 : 0)
 		}
+	}
+
+	private killAllAndExit(exitedName: string): void {
+		if (this.stopping) return
+		this.stopping = true
+		const state = this.manager.getState(exitedName)
+		const code = state?.exitCode ?? 1
+		this.manager.stopAll().then(() => {
+			this.logWriter?.close()
+			// Flush all remaining buffers
+			for (const name of this.manager.getProcessNames()) {
+				this.flushBuffer(name)
+			}
+			process.exit(code === 0 ? 0 : 1)
+		})
 	}
 
 	async shutdown(): Promise<void> {

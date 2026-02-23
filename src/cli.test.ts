@@ -51,6 +51,14 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).prefix).toBe(false)
 	})
 
+	test('--kill-others sets killOthers flag', () => {
+		expect(parseArgs(argv('--kill-others')).killOthers).toBe(true)
+	})
+
+	test('killOthers is false by default', () => {
+		expect(parseArgs(argv()).killOthers).toBe(false)
+	})
+
 	test('-c sets config path', () => {
 		expect(parseArgs(argv('-c', 'my.config.ts')).configPath).toBe('my.config.ts')
 	})
