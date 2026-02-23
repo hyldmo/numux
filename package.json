@@ -27,7 +27,7 @@
     ".": "./src/config.ts"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
+    "dev": "cd example && bun run dev --debug",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "lint": "biome check .",

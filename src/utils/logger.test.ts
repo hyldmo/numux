@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { _resetLogger, enableDebugLog, log } from './logger'
+import { _resetLogger, enableDebugLog, log, setDebugCallback } from './logger'
 
 let dir: string
 
@@ -64,5 +64,41 @@ describe('logger', () => {
 		expect(lines).toHaveLength(2)
 		expect(lines[0]).toContain('first')
 		expect(lines[1]).toContain('second')
+	})
+
+	test('debugCallback receives formatted log lines', () => {
+		enableDebugLog(dir)
+		const lines: string[] = []
+		setDebugCallback(line => lines.push(line))
+
+		log('hello')
+		log('world', { n: 1 })
+
+		expect(lines).toHaveLength(2)
+		expect(lines[0]).toContain('hello')
+		expect(lines[1]).toContain('world {"n":1}')
+	})
+
+	test('debugCallback is not called when logging is disabled', () => {
+		const lines: string[] = []
+		setDebugCallback(line => lines.push(line))
+
+		log('should not appear')
+
+		expect(lines).toHaveLength(0)
+	})
+
+	test('_resetLogger clears debugCallback', () => {
+		enableDebugLog(dir)
+		const lines: string[] = []
+		setDebugCallback(line => lines.push(line))
+
+		log('before reset')
+		_resetLogger()
+		enableDebugLog(dir)
+		log('after reset')
+
+		expect(lines).toHaveLength(1)
+		expect(lines[0]).toContain('before reset')
 	})
 })

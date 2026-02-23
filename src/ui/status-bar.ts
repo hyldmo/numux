@@ -92,9 +92,7 @@ export class StatusBar {
 			chunks.push(plain('  '))
 			chunks.push(yellow('[scrolled]'))
 		}
-		chunks.push(
-			plain('  Alt+\u2190\u2192/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+S: stop/start  Ctrl+C: quit')
-		)
+		chunks.push(plain('  \u2190\u2192/1-9: tabs  R: restart  S: stop/start  F: search  L: clear  Ctrl+C: quit'))
 		return new StyledText(chunks)
 	}
 
