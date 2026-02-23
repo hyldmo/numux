@@ -55,7 +55,7 @@ export class App {
 		})
 
 		// Tab bar
-		this.tabBar = new TabBar(this.renderer, this.names, this.processColors)
+		this.tabBar = new TabBar(this.renderer, this.names)
 
 		// Pane container
 		const paneContainer = new BoxRenderable(this.renderer, {
