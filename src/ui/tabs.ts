@@ -1,5 +1,6 @@
 import {
 	type CliRenderer,
+	type MouseEvent,
 	type OptimizedBuffer,
 	parseColor,
 	type RGBA,
@@ -51,6 +52,18 @@ class ColoredSelectRenderable extends SelectRenderable {
 		super.renderSelf(buffer, deltaTime)
 		if (wasDirty && this.frameBuffer && this._optionColors.length > 0) {
 			this.colorizeOptions()
+		}
+	}
+
+	protected onMouseEvent(event: MouseEvent): void {
+		if (event.type === 'down') {
+			const linesPerItem = (this as any).linesPerItem as number
+			const scrollOffset = (this as any).scrollOffset as number
+			const clickedIndex = scrollOffset + Math.floor(event.y / linesPerItem)
+			if (clickedIndex >= 0 && clickedIndex < this.options.length) {
+				this.setSelectedIndex(clickedIndex)
+				this.selectCurrent()
+			}
 		}
 	}
 
