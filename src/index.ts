@@ -169,11 +169,12 @@ async function main() {
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
-		const hasNpmPatterns = parsed.commands.some(c => c.startsWith('npm:'))
+		const isScriptPattern = (c: string) => c.startsWith('npm:') || /[*?[]/.test(c)
+		const hasNpmPatterns = parsed.commands.some(isScriptPattern)
 		if (hasNpmPatterns) {
-			// Expand npm: patterns into named processes, pass remaining commands as-is
-			const npmPatterns = parsed.commands.filter(c => c.startsWith('npm:'))
-			const otherCommands = parsed.commands.filter(c => !c.startsWith('npm:'))
+			// Expand npm:/glob patterns into named processes, pass remaining commands as-is
+			const npmPatterns = parsed.commands.filter(isScriptPattern)
+			const otherCommands = parsed.commands.filter(c => !isScriptPattern(c))
 			const processes: Record<string, NumuxProcessConfig | string> = {}
 			for (const pattern of npmPatterns) {
 				const entry: Partial<NumuxProcessConfig> = {}

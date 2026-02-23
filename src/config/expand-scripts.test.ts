@@ -217,6 +217,140 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns({ cwd: dir, processes: { 'npm:dev': {} } })
 		expect((result.processes.dev as any).command).toBe('npm run dev')
 	})
+
+	test('bare glob pattern expands like npm: prefix', () => {
+		const dir = setupDir('bare-glob', {
+			'package.json': pkgJson({
+				'store:dev': 'next dev',
+				'api:dev': 'bun run api',
+				build: 'tsc'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['api:dev', 'store:dev'])
+		expect((result.processes['store:dev'] as { command: string }).command).toBe('npm run store:dev')
+		expect((result.processes['api:dev'] as { command: string }).command).toBe('npm run api:dev')
+	})
+
+	test('bare glob with template properties', () => {
+		const dir = setupDir('bare-glob-template', {
+			'package.json': pkgJson({ 'app:dev': 'next dev', 'api:dev': 'bun api' })
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					'*:dev': { env: { NODE_ENV: 'dev' }, dependsOn: ['db'] } as any
+				}
+			},
+			dir
+		)
+		const proc = result.processes['app:dev'] as any
+		expect(proc.env).toEqual({ NODE_ENV: 'dev' })
+		expect(proc.dependsOn).toEqual(['db'])
+		expect(proc.command).toBe('npm run app:dev')
+	})
+
+	test('bare glob with color array', () => {
+		const dir = setupDir('bare-glob-colors', {
+			'package.json': pkgJson({ 'a:dev': 'a', 'b:dev': 'b', 'c:dev': 'c' })
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					'*:dev': { color: ['#ff0000', '#00ff00'] } as any
+				}
+			},
+			dir
+		)
+		expect((result.processes['a:dev'] as any).color).toBe('#ff0000')
+		expect((result.processes['b:dev'] as any).color).toBe('#00ff00')
+		expect((result.processes['c:dev'] as any).color).toBe('#ff0000')
+	})
+
+	test('bare glob mixed with regular processes', () => {
+		const dir = setupDir('bare-glob-mixed', {
+			'package.json': pkgJson({ 'app:dev': 'next dev' })
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					db: 'docker compose up',
+					'*:dev': {}
+				}
+			},
+			dir
+		)
+		expect(result.processes.db).toBe('docker compose up')
+		expect((result.processes['app:dev'] as any).command).toBe('npm run app:dev')
+	})
+
+	test('bare glob no matches throws with available scripts', () => {
+		const dir = setupDir('bare-glob-no-match', {
+			'package.json': pkgJson({ build: 'tsc', lint: 'eslint' })
+		})
+		expect(() => expandScriptPatterns({ processes: { '*:dev': {} } }, dir)).toThrow(
+			/no scripts matched.*Available scripts/
+		)
+	})
+
+	test('bare glob collision with existing process throws', () => {
+		const dir = setupDir('bare-glob-collision', {
+			'package.json': pkgJson({ web: 'next dev' })
+		})
+		expect(() =>
+			expandScriptPatterns(
+				{
+					processes: {
+						web: 'echo hi',
+						'w*': {}
+					}
+				},
+				dir
+			)
+		).toThrow('collides')
+	})
+
+	test('bare glob with question mark pattern', () => {
+		const dir = setupDir('bare-glob-question', {
+			'package.json': pkgJson({ 'a1': 'cmd1', 'a2': 'cmd2', 'ab': 'cmd3' })
+		})
+		const result = expandScriptPatterns({ processes: { 'a?': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['a1', 'a2', 'ab'])
+	})
+
+	test('bare glob command on wildcard throws', () => {
+		const dir = setupDir('bare-glob-cmd-err', {
+			'package.json': pkgJson({ dev: 'next dev' })
+		})
+		expect(() => expandScriptPatterns({ processes: { '*ev': { command: 'override' } as any } }, dir)).toThrow(
+			'cannot have a "command"'
+		)
+	})
+
+	test('non-glob names without command are not expanded', () => {
+		// Names like "web" that don't contain glob chars should NOT be treated as patterns
+		const config = { processes: { web: { env: { FOO: 'bar' } } as any } }
+		// This should passthrough, not try to expand
+		expect(expandScriptPatterns(config)).toBe(config)
+	})
+
+	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
+		// Simulates: numux '*:dev' — should only match scripts containing ":dev"
+		const dir = setupDir('cli-bare-glob', {
+			'package.json': pkgJson({
+				dev: "numux '*:dev'",
+				'store:dev': 'next dev --port 3001',
+				'api:dev': 'bun run src/api.ts',
+				build: 'tsc',
+				lint: 'biome check'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { '*:dev': { color: ['#00ff00', '#00ffff'] } as any } }, dir)
+		const names = Object.keys(result.processes).sort()
+		expect(names).toEqual(['api:dev', 'store:dev'])
+		// "dev" script should NOT match *:dev (no colon)
+		expect(result.processes.dev).toBeUndefined()
+	})
 })
 
 describe('detectPackageManager', () => {
