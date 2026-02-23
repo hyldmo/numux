@@ -43,6 +43,26 @@ describe('parseEnvFile', () => {
 		const result = parseEnvFile('INVALID\nFOO=bar')
 		expect(result).toEqual({ FOO: 'bar' })
 	})
+
+	test('handles \\r\\n line endings (Windows)', () => {
+		const result = parseEnvFile('FOO=bar\r\nBAZ=qux\r\n')
+		expect(result).toEqual({ FOO: 'bar', BAZ: 'qux' })
+	})
+
+	test('strips inline comments on unquoted values', () => {
+		const result = parseEnvFile('FOO=bar # this is a comment')
+		expect(result).toEqual({ FOO: 'bar' })
+	})
+
+	test('preserves # in quoted values', () => {
+		const result = parseEnvFile('FOO="bar # not a comment"')
+		expect(result).toEqual({ FOO: 'bar # not a comment' })
+	})
+
+	test('handles value with # but no space before it', () => {
+		const result = parseEnvFile('COLOR=#ff0000')
+		expect(result).toEqual({ COLOR: '#ff0000' })
+	})
 })
 
 describe('loadEnvFiles', () => {
