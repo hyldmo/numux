@@ -20,7 +20,6 @@ export class App {
 	private sidebarWidth = 20
 
 	private config: ResolvedNumuxConfig
-	private processHexColors: Map<string, string>
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -38,7 +37,6 @@ export class App {
 		this.manager = manager
 		this.config = config
 		this.names = manager.getProcessNames()
-		this.processHexColors = buildProcessHexColorMap(this.names, config)
 	}
 
 	async start(): Promise<void> {
@@ -64,7 +62,8 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		this.tabBar = new TabBar(this.renderer, this.names, this.processHexColors)
+		const processHexColors = buildProcessHexColorMap(this.names, this.config)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -95,15 +94,12 @@ export class App {
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
-			pane.onScroll(() => {
-				if (name === this.activePane) this.updateScrollIndicator()
-			})
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
 
-		// Status bar
-		this.statusBar = new StatusBar(this.renderer, this.names, this.processHexColors)
+		// Status bar (only visible during search)
+		this.statusBar = new StatusBar(this.renderer)
 
 		// Assemble layout
 		contentRow.add(sidebar)
@@ -121,9 +117,6 @@ export class App {
 			if (this.destroyed) return
 			if (event.type === 'output') {
 				this.panes.get(event.name)?.feed(event.data)
-				if (event.name === this.activePane) {
-					this.updateScrollIndicator()
-				}
 				// Detect input-waiting for interactive processes
 				if (this.config.processes[event.name]?.interactive) {
 					this.checkInputWaiting(event.name, event.data)
@@ -131,7 +124,6 @@ export class App {
 			} else if (event.type === 'status') {
 				const state = this.manager.getState(event.name)
 				this.tabBar.updateStatus(event.name, event.status, state?.exitCode, state?.restartCount)
-				this.statusBar.updateStatus(event.name, event.status)
 				// Clear input-waiting on non-active statuses
 				if (event.status !== 'running' && event.status !== 'ready') {
 					this.clearInputWaiting(event.name)
@@ -237,19 +229,16 @@ export class App {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
 						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
-						this.updateScrollIndicator()
 						return
 					}
 
 					// Alt+Home/End: scroll to top/bottom
 					if (this.activePane && key.name === 'home') {
 						this.panes.get(this.activePane)?.scrollToTop()
-						this.updateScrollIndicator()
 						return
 					}
 					if (this.activePane && key.name === 'end') {
 						this.panes.get(this.activePane)?.scrollToBottom()
-						this.updateScrollIndicator()
 						return
 					}
 				}
@@ -263,18 +252,14 @@ export class App {
 					if (key.name === 'up' || key.name === 'down') {
 						const pane = this.panes.get(this.activePane)
 						pane?.scrollBy(key.name === 'up' ? -1 : 1)
-						this.updateScrollIndicator()
 					} else if (key.name === 'pageup' || key.name === 'pagedown') {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
 						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
-						this.updateScrollIndicator()
 					} else if (key.name === 'home') {
 						this.panes.get(this.activePane)?.scrollToTop()
-						this.updateScrollIndicator()
 					} else if (key.name === 'end') {
 						this.panes.get(this.activePane)?.scrollToBottom()
-						this.updateScrollIndicator()
 					}
 					return
 				}
@@ -306,14 +291,6 @@ export class App {
 		}
 		this.activePane = name
 		this.panes.get(name)?.show()
-		this.updateScrollIndicator()
-	}
-
-	private updateScrollIndicator(): void {
-		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
-		this.statusBar.setScrollIndicator(!pane.isAtBottom)
 	}
 
 	/** Detect when an interactive process is likely waiting for user input */
@@ -447,7 +424,6 @@ export class App {
 		if (!pane) return
 		const match = this.searchMatches[this.searchIndex]
 		pane.scrollToLine(match.line)
-		this.updateScrollIndicator()
 	}
 
 	async shutdown(): Promise<void> {

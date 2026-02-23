@@ -1,25 +1,4 @@
-import {
-	type CliRenderer,
-	cyan,
-	fg,
-	green,
-	red,
-	reverse,
-	StyledText,
-	type TextChunk,
-	TextRenderable,
-	yellow
-} from '@opentui/core'
-import type { ProcessStatus } from '../types'
-
-const STATUS_STYLE: Partial<Record<ProcessStatus, (input: string) => TextChunk>> = {
-	ready: green,
-	running: cyan,
-	finished: green,
-	failed: red,
-	stopped: fg('#888'),
-	skipped: fg('#888')
-}
+import { type CliRenderer, cyan, red, reverse, StyledText, type TextChunk, TextRenderable, yellow } from '@opentui/core'
 
 function plain(text: string): TextChunk {
 	return { __isChunk: true, text } as TextChunk
@@ -27,20 +6,12 @@ function plain(text: string): TextChunk {
 
 export class StatusBar {
 	readonly renderable: TextRenderable
-	private statuses = new Map<string, ProcessStatus>()
-	private colors: Map<string, string>
-	private scrolledUp = false
 	private _searchMode = false
 	private _searchQuery = ''
 	private _searchMatchCount = 0
 	private _searchCurrentIndex = -1
 
-	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
-		this.colors = colors ?? new Map()
-		for (const name of names) {
-			this.statuses.set(name, 'pending')
-		}
-
+	constructor(renderer: CliRenderer) {
 		this.renderable = new TextRenderable(renderer, {
 			id: 'status-bar',
 			width: '100%',
@@ -49,17 +20,6 @@ export class StatusBar {
 			bg: '#1a1a1a',
 			paddingX: 1
 		})
-	}
-
-	updateStatus(name: string, status: ProcessStatus): void {
-		this.statuses.set(name, status)
-		this.renderable.content = this.buildContent()
-	}
-
-	setScrollIndicator(scrolledUp: boolean): void {
-		if (this.scrolledUp === scrolledUp) return
-		this.scrolledUp = scrolledUp
-		this.renderable.content = this.buildContent()
 	}
 
 	setSearchMode(active: boolean, query = '', matchCount = 0, currentIndex = -1): void {
@@ -74,29 +34,7 @@ export class StatusBar {
 		if (this._searchMode) {
 			return this.buildSearchContent()
 		}
-		const chunks: TextChunk[] = []
-		let first = true
-		for (const [name, status] of this.statuses) {
-			if (!first) chunks.push(plain('  '))
-			first = false
-			const styleFn = STATUS_STYLE[status]
-			const hexColor = this.colors.get(name)
-			if (styleFn) {
-				chunks.push(styleFn(`${name}:${status}`))
-			} else if (hexColor) {
-				chunks.push(fg(hexColor)(`${name}:${status}`))
-			} else {
-				chunks.push(plain(`${name}:${status}`))
-			}
-		}
-		if (this.scrolledUp) {
-			chunks.push(plain('  '))
-			chunks.push(yellow('[scrolled]'))
-		}
-		chunks.push(
-			plain('  Alt+\u2190\u2192/1-9: tabs  Alt+PgUp/Dn: scroll  Alt+R: restart  Alt+S: stop/start  Ctrl+C: quit')
-		)
-		return new StyledText(chunks)
+		return new StyledText([plain('')])
 	}
 
 	private buildSearchContent(): StyledText {
