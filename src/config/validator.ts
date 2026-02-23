@@ -1,5 +1,5 @@
 import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
-import { HEX_COLOR_RE } from '../utils/color'
+import { isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
 
@@ -71,16 +71,18 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
-		// Validate color hex format
+		// Validate color (hex or basic name: green, cyan, magenta, red, yellow, blue)
 		if (typeof p.color === 'string') {
-			if (!HEX_COLOR_RE.test(p.color)) {
-				throw new Error(`Process "${name}".color must be a valid hex color (e.g. "#ff8800"), got "${p.color}"`)
+			if (!isValidColor(p.color)) {
+				throw new Error(
+					`Process "${name}".color must be a hex color (e.g. "#ff8800") or basic name (black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple), got "${p.color}"`
+				)
 			}
 		} else if (Array.isArray(p.color)) {
 			for (const c of p.color) {
-				if (typeof c !== 'string' || !HEX_COLOR_RE.test(c)) {
+				if (typeof c !== 'string' || !isValidColor(c)) {
 					throw new Error(
-						`Process "${name}".color entries must be valid hex colors (e.g. "#ff8800"), got "${c}"`
+						`Process "${name}".color entries must be hex or basic names (black, red, green, yellow, blue, magenta, cyan, white, gray, orange), got "${c}"`
 					)
 				}
 			}

@@ -316,14 +316,23 @@ describe('validateConfig', () => {
 		expect(config.processes.web.color).toBe('ff8800')
 	})
 
-	test('throws on invalid hex color', () => {
+	test('accepts basic color names', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', color: 'red' }
+			}
+		})
+		expect(config.processes.web.color).toBe('red')
+	})
+
+	test('throws on invalid color', () => {
 		expect(() =>
 			validateConfig({
 				processes: {
-					web: { command: 'echo hi', color: 'red' }
+					web: { command: 'echo hi', color: 'indigo' }
 				}
 			})
-		).toThrow('valid hex color')
+		).toThrow('basic name')
 	})
 
 	test('throws on short hex color', () => {
@@ -333,7 +342,7 @@ describe('validateConfig', () => {
 					web: { command: 'echo hi', color: '#fff' }
 				}
 			})
-		).toThrow('valid hex color')
+		).toThrow('basic name')
 	})
 
 	test('warns when readyPattern is set on non-persistent process', () => {

@@ -1,3 +1,32 @@
+/** Basic color names mapped to hex (lowercase keys) — 8 ANSI base + gray/orange */
+export const BASIC_COLORS: Record<string, string> = {
+	black: '#000000',
+	red: '#ff0000',
+	green: '#00ff00',
+	yellow: '#ffff00',
+	blue: '#0000ff',
+	magenta: '#ff00ff',
+	cyan: '#00ffff',
+	white: '#ffffff',
+	gray: '#808080',
+	grey: '#808080',
+	orange: '#ffa500',
+	purple: '#800080'
+}
+
+/** Check if a string is a valid color (hex or basic name) */
+export function isValidColor(color: string): boolean {
+	if (HEX_COLOR_RE.test(color)) return true
+	return color.toLowerCase() in BASIC_COLORS
+}
+
+/** Resolve any color (hex or basic name) to normalized hex (#rrggbb) */
+export function resolveToHex(color: string): string {
+	if (HEX_COLOR_RE.test(color)) return color.startsWith('#') ? color : `#${color}`
+	const hex = BASIC_COLORS[color.toLowerCase()]
+	return hex ?? ''
+}
+
 /**
  * Convert a hex color string (e.g. "#ff8800") to an ANSI true-color escape sequence.
  * Returns an empty string if the hex is malformed.
@@ -66,7 +95,9 @@ export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfi
 	for (const name of names) {
 		const explicit = resolveColor(config.processes[name]?.color)
 		if (explicit) {
-			map.set(name, hexToAnsi(explicit))
+			const hex = resolveToHex(explicit)
+			if (hex) map.set(name, hexToAnsi(hex))
+			else map.set(name, DEFAULT_ANSI_COLORS[paletteIndex++ % DEFAULT_ANSI_COLORS.length])
 		} else {
 			map.set(name, DEFAULT_ANSI_COLORS[paletteIndex % DEFAULT_ANSI_COLORS.length])
 			paletteIndex++
@@ -83,7 +114,9 @@ export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxCo
 	for (const name of names) {
 		const explicit = resolveColor(config.processes[name]?.color)
 		if (explicit) {
-			map.set(name, explicit.startsWith('#') ? explicit : `#${explicit}`)
+			const hex = resolveToHex(explicit)
+			if (hex) map.set(name, hex)
+			else map.set(name, DEFAULT_HEX_COLORS[paletteIndex++ % DEFAULT_HEX_COLORS.length])
 		} else {
 			map.set(name, DEFAULT_HEX_COLORS[paletteIndex % DEFAULT_HEX_COLORS.length])
 			paletteIndex++

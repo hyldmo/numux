@@ -178,7 +178,7 @@ Each process accepts:
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
 | `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
-| `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
+| `color` | `string \| string[]` | auto | Hex (e.g. `"#ff6600"`) or basic name: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple |
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
 | `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HEX_COLOR_RE, hexToAnsi, stripAnsi } from './color'
+import { BASIC_COLORS, HEX_COLOR_RE, hexToAnsi, isValidColor, resolveToHex, stripAnsi } from './color'
 
 describe('hexToAnsi', () => {
 	test('converts #rrggbb to ANSI true-color sequence', () => {
@@ -22,6 +22,56 @@ describe('hexToAnsi', () => {
 		expect(hexToAnsi('zzzzzz')).toBe('')
 		expect(hexToAnsi('#gggggg')).toBe('')
 		expect(hexToAnsi('')).toBe('')
+	})
+})
+
+describe('isValidColor', () => {
+	test('accepts hex colors', () => {
+		expect(isValidColor('#ff8800')).toBe(true)
+		expect(isValidColor('ff8800')).toBe(true)
+	})
+
+	test('accepts basic color names', () => {
+		for (const name of Object.keys(BASIC_COLORS)) {
+			expect(isValidColor(name)).toBe(true)
+			expect(isValidColor(name.toUpperCase())).toBe(true)
+		}
+	})
+
+	test('rejects invalid colors', () => {
+		expect(isValidColor('indigo')).toBe(false)
+		expect(isValidColor('#fff')).toBe(false)
+		expect(isValidColor('')).toBe(false)
+	})
+})
+
+describe('resolveToHex', () => {
+	test('returns hex for hex input', () => {
+		expect(resolveToHex('#ff8800')).toBe('#ff8800')
+		expect(resolveToHex('ff8800')).toBe('#ff8800')
+	})
+
+	test('returns hex for basic color names', () => {
+		expect(resolveToHex('black')).toBe('#000000')
+		expect(resolveToHex('red')).toBe('#ff0000')
+		expect(resolveToHex('green')).toBe('#00ff00')
+		expect(resolveToHex('yellow')).toBe('#ffff00')
+		expect(resolveToHex('blue')).toBe('#0000ff')
+		expect(resolveToHex('magenta')).toBe('#ff00ff')
+		expect(resolveToHex('cyan')).toBe('#00ffff')
+		expect(resolveToHex('white')).toBe('#ffffff')
+		expect(resolveToHex('gray')).toBe('#808080')
+		expect(resolveToHex('grey')).toBe('#808080')
+		expect(resolveToHex('orange')).toBe('#ffa500')
+		expect(resolveToHex('purple')).toBe('#800080')
+	})
+
+	test('is case-insensitive for names', () => {
+		expect(resolveToHex('RED')).toBe('#ff0000')
+	})
+
+	test('returns empty string for invalid', () => {
+		expect(resolveToHex('indigo')).toBe('')
 	})
 })
 

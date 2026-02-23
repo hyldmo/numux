@@ -29,7 +29,7 @@ Usage:
 
 Options:
   -n, --name <name=command>  Add a named process
-  -c, --color <colors>       Comma-separated colors for processes (hex, e.g. #ff0,#0f0)
+  -c, --color <colors>       Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple)
   --config <path>            Config file path (default: auto-detect)
   -p, --prefix               Prefixed output mode (no TUI, for CI/scripts)
   --only <a,b,...>           Only run these processes (+ their dependencies)
