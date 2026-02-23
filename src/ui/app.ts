@@ -3,6 +3,7 @@ import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import { log } from '../utils/logger'
+import { SHORTCUTS } from './keybindings'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
@@ -95,6 +96,7 @@ export class App {
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
+			pane.onCopy(() => this.statusBar.showTemporaryMessage('Copied!'))
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
@@ -180,26 +182,27 @@ export class App {
 				if (!isInteractive) {
 					const name = key.name.toLowerCase()
 
-					// Shift+R: restart all processes
-					if (key.shift && name === 'r') {
+					if (key.shift && name === SHORTCUTS.restartAll.key) {
 						this.manager.restartAll(this.termCols, this.termRows)
 						return
 					}
 
-					// F: enter search mode
-					if (name === 'f') {
+					if (name === SHORTCUTS.copy.key) {
+						this.copySelection()
+						return
+					}
+
+					if (name === SHORTCUTS.search.key) {
 						this.enterSearch()
 						return
 					}
 
-					// R: restart active process
-					if (name === 'r') {
+					if (name === SHORTCUTS.restart.key) {
 						this.manager.restart(this.activePane, this.termCols, this.termRows)
 						return
 					}
 
-					// S: stop/start active process
-					if (name === 's') {
+					if (name === SHORTCUTS.stopStart.key) {
 						const state = this.manager.getState(this.activePane)
 						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
 							this.manager.start(this.activePane, this.termCols, this.termRows)
@@ -209,8 +212,7 @@ export class App {
 						return
 					}
 
-					// L: clear active pane
-					if (name === 'l') {
+					if (name === SHORTCUTS.clear.key) {
 						this.panes.get(this.activePane)?.clear()
 						return
 					}
@@ -320,6 +322,18 @@ export class App {
 			this.awaitingInput.delete(name)
 			this.tabBar.setInputWaiting(name, false)
 		}
+	}
+
+	/** Copy selected text to clipboard. Returns true if there was a selection to copy. */
+	private copySelection(): boolean {
+		const selection = this.renderer.getSelection()
+		if (!selection?.isActive) return false
+		const text = selection.getSelectedText()
+		if (!text) return false
+		this.renderer.copyToClipboardOSC52(text)
+		this.renderer.clearSelection()
+		this.statusBar.showTemporaryMessage('Copied!')
+		return true
 	}
 
 	private enterSearch(): void {
