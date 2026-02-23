@@ -1,13 +1,10 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
 import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
-import { hexToAnsi } from '../utils/color'
+import { buildProcessColorMap } from '../utils/color'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
-
-/** Default palette for processes without an explicit color */
-const DEFAULT_COLORS = ['\x1b[36m', '\x1b[33m', '\x1b[35m', '\x1b[34m', '\x1b[32m', '\x1b[91m', '\x1b[93m', '\x1b[95m']
 
 export class App {
 	private renderer!: CliRenderer
@@ -34,22 +31,7 @@ export class App {
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
 		this.names = manager.getProcessNames()
-		this.processColors = this.buildColorMap(config)
-	}
-
-	private buildColorMap(config: ResolvedNumuxConfig): Map<string, string> {
-		const map = new Map<string, string>()
-		let paletteIndex = 0
-		for (const name of this.names) {
-			const explicit = config.processes[name]?.color
-			if (explicit) {
-				map.set(name, hexToAnsi(explicit))
-			} else {
-				map.set(name, DEFAULT_COLORS[paletteIndex % DEFAULT_COLORS.length])
-				paletteIndex++
-			}
-		}
-		return map
+		this.processColors = buildProcessColorMap(this.names, config)
 	}
 
 	async start(): Promise<void> {

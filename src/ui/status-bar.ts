@@ -1,15 +1,8 @@
 import { type CliRenderer, TextRenderable } from '@opentui/core'
 import type { ProcessStatus } from '../types'
+import { ANSI_RESET, STATUS_ANSI } from '../utils/color'
 
-const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
-	ready: '\x1b[32m',
-	running: '\x1b[36m',
-	failed: '\x1b[31m',
-	stopped: '\x1b[90m',
-	skipped: '\x1b[90m'
-}
-
-const RESET = '\x1b[0m'
+const RESET = ANSI_RESET
 
 export class StatusBar {
 	readonly renderable: TextRenderable

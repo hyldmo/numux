@@ -1,5 +1,6 @@
 import { type CliRenderer, TabSelectRenderable, TabSelectRenderableEvents } from '@opentui/core'
 import type { ProcessStatus } from '../types'
+import { ANSI_RESET, STATUS_ANSI } from '../utils/color'
 
 const STATUS_ICONS: Record<ProcessStatus, string> = {
 	pending: '○',
@@ -12,14 +13,7 @@ const STATUS_ICONS: Record<ProcessStatus, string> = {
 	skipped: '⊘'
 }
 
-const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
-	ready: '\x1b[32m',
-	failed: '\x1b[31m',
-	stopped: '\x1b[90m',
-	skipped: '\x1b[90m'
-}
-
-const RESET = '\x1b[0m'
+const RESET = ANSI_RESET
 
 export class TabBar {
 	readonly renderable: TabSelectRenderable

@@ -1,19 +1,10 @@
 import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
-import { hexToAnsi } from '../utils/color'
+import { ANSI_RESET, STATUS_ANSI, buildProcessColorMap } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 
-/** Default ANSI colors for process name prefixes */
-const PREFIX_COLORS = ['\x1b[36m', '\x1b[33m', '\x1b[35m', '\x1b[34m', '\x1b[32m', '\x1b[91m', '\x1b[93m', '\x1b[95m']
-const RESET = '\x1b[0m'
+const RESET = ANSI_RESET
 const DIM = '\x1b[90m'
-
-const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
-	ready: '\x1b[32m',
-	failed: '\x1b[31m',
-	stopped: '\x1b[90m',
-	skipped: '\x1b[90m'
-}
 
 /**
  * Concurrently-style prefixed output mode for CI and headless environments.
@@ -35,27 +26,11 @@ export class PrefixDisplay {
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.maxNameLen = Math.max(...names.map(n => n.length))
-		this.colors = this.buildColorMap(names, config)
+		this.colors = buildProcessColorMap(names, config)
 		for (const name of names) {
 			this.decoders.set(name, new TextDecoder('utf-8', { fatal: false }))
 			this.buffers.set(name, '')
 		}
-	}
-
-	private buildColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
-		const map = new Map<string, string>()
-		if ('NO_COLOR' in process.env) return map
-		let paletteIndex = 0
-		for (const name of names) {
-			const explicit = config.processes[name]?.color
-			if (explicit) {
-				map.set(name, hexToAnsi(explicit))
-			} else {
-				map.set(name, PREFIX_COLORS[paletteIndex % PREFIX_COLORS.length])
-				paletteIndex++
-			}
-		}
-		return map
 	}
 
 	async start(): Promise<void> {
