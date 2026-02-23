@@ -1,4 +1,20 @@
 {
   "name": "numux",
-  "packageManager": "yarn@4.5.1"
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "fix": "biome check . --fix --unsafe"
+  },
+  "files": [
+    "src/**/*.ts"
+  ],
+  "dependencies": {
+    "@opentui/core": "latest",
+    "ghostty-opentui": "latest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@types/bun": "latest"
+  }
 }
