@@ -23,6 +23,7 @@ export class PrefixDisplay {
 	private manager: ProcessManager
 	private colors: Map<string, string>
 	private noColor: boolean
+	private decoders = new Map<string, TextDecoder>()
 	private buffers = new Map<string, string>()
 	private maxNameLen: number
 	private logWriter?: LogWriter
@@ -36,6 +37,7 @@ export class PrefixDisplay {
 		this.maxNameLen = Math.max(...names.map(n => n.length))
 		this.colors = this.buildColorMap(names, config)
 		for (const name of names) {
+			this.decoders.set(name, new TextDecoder('utf-8', { fatal: false }))
 			this.buffers.set(name, '')
 		}
 	}
@@ -88,7 +90,8 @@ export class PrefixDisplay {
 	}
 
 	private handleOutput(name: string, data: Uint8Array): void {
-		const text = new TextDecoder().decode(data)
+		const decoder = this.decoders.get(name) ?? new TextDecoder()
+		const text = decoder.decode(data, { stream: true })
 		const buffer = (this.buffers.get(name) ?? '') + text
 		const lines = buffer.split(/\r?\n/)
 
