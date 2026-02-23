@@ -45,6 +45,11 @@ export default defineConfig({
     },
     // String shorthand for simple processes
     web: 'bun run dev:web',
+    // Interactive process — keyboard input is forwarded
+    shell: {
+      command: 'psql -U postgres',
+      interactive: true,
+    },
   },
 })
 ```
