@@ -79,6 +79,7 @@ Each process accepts:
 | `dependsOn` | `string[]` | — | Processes that must be ready first |
 | `readyPattern` | `string` | — | Regex matched against stdout to signal readiness |
 | `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
+| `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
 | `color` | `string` | auto | Hex color for tab icon and status bar (e.g. `"#ff6600"`) |
 
 ### Dependency orchestration

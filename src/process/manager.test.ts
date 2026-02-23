@@ -255,6 +255,92 @@ describe('ProcessManager — manual restart', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — maxRestarts', () => {
+	test('stops auto-restarting after maxRestarts is reached', async () => {
+		const config: NumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 2 }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'crasher') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+
+		// Wait for backoff timers: attempt 1 at 1s, attempt 2 at 2s, then limit
+		await new Promise(r => setTimeout(r, 4500))
+
+		const allOutput = outputs.join('')
+		// Should see "attempt 1/2" and "attempt 2/2" restart messages
+		expect(allOutput).toContain('attempt 1/2')
+		expect(allOutput).toContain('attempt 2/2')
+		// Should see the "giving up" message
+		expect(allOutput).toContain('reached restart limit')
+		// Should NOT see attempt 3
+		expect(allOutput).not.toContain('attempt 3')
+
+		await mgr.stopAll()
+	}, 10000)
+
+	test('maxRestarts: 0 prevents any auto-restart', async () => {
+		const config: NumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 0 }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'crasher') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		const allOutput = outputs.join('')
+		expect(allOutput).toContain('reached restart limit')
+		expect(allOutput).not.toContain('restarting in')
+
+		await mgr.stopAll()
+	}, 5000)
+
+	test('undefined maxRestarts allows unlimited restarts', async () => {
+		const config: NumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", persistent: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'crasher') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+		// Wait long enough for at least 2 restarts (1s + 2s backoff)
+		await new Promise(r => setTimeout(r, 4000))
+
+		const allOutput = outputs.join('')
+		expect(allOutput).toContain('attempt 1')
+		expect(allOutput).toContain('attempt 2')
+		expect(allOutput).not.toContain('giving up')
+
+		await mgr.stopAll()
+	}, 10000)
+})
+
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: NumuxConfig = {

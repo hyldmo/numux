@@ -86,6 +86,42 @@ describe('validateConfig', () => {
 		).toThrow('cannot depend on itself')
 	})
 
+	test('preserves explicit maxRestarts', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', maxRestarts: 3 }
+			}
+		})
+		expect(config.processes.web.maxRestarts).toBe(3)
+	})
+
+	test('preserves maxRestarts: 0', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', maxRestarts: 0 }
+			}
+		})
+		expect(config.processes.web.maxRestarts).toBe(0)
+	})
+
+	test('ignores negative maxRestarts', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', maxRestarts: -1 }
+			}
+		})
+		expect(config.processes.web.maxRestarts).toBeUndefined()
+	})
+
+	test('ignores non-number maxRestarts', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', maxRestarts: 'abc' }
+			}
+		})
+		expect(config.processes.web.maxRestarts).toBeUndefined()
+	})
+
 	test('throws on non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({

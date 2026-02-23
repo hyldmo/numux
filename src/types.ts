@@ -5,6 +5,7 @@ export interface NumuxProcessConfig {
 	dependsOn?: string[]
 	readyPattern?: string
 	persistent?: boolean // default true, false = one-shot
+	maxRestarts?: number // default Infinity, limit auto-restart attempts
 	color?: string
 }
 

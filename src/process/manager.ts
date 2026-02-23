@@ -136,11 +136,22 @@ export class ProcessManager {
 		}
 
 		const attempt = this.restartAttempts.get(name) ?? 0
+
+		// Enforce maxRestarts limit
+		const maxRestarts = proc.maxRestarts
+		if (maxRestarts !== undefined && attempt >= maxRestarts) {
+			log(`[${name}] Reached maxRestarts limit (${maxRestarts}), not restarting`)
+			const encoder = new TextEncoder()
+			const msg = `\r\n\x1b[31m[numux] reached restart limit (${maxRestarts}), giving up\x1b[0m\r\n`
+			this.emit({ type: 'output', name, data: encoder.encode(msg) })
+			return
+		}
+
 		const delay = Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_MAX_MS)
 		this.restartAttempts.set(name, attempt + 1)
 
 		const encoder = new TextEncoder()
-		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1})...\x1b[0m\r\n`
+		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1}${maxRestarts !== undefined ? `/${maxRestarts}` : ''})...\x1b[0m\r\n`
 		this.emit({ type: 'output', name, data: encoder.encode(msg) })
 
 		const timer = setTimeout(() => {

@@ -56,6 +56,7 @@ export function validateConfig(raw: unknown): NumuxConfig {
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern: typeof p.readyPattern === 'string' ? p.readyPattern : undefined,
 			persistent: typeof p.persistent === 'boolean' ? p.persistent : true,
+			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
 			color: typeof p.color === 'string' ? p.color : undefined
 		}
 	}
