@@ -14,7 +14,7 @@ export class Pane {
 
 	private _onScroll: (() => void) | null = null
 
-	constructor(renderer: CliRenderer, name: string, cols: number, rows: number) {
+	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
 			flexGrow: 1,
@@ -30,7 +30,7 @@ export class Pane {
 			cols,
 			rows,
 			persistent: true,
-			showCursor: true,
+			showCursor: interactive,
 			trimEnd: true
 		})
 

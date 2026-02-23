@@ -429,6 +429,33 @@ describe('validateConfig', () => {
 		})
 		expect(config.processes.web.watch).toBeUndefined()
 	})
+
+	test('interactive defaults to false', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi' }
+			}
+		})
+		expect(config.processes.web.interactive).toBe(false)
+	})
+
+	test('preserves interactive: true', () => {
+		const config = validateConfig({
+			processes: {
+				shell: { command: 'bash', interactive: true }
+			}
+		})
+		expect(config.processes.shell.interactive).toBe(true)
+	})
+
+	test('interactive defaults to false for string shorthand', () => {
+		const config = validateConfig({
+			processes: {
+				web: 'bun dev'
+			}
+		})
+		expect(config.processes.web.interactive).toBe(false)
+	})
 })
 
 describe('validateConfig — global options', () => {

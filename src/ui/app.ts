@@ -19,6 +19,7 @@ export class App {
 	private termRows = 24
 	private sidebarWidth = 20
 
+	private config: ResolvedNumuxConfig
 	private processHexColors: Map<string, string>
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
@@ -31,6 +32,7 @@ export class App {
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
+		this.config = config
 		this.names = manager.getProcessNames()
 		this.processHexColors = buildProcessHexColorMap(this.names, config)
 	}
@@ -87,7 +89,8 @@ export class App {
 
 		// Create a pane per process
 		for (const name of this.names) {
-			const pane = new Pane(this.renderer, name, termCols, termRows)
+			const interactive = this.config.processes[name].interactive === true
+			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
 			pane.onScroll(() => {
 				if (name === this.activePane) this.updateScrollIndicator()
 			})
@@ -241,8 +244,33 @@ export class App {
 					}
 				}
 
+				if (!this.activePane) return
+
+				const isInteractive = this.config.processes[this.activePane]?.interactive === true
+
+				// Non-interactive panes: arrow keys scroll, all other input is dropped
+				if (!isInteractive) {
+					if (key.name === 'up' || key.name === 'down') {
+						const pane = this.panes.get(this.activePane)
+						pane?.scrollBy(key.name === 'up' ? -1 : 1)
+						this.updateScrollIndicator()
+					} else if (key.name === 'pageup' || key.name === 'pagedown') {
+						const pane = this.panes.get(this.activePane)
+						const delta = this.termRows - 2
+						pane?.scrollBy(key.name === 'pageup' ? -delta : delta)
+						this.updateScrollIndicator()
+					} else if (key.name === 'home') {
+						this.panes.get(this.activePane)?.scrollToTop()
+						this.updateScrollIndicator()
+					} else if (key.name === 'end') {
+						this.panes.get(this.activePane)?.scrollToBottom()
+						this.updateScrollIndicator()
+					}
+					return
+				}
+
 				// Forward all other input to the active process
-				if (this.activePane && key.sequence) {
+				if (key.sequence) {
 					this.manager.write(this.activePane, key.sequence)
 				}
 			}
