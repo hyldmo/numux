@@ -23,12 +23,13 @@ function writeConfig(name: string, content: string): string {
 
 async function runPrefix(
 	configPath: string,
-	extraArgs: string[] = []
+	extraArgs: string[] = [],
+	envOverrides: Record<string, string> = {}
 ): Promise<{ stdout: string; exitCode: number }> {
 	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '-c', configPath], {
 		stdout: 'pipe',
 		stderr: 'pipe',
-		env: { ...process.env, FORCE_COLOR: '0' }
+		env: { ...process.env, FORCE_COLOR: '0', ...envOverrides }
 	})
 	const stdout = await new Response(proc.stdout).text()
 	const exitCode = await proc.exited
@@ -173,6 +174,21 @@ describe('PrefixDisplay (integration)', () => {
 		const lines = stdout.split('\n')
 		const summaryLines = lines.filter(l => l.includes('exit 2') && !l.startsWith('['))
 		expect(summaryLines.length).toBeGreaterThan(0)
+	}, 10000)
+
+	test('strips ANSI from process output when NO_COLOR is set', async () => {
+		const config = writeConfig(
+			'no-color.json',
+			JSON.stringify({
+				processes: {
+					ansi: { command: "printf '\\x1b[32mgreen\\x1b[0m plain'", persistent: false }
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		expect(stdout).toContain('green plain')
+		expect(stdout).not.toContain('\x1b[')
+		expect(exitCode).toBe(0)
 	}, 10000)
 
 	test('skips dependents of failed processes', async () => {

@@ -1,6 +1,6 @@
 import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
-import { ANSI_RESET, buildProcessColorMap, STATUS_ANSI } from '../utils/color'
+import { ANSI_RESET, buildProcessColorMap, STATUS_ANSI, stripAnsi } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 
 const RESET = ANSI_RESET
@@ -117,7 +117,7 @@ export class PrefixDisplay {
 		const ts = this.timestamps ? `${DIM}[${this.formatTimestamp()}]${RESET} ` : ''
 		const tsPlain = this.timestamps ? `[${this.formatTimestamp()}] ` : ''
 		if (this.noColor) {
-			process.stdout.write(`${tsPlain}[${padded}] ${line}\n`)
+			process.stdout.write(`${tsPlain}[${padded}] ${stripAnsi(line)}\n`)
 		} else {
 			const color = this.colors.get(name) ?? ''
 			process.stdout.write(`${ts}${color}[${padded}]${RESET} ${line}\n`)
