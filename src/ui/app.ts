@@ -350,6 +350,10 @@ export class App {
 	async shutdown(): Promise<void> {
 		if (this.destroyed) return
 		this.destroyed = true
+		if (this.resizeTimer) {
+			clearTimeout(this.resizeTimer)
+			this.resizeTimer = null
+		}
 		await this.manager.stopAll()
 		for (const pane of this.panes.values()) {
 			pane.destroy()

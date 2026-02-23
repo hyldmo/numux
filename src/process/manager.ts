@@ -218,10 +218,10 @@ export class ProcessManager {
 			clearTimeout(timer)
 		}
 		this.restartTimers.clear()
-		// Stop in reverse tier order
+		// Stop in reverse tier order — use allSettled so one failure doesn't skip remaining tiers
 		const reversed = [...this.tiers].reverse()
 		for (const tier of reversed) {
-			await Promise.all(tier.map(name => this.runners.get(name)?.stop()).filter(Boolean))
+			await Promise.allSettled(tier.map(name => this.runners.get(name)?.stop()).filter(Boolean))
 		}
 	}
 }

@@ -17,6 +17,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	process.on('SIGTERM', shutdown)
 	process.on('uncaughtException', err => {
 		log('Uncaught exception:', err?.message ?? err)
+		process.stderr.write(`numux: unexpected error: ${err?.stack ?? err}\n`)
 		app.shutdown().finally(() => {
 			logWriter?.close()
 			process.exit(1)
@@ -26,6 +27,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	process.on('unhandledRejection', (reason: unknown) => {
 		const message = reason instanceof Error ? reason.message : String(reason)
 		log('Unhandled rejection:', message)
+		process.stderr.write(`numux: unhandled rejection: ${message}\n`)
 		app.shutdown().finally(() => {
 			logWriter?.close()
 			process.exit(1)
