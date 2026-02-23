@@ -29,8 +29,12 @@ async function loadFile(path: string): Promise<NumuxConfig> {
 			throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
 		}
 	}
-	const mod = await import(path)
-	return mod.default ?? mod
+	try {
+		const mod = await import(path)
+		return mod.default ?? mod
+	} catch (err) {
+		throw new Error(`Failed to load ${path}: ${err instanceof Error ? err.message : err}`, { cause: err })
+	}
 }
 
 async function loadExplicitConfig(configPath: string): Promise<NumuxConfig> {

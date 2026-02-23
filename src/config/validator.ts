@@ -74,6 +74,15 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			})
 		}
 
+		// Validate env values are strings
+		if (p.env && typeof p.env === 'object') {
+			for (const [k, v] of Object.entries(p.env as Record<string, unknown>)) {
+				if (typeof v !== 'string') {
+					throw new Error(`Process "${name}".env.${k} must be a string, got ${typeof v}`)
+				}
+			}
+		}
+
 		validated[name] = {
 			command: p.command,
 			cwd: typeof p.cwd === 'string' ? p.cwd : undefined,

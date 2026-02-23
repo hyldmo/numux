@@ -302,6 +302,25 @@ describe('validateConfig', () => {
 		expect(warnings).toHaveLength(0)
 	})
 
+	test('throws on non-string env values', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', env: { PORT: 3000 } }
+				}
+			})
+		).toThrow('env.PORT must be a string, got number')
+	})
+
+	test('accepts valid string env values', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', env: { PORT: '3000', HOST: 'localhost' } }
+			}
+		})
+		expect(config.processes.web.env).toEqual({ PORT: '3000', HOST: 'localhost' })
+	})
+
 	test('no warning when warnings array is not provided', () => {
 		// Should not throw when warnings param is omitted
 		const config = validateConfig({
