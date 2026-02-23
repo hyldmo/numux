@@ -22,4 +22,13 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 			process.exit(1)
 		})
 	})
+
+	process.on('unhandledRejection', (reason: unknown) => {
+		const message = reason instanceof Error ? reason.message : String(reason)
+		log('Unhandled rejection:', message)
+		app.shutdown().finally(() => {
+			logWriter?.close()
+			process.exit(1)
+		})
+	})
 }
