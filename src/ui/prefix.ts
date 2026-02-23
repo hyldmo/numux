@@ -22,6 +22,7 @@ const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
 export class PrefixDisplay {
 	private manager: ProcessManager
 	private colors: Map<string, string>
+	private noColor: boolean
 	private buffers = new Map<string, string>()
 	private maxNameLen: number
 	private logWriter?: LogWriter
@@ -30,6 +31,7 @@ export class PrefixDisplay {
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, logWriter?: LogWriter) {
 		this.manager = manager
 		this.logWriter = logWriter
+		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.maxNameLen = Math.max(...names.map(n => n.length))
 		this.colors = this.buildColorMap(names, config)
@@ -40,6 +42,7 @@ export class PrefixDisplay {
 
 	private buildColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
 		const map = new Map<string, string>()
+		if ('NO_COLOR' in process.env) return map
 		let paletteIndex = 0
 		for (const name of names) {
 			const explicit = config.processes[name]?.color
@@ -98,17 +101,25 @@ export class PrefixDisplay {
 	}
 
 	private handleStatus(name: string, status: ProcessStatus): void {
-		const ansi = STATUS_ANSI[status]
 		if (status === 'ready' || status === 'failed' || status === 'stopped' || status === 'skipped') {
-			const statusText = ansi ? `${ansi}${status}${RESET}` : status
-			this.printLine(name, `${DIM}→ ${statusText}${DIM}${RESET}`)
+			if (this.noColor) {
+				this.printLine(name, `→ ${status}`)
+			} else {
+				const ansi = STATUS_ANSI[status]
+				const statusText = ansi ? `${ansi}${status}${RESET}` : status
+				this.printLine(name, `${DIM}→ ${statusText}${DIM}${RESET}`)
+			}
 		}
 	}
 
 	private printLine(name: string, line: string): void {
-		const color = this.colors.get(name) ?? ''
 		const padded = name.padEnd(this.maxNameLen)
-		process.stdout.write(`${color}[${padded}]${RESET} ${line}\n`)
+		if (this.noColor) {
+			process.stdout.write(`[${padded}] ${line}\n`)
+		} else {
+			const color = this.colors.get(name) ?? ''
+			process.stdout.write(`${color}[${padded}]${RESET} ${line}\n`)
+		}
 	}
 
 	private flushBuffer(name: string): void {

@@ -47,9 +47,10 @@ export class ProcessRunner {
 		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
 		const envFromFile = this.config.envFile ? loadEnvFiles(this.config.envFile, cwd) : {}
 
+		const noColor = 'NO_COLOR' in process.env
 		const env: Record<string, string> = {
 			...(process.env as Record<string, string>),
-			FORCE_COLOR: '1',
+			...(noColor ? {} : { FORCE_COLOR: '1' }),
 			TERM: 'xterm-256color',
 			...envFromFile,
 			...this.config.env
