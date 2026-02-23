@@ -149,6 +149,26 @@ describe('validateConfig', () => {
 		expect(config.processes.web.readyTimeout).toBeUndefined()
 	})
 
+	test('preserves valid stopSignal', () => {
+		for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
+			const config = validateConfig({
+				processes: {
+					web: { command: 'echo hi', stopSignal: sig }
+				}
+			})
+			expect(config.processes.web.stopSignal).toBe(sig)
+		}
+	})
+
+	test('ignores invalid stopSignal', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', stopSignal: 'SIGKILL' }
+			}
+		})
+		expect(config.processes.web.stopSignal).toBeUndefined()
+	})
+
 	test('throws on non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({

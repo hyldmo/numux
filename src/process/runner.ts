@@ -33,6 +33,10 @@ export class ProcessRunner {
 		return this._ready
 	}
 
+	private get signal(): NodeJS.Signals {
+		return this.config.stopSignal ?? 'SIGTERM'
+	}
+
 	start(cols: number, rows: number): void {
 		const gen = ++this.generation
 		this.stopping = false
@@ -130,7 +134,7 @@ export class ProcessRunner {
 		if (this.proc) {
 			this.stopping = true
 			this.handler.onStatus('stopping')
-			this.proc.kill('SIGTERM')
+			this.proc.kill(this.signal)
 			const result = await Promise.race([
 				this.proc.exited.then(() => 'exited' as const),
 				new Promise<'timeout'>(r => setTimeout(() => r('timeout'), 2000))
@@ -153,7 +157,7 @@ export class ProcessRunner {
 		this.stopping = true
 		log(`[${this.name}] Stopping (timeout: ${timeoutMs}ms)`)
 		this.handler.onStatus('stopping')
-		this.proc.kill('SIGTERM')
+		this.proc.kill(this.signal)
 
 		const exited = Promise.race([
 			this.proc.exited,

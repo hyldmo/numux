@@ -58,9 +58,19 @@ export function validateConfig(raw: unknown): NumuxConfig {
 			persistent: typeof p.persistent === 'boolean' ? p.persistent : true,
 			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
 			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
+			stopSignal: validateStopSignal(p.stopSignal),
 			color: typeof p.color === 'string' ? p.color : undefined
 		}
 	}
 
 	return { processes: validated }
+}
+
+const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])
+
+function validateStopSignal(value: unknown): 'SIGTERM' | 'SIGINT' | 'SIGHUP' | undefined {
+	if (typeof value === 'string' && VALID_STOP_SIGNALS.has(value)) {
+		return value as 'SIGTERM' | 'SIGINT' | 'SIGHUP'
+	}
+	return undefined
 }

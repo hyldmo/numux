@@ -7,6 +7,7 @@ export interface NumuxProcessConfig {
 	persistent?: boolean // default true, false = one-shot
 	maxRestarts?: number // default Infinity, limit auto-restart attempts
 	readyTimeout?: number // ms to wait for readyPattern before failing (default: none)
+	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
 	color?: string
 }
 
