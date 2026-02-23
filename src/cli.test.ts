@@ -59,6 +59,18 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).killOthers).toBe(false)
 	})
 
+	test('-t sets timestamps flag', () => {
+		expect(parseArgs(argv('-t')).timestamps).toBe(true)
+	})
+
+	test('--timestamps sets timestamps flag', () => {
+		expect(parseArgs(argv('--timestamps')).timestamps).toBe(true)
+	})
+
+	test('timestamps is false by default', () => {
+		expect(parseArgs(argv()).timestamps).toBe(false)
+	})
+
 	test('-c sets config path', () => {
 		expect(parseArgs(argv('-c', 'my.config.ts')).configPath).toBe('my.config.ts')
 	})

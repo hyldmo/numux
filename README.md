@@ -88,6 +88,7 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 | `--only <a,b,...>` | Only run these processes (+ their dependencies) |
 | `--exclude <a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits |
+| `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |
 | `--log-dir <path>` | Write per-process output to `<path>/<name>.log` |
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |

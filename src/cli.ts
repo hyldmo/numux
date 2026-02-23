@@ -8,6 +8,7 @@ export interface ParsedArgs {
 	validate: boolean
 	prefix: boolean
 	killOthers: boolean
+	timestamps: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -25,6 +26,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		validate: false,
 		prefix: false,
 		killOthers: false,
+		timestamps: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -55,6 +57,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.prefix = true
 		} else if (arg === '--kill-others') {
 			result.killOthers = true
+		} else if (arg === '-t' || arg === '--timestamps') {
+			result.timestamps = true
 		} else if (arg === '-c' || arg === '--config') {
 			result.configPath = consumeValue(arg)
 		} else if (arg === '--log-dir') {

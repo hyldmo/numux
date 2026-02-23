@@ -13,6 +13,7 @@ const DIM = '\x1b[90m'
 export interface PrefixDisplayOptions {
 	logWriter?: LogWriter
 	killOthers?: boolean
+	timestamps?: boolean
 }
 
 export class PrefixDisplay {
@@ -24,12 +25,14 @@ export class PrefixDisplay {
 	private maxNameLen: number
 	private logWriter?: LogWriter
 	private killOthers: boolean
+	private timestamps: boolean
 	private stopping = false
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, options: PrefixDisplayOptions = {}) {
 		this.manager = manager
 		this.logWriter = options.logWriter
 		this.killOthers = options.killOthers ?? false
+		this.timestamps = options.timestamps ?? false
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.maxNameLen = Math.max(...names.map(n => n.length))
@@ -101,13 +104,23 @@ export class PrefixDisplay {
 		}
 	}
 
+	private formatTimestamp(): string {
+		const now = new Date()
+		const h = String(now.getHours()).padStart(2, '0')
+		const m = String(now.getMinutes()).padStart(2, '0')
+		const s = String(now.getSeconds()).padStart(2, '0')
+		return `${h}:${m}:${s}`
+	}
+
 	private printLine(name: string, line: string): void {
 		const padded = name.padEnd(this.maxNameLen)
+		const ts = this.timestamps ? `${DIM}[${this.formatTimestamp()}]${RESET} ` : ''
+		const tsPlain = this.timestamps ? `[${this.formatTimestamp()}] ` : ''
 		if (this.noColor) {
-			process.stdout.write(`[${padded}] ${line}\n`)
+			process.stdout.write(`${tsPlain}[${padded}] ${line}\n`)
 		} else {
 			const color = this.colors.get(name) ?? ''
-			process.stdout.write(`${color}[${padded}]${RESET} ${line}\n`)
+			process.stdout.write(`${ts}${color}[${padded}]${RESET} ${line}\n`)
 		}
 	}
 

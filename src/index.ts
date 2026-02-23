@@ -29,6 +29,7 @@ Options:
   --only <a,b,...>           Only run these processes (+ their dependencies)
   --exclude <a,b,...>        Exclude these processes
   --kill-others              Kill all processes when any exits
+  -t, --timestamps           Add timestamps to prefixed output lines
   --log-dir <path>           Write per-process logs to directory
   --debug                    Enable debug logging to .numux/debug.log
   -h, --help                 Show this help
@@ -140,7 +141,8 @@ async function main() {
 	if (parsed.prefix) {
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
-			killOthers: parsed.killOthers
+			killOthers: parsed.killOthers,
+			timestamps: parsed.timestamps
 		})
 		await display.start()
 	} else {
