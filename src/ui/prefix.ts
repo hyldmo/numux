@@ -138,6 +138,7 @@ export class PrefixDisplay {
 		const allDone = states.every(s => s.status === 'stopped' || s.status === 'failed' || s.status === 'skipped')
 		if (allDone) {
 			this.printSummary()
+			this.logWriter?.close()
 			const anyFailed = states.some(s => s.status === 'failed')
 			process.exit(anyFailed ? 1 : 0)
 		}
@@ -149,11 +150,11 @@ export class PrefixDisplay {
 		const state = this.manager.getState(exitedName)
 		const code = state?.exitCode ?? 1
 		this.manager.stopAll().then(() => {
-			this.logWriter?.close()
 			for (const name of this.manager.getProcessNames()) {
 				this.flushBuffer(name)
 			}
 			this.printSummary()
+			this.logWriter?.close()
 			process.exit(code === 0 ? 0 : 1)
 		})
 	}
@@ -179,6 +180,9 @@ export class PrefixDisplay {
 		if (this.stopping) return
 		this.stopping = true
 		await this.manager.stopAll()
+		for (const name of this.manager.getProcessNames()) {
+			this.flushBuffer(name)
+		}
 		this.logWriter?.close()
 		process.exit(0)
 	}
