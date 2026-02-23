@@ -15,6 +15,7 @@ export interface ParsedArgs {
 	timestamps: boolean
 	noRestart: boolean
 	noWatch: boolean
+	autoColors: boolean
 	configPath?: string
 	logDir?: string
 	only?: string[]
@@ -37,6 +38,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		timestamps: false,
 		noRestart: false,
 		noWatch: false,
+		autoColors: false,
 		configPath: undefined,
 		commands: [],
 		named: []
@@ -73,6 +75,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.noRestart = true
 		} else if (arg === '--no-watch') {
 			result.noWatch = true
+		} else if (arg === '--colors') {
+			result.autoColors = true
 		} else if (arg === '--config') {
 			result.configPath = consumeValue(arg)
 		} else if (arg === '-c' || arg === '--color') {

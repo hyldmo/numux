@@ -11,6 +11,7 @@ import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
+import { colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
@@ -30,6 +31,7 @@ Usage:
 Options:
   -n, --name <name=command>  Add a named process
   -c, --color <colors>       Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple)
+  --colors                   Auto-assign colors to processes based on their name
   --config <path>            Config file path (default: auto-detect)
   -p, --prefix               Prefixed output mode (no TUI, for CI/scripts)
   --only <a,b,...>           Only run these processes (+ their dependencies)
@@ -217,6 +219,14 @@ async function main() {
 
 	if (parsed.only || parsed.exclude) {
 		config = filterConfig(config, parsed.only, parsed.exclude)
+	}
+
+	if (parsed.autoColors) {
+		for (const [name, proc] of Object.entries(config.processes)) {
+			if (!proc.color) {
+				proc.color = colorFromName(name)
+			}
+		}
 	}
 
 	const manager = new ProcessManager(config)

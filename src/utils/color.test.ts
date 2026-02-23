@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BASIC_COLORS, HEX_COLOR_RE, hexToAnsi, isValidColor, resolveToHex, stripAnsi } from './color'
+import { BASIC_COLORS, colorFromName, HEX_COLOR_RE, hexToAnsi, isValidColor, resolveToHex, stripAnsi } from './color'
 
 describe('hexToAnsi', () => {
 	test('converts #rrggbb to ANSI true-color sequence', () => {
@@ -92,6 +92,24 @@ describe('HEX_COLOR_RE', () => {
 		expect(HEX_COLOR_RE.test('#gggggg')).toBe(false)
 		expect(HEX_COLOR_RE.test('#ff88001')).toBe(false)
 		expect(HEX_COLOR_RE.test('')).toBe(false)
+	})
+})
+
+describe('colorFromName', () => {
+	test('returns consistent colors for known names', () => {
+		expect(colorFromName('api')).toBe('#cc00cc')
+		expect(colorFromName('web')).toBe('#00cc00')
+		expect(colorFromName('db')).toBe('#ffff55')
+		expect(colorFromName('worker')).toBe('#cc00cc')
+		expect(colorFromName('redis')).toBe('#0000cc')
+		expect(colorFromName('migrate')).toBe('#0000cc')
+		expect(colorFromName('proxy')).toBe('#ffff55')
+		expect(colorFromName('cache')).toBe('#cc00cc')
+	})
+
+	test('different names can produce different colors', () => {
+		const colors = new Set(['api', 'web', 'db', 'worker', 'redis'].map(colorFromName))
+		expect(colors.size).toBeGreaterThan(1)
 	})
 })
 
