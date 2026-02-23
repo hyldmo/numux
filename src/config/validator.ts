@@ -53,6 +53,7 @@ export function validateConfig(raw: unknown): NumuxConfig {
 			command: p.command,
 			cwd: typeof p.cwd === 'string' ? p.cwd : undefined,
 			env: p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined,
+			envFile: validateEnvFile(p.envFile),
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern: typeof p.readyPattern === 'string' ? p.readyPattern : undefined,
 			persistent: typeof p.persistent === 'boolean' ? p.persistent : true,
@@ -64,6 +65,12 @@ export function validateConfig(raw: unknown): NumuxConfig {
 	}
 
 	return { processes: validated }
+}
+
+function validateEnvFile(value: unknown): string | string[] | undefined {
+	if (typeof value === 'string') return value
+	if (Array.isArray(value) && value.every(v => typeof v === 'string')) return value as string[]
+	return undefined
 }
 
 const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])

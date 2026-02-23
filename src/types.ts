@@ -2,6 +2,7 @@ export interface NumuxProcessConfig {
 	command: string
 	cwd?: string
 	env?: Record<string, string>
+	envFile?: string | string[] // .env file path(s) to load
 	dependsOn?: string[]
 	readyPattern?: string
 	persistent?: boolean // default true, false = one-shot

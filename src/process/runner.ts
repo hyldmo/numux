@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import type { NumuxProcessConfig, ProcessStatus } from '../types'
+import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
 import { createReadinessChecker } from './ready'
 
@@ -43,14 +44,16 @@ export class ProcessRunner {
 		log(`[${this.name}] Starting (gen ${gen}): ${this.config.command}`)
 		this.handler.onStatus('starting')
 
+		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
+		const envFromFile = this.config.envFile ? loadEnvFiles(this.config.envFile, cwd) : {}
+
 		const env: Record<string, string> = {
 			...(process.env as Record<string, string>),
 			FORCE_COLOR: '1',
 			TERM: 'xterm-256color',
+			...envFromFile,
 			...this.config.env
 		}
-
-		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
 
 		this.proc = Bun.spawn(['sh', '-c', this.config.command], {
 			cwd,

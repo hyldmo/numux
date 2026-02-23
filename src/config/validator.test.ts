@@ -169,6 +169,33 @@ describe('validateConfig', () => {
 		expect(config.processes.web.stopSignal).toBeUndefined()
 	})
 
+	test('preserves envFile string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', envFile: '.env' }
+			}
+		})
+		expect(config.processes.web.envFile).toBe('.env')
+	})
+
+	test('preserves envFile array', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', envFile: ['.env', '.env.local'] }
+			}
+		})
+		expect(config.processes.web.envFile).toEqual(['.env', '.env.local'])
+	})
+
+	test('ignores invalid envFile', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', envFile: 123 }
+			}
+		})
+		expect(config.processes.web.envFile).toBeUndefined()
+	})
+
 	test('throws on non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({
