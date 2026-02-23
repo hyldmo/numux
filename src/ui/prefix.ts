@@ -102,7 +102,13 @@ export class PrefixDisplay {
 	}
 
 	private handleStatus(name: string, status: ProcessStatus): void {
-		if (status === 'ready' || status === 'failed' || status === 'stopped' || status === 'skipped') {
+		if (
+			status === 'ready' ||
+			status === 'failed' ||
+			status === 'finished' ||
+			status === 'stopped' ||
+			status === 'skipped'
+		) {
 			if (this.noColor) {
 				this.printLine(name, `→ ${status}`)
 			} else {
@@ -144,7 +150,9 @@ export class PrefixDisplay {
 	private checkAllDone(): void {
 		if (this.stopping) return
 		const states = this.manager.getAllStates()
-		const allDone = states.every(s => s.status === 'stopped' || s.status === 'failed' || s.status === 'skipped')
+		const allDone = states.every(
+			s => s.status === 'stopped' || s.status === 'finished' || s.status === 'failed' || s.status === 'skipped'
+		)
 		if (allDone) {
 			this.printSummary()
 			this.logWriter?.close()

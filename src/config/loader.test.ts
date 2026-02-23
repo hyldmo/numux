@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { NumuxProcessConfig } from '../types'
+import type { NumuxConfig, NumuxProcessConfig } from '../types'
 import { loadConfig } from './loader'
 
 /** Helper to cast raw process config to the full object type (for test assertions on loader output) */
-const proc = (p: NumuxProcessConfig | string) => p as NumuxProcessConfig
+const proc = (p: NumuxConfig['processes'][string]) => p as NumuxProcessConfig
 
 const TMP = join(import.meta.dir, '../../.tmp-loader-test')
 

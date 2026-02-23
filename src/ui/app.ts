@@ -21,7 +21,6 @@ export class App {
 	private sidebarWidth = 20
 
 	private config: ResolvedNumuxConfig
-	private processHexColors: Map<string, string>
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -31,11 +30,14 @@ export class App {
 	private searchMatches: SearchMatch[] = []
 	private searchIndex = -1
 
+	// Input-waiting detection for interactive processes
+	private inputWaitTimers = new Map<string, ReturnType<typeof setTimeout>>()
+	private awaitingInput = new Set<string>()
+
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
 		this.manager = manager
 		this.config = config
 		this.names = manager.getProcessNames()
-		this.processHexColors = buildProcessHexColorMap(this.names, config)
 	}
 
 	async start(): Promise<void> {
@@ -61,7 +63,8 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		this.tabBar = new TabBar(this.renderer, this.names, this.processHexColors)
+		const processHexColors = buildProcessHexColorMap(this.names, this.config)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -92,15 +95,12 @@ export class App {
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
-			pane.onScroll(() => {
-				if (name === this.activePane) this.updateScrollIndicator()
-			})
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
 
-		// Status bar
-		this.statusBar = new StatusBar(this.renderer, this.names, this.processHexColors)
+		// Status bar (only visible during search)
+		this.statusBar = new StatusBar(this.renderer)
 
 		// Assemble layout
 		contentRow.add(sidebar)
@@ -118,13 +118,17 @@ export class App {
 			if (this.destroyed) return
 			if (event.type === 'output') {
 				this.panes.get(event.name)?.feed(event.data)
-				if (event.name === this.activePane) {
-					this.updateScrollIndicator()
+				// Detect input-waiting for interactive processes
+				if (this.config.processes[event.name]?.interactive) {
+					this.checkInputWaiting(event.name, event.data)
 				}
 			} else if (event.type === 'status') {
 				const state = this.manager.getState(event.name)
 				this.tabBar.updateStatus(event.name, event.status, state?.exitCode, state?.restartCount)
-				this.statusBar.updateStatus(event.name, event.status)
+				// Clear input-waiting on non-active statuses
+				if (event.status !== 'running' && event.status !== 'ready') {
+					this.clearInputWaiting(event.name)
+				}
 			}
 		})
 
@@ -195,7 +199,7 @@ export class App {
 					// S: stop/start active process
 					if (name === 's') {
 						const state = this.manager.getState(this.activePane)
-						if (state?.status === 'stopped' || state?.status === 'failed') {
+						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
 							this.manager.start(this.activePane, this.termCols, this.termRows)
 						} else {
 							this.manager.stop(this.activePane)
@@ -209,31 +213,21 @@ export class App {
 						return
 					}
 
-					// 1-9: jump to tab
+					// 1-9: jump to tab (uses display order from tab bar)
 					const num = Number.parseInt(name, 10)
-					if (num >= 1 && num <= 9 && num <= this.names.length) {
+					if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
 						this.tabBar.setSelectedIndex(num - 1)
-						this.switchPane(this.names[num - 1])
+						this.switchPane(this.tabBar.getNameAtIndex(num - 1))
 						return
 					}
 
 					// Left/Right: cycle tabs
 					if (name === 'left' || name === 'right') {
 						const current = this.tabBar.getSelectedIndex()
-						const next =
-							name === 'right'
-								? (current + 1) % this.names.length
-								: (current - 1 + this.names.length) % this.names.length
+						const count = this.tabBar.count
+						const next = name === 'right' ? (current + 1) % count : (current - 1 + count) % count
 						this.tabBar.setSelectedIndex(next)
-						this.switchPane(this.names[next])
-						return
-					}
-
-					// Up/Down: scroll line by line
-					if (name === 'up' || name === 'down') {
-						const pane = this.panes.get(this.activePane)
-						pane?.scrollBy(name === 'up' ? -1 : 1)
-						this.updateScrollIndicator()
+						this.switchPane(this.tabBar.getNameAtIndex(next))
 						return
 					}
 
@@ -242,19 +236,16 @@ export class App {
 						const pane = this.panes.get(this.activePane)
 						const delta = this.termRows - 2
 						pane?.scrollBy(name === 'pageup' ? -delta : delta)
-						this.updateScrollIndicator()
 						return
 					}
 
 					// Home/End: scroll to top/bottom
 					if (name === 'home') {
 						this.panes.get(this.activePane)?.scrollToTop()
-						this.updateScrollIndicator()
 						return
 					}
 					if (name === 'end') {
 						this.panes.get(this.activePane)?.scrollToBottom()
-						this.updateScrollIndicator()
 						return
 					}
 					return
@@ -267,9 +258,10 @@ export class App {
 			}
 		)
 
-		// Show first pane
+		// Show first pane and focus sidebar for keyboard navigation
 		if (this.names.length > 0) {
 			this.switchPane(this.names[0])
+			this.tabBar.focus()
 		}
 
 		// Start all processes
@@ -287,14 +279,45 @@ export class App {
 		}
 		this.activePane = name
 		this.panes.get(name)?.show()
-		this.updateScrollIndicator()
 	}
 
-	private updateScrollIndicator(): void {
-		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
-		this.statusBar.setScrollIndicator(!pane.isAtBottom)
+	/** Detect when an interactive process is likely waiting for user input */
+	private checkInputWaiting(name: string, data: Uint8Array): void {
+		// Clear existing timer
+		const existing = this.inputWaitTimers.get(name)
+		if (existing) clearTimeout(existing)
+
+		// If we were showing awaiting input, clear it since new output arrived
+		if (this.awaitingInput.has(name)) {
+			this.awaitingInput.delete(name)
+			this.tabBar.setInputWaiting(name, false)
+		}
+
+		// If the last byte is not a newline, the process may be showing a prompt
+		const lastByte = data[data.length - 1]
+		if (lastByte !== 0x0a && lastByte !== 0x0d) {
+			const timer = setTimeout(() => {
+				this.inputWaitTimers.delete(name)
+				const state = this.manager.getState(name)
+				if (state && (state.status === 'running' || state.status === 'ready')) {
+					this.awaitingInput.add(name)
+					this.tabBar.setInputWaiting(name, true)
+				}
+			}, 200)
+			this.inputWaitTimers.set(name, timer)
+		}
+	}
+
+	private clearInputWaiting(name: string): void {
+		const timer = this.inputWaitTimers.get(name)
+		if (timer) {
+			clearTimeout(timer)
+			this.inputWaitTimers.delete(name)
+		}
+		if (this.awaitingInput.has(name)) {
+			this.awaitingInput.delete(name)
+			this.tabBar.setInputWaiting(name, false)
+		}
 	}
 
 	private enterSearch(): void {
@@ -389,7 +412,6 @@ export class App {
 		if (!pane) return
 		const match = this.searchMatches[this.searchIndex]
 		pane.scrollToLine(match.line)
-		this.updateScrollIndicator()
 	}
 
 	async shutdown(): Promise<void> {
@@ -399,6 +421,11 @@ export class App {
 			clearTimeout(this.resizeTimer)
 			this.resizeTimer = null
 		}
+		// Clear all input-waiting timers
+		for (const timer of this.inputWaitTimers.values()) {
+			clearTimeout(timer)
+		}
+		this.inputWaitTimers.clear()
 		await this.manager.stopAll()
 		for (const pane of this.panes.values()) {
 			pane.destroy()

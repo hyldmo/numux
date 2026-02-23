@@ -26,7 +26,7 @@ async function runPrefix(
 	extraArgs: string[] = [],
 	envOverrides: Record<string, string> = {}
 ): Promise<{ stdout: string; exitCode: number }> {
-	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '-c', configPath], {
+	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '--config', configPath], {
 		stdout: 'pipe',
 		stderr: 'pipe',
 		env: { ...process.env, FORCE_COLOR: '0', ...envOverrides }
@@ -109,10 +109,10 @@ describe('PrefixDisplay (integration)', () => {
 		// Both should appear in output
 		expect(stdout).toContain('step1')
 		expect(stdout).toContain('step2')
-		// "first" should reach stopped status before "second" starts
-		const firstStopped = stdout.indexOf('stopped')
+		// "first" should reach finished status before "second" starts
+		const firstFinished = stdout.indexOf('finished')
 		const secondOutput = stdout.indexOf('step2')
-		expect(firstStopped).toBeLessThan(secondOutput)
+		expect(firstFinished).toBeLessThan(secondOutput)
 		expect(exitCode).toBe(0)
 	}, 10000)
 

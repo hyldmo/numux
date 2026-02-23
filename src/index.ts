@@ -3,11 +3,12 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
 import { generateCompletions } from './completions'
+import { expandScriptPatterns } from './config/expand-scripts'
 import { loadConfig } from './config/loader'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
 import { ProcessManager } from './process/manager'
-import type { ResolvedNumuxConfig } from './types'
+import type { NumuxProcessConfig, ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
 import { loadEnvFiles } from './utils/env-file'
@@ -28,7 +29,8 @@ Usage:
 
 Options:
   -n, --name <name=command>  Add a named process
-  -c, --config <path>        Config file path (default: auto-detect)
+  -c, --color <colors>       Comma-separated colors for processes (hex, e.g. #ff0,#0f0)
+  --config <path>            Config file path (default: auto-detect)
   -p, --prefix               Prefixed output mode (no TUI, for CI/scripts)
   --only <a,b,...>           Only run these processes (+ their dependencies)
   --exclude <a,b,...>        Exclude these processes
@@ -100,7 +102,7 @@ async function main() {
 	}
 
 	if (parsed.validate) {
-		const raw = await loadConfig(parsed.configPath)
+		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		const warnings: ValidationWarning[] = []
 		let config = validateConfig(raw, warnings)
 
@@ -135,7 +137,7 @@ async function main() {
 	}
 
 	if (parsed.exec) {
-		const raw = await loadConfig(parsed.configPath)
+		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		const config = validateConfig(raw)
 		const proc = config.processes[parsed.execName!]
 		if (!proc) {
@@ -169,9 +171,36 @@ async function main() {
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0) {
-		config = buildConfigFromArgs(parsed.commands, parsed.named, { noRestart: parsed.noRestart })
+		const hasNpmPatterns = parsed.commands.some(c => c.startsWith('npm:'))
+		if (hasNpmPatterns) {
+			// Expand npm: patterns into named processes, pass remaining commands as-is
+			const npmPatterns = parsed.commands.filter(c => c.startsWith('npm:'))
+			const otherCommands = parsed.commands.filter(c => !c.startsWith('npm:'))
+			const processes: Record<string, NumuxProcessConfig | string> = {}
+			for (const pattern of npmPatterns) {
+				const entry: Partial<NumuxProcessConfig> = {}
+				if (parsed.colors?.length) entry.color = parsed.colors
+				processes[pattern] = entry as NumuxProcessConfig
+			}
+			for (let i = 0; i < otherCommands.length; i++) {
+				const cmd = otherCommands[i]
+				let name = cmd.split(/\s+/)[0].split('/').pop()!
+				if (processes[name]) name = `${name}-${i}`
+				processes[name] = cmd
+			}
+			for (const { name, command } of parsed.named) {
+				processes[name] = command
+			}
+			const expanded = expandScriptPatterns({ processes })
+			config = validateConfig(expanded, warnings)
+		} else {
+			config = buildConfigFromArgs(parsed.commands, parsed.named, {
+				noRestart: parsed.noRestart,
+				colors: parsed.colors
+			})
+		}
 	} else {
-		const raw = await loadConfig(parsed.configPath)
+		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		config = validateConfig(raw, warnings)
 
 		if (parsed.noRestart) {

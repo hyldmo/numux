@@ -11,17 +11,20 @@ export interface NumuxProcessConfig {
 	delay?: number // ms to wait before starting the process (default: none)
 	condition?: string // env var name (prefix with ! to negate); process skipped if condition is falsy
 	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
-	color?: string
+	color?: string | string[]
 	watch?: string | string[] // Glob patterns — restart process when matching files change
 	interactive?: boolean // default false — when true, keyboard input is forwarded to the process
 }
 
-/** Raw config as authored — processes can be string shorthand or full objects */
+/** Config for npm: wildcard entries — command is derived from package.json scripts */
+export type NumuxScriptPattern = Omit<NumuxProcessConfig, 'command'> & { command?: never }
+
+/** Raw config as authored — processes can be string shorthand, full objects, or wildcard patterns */
 export interface NumuxConfig {
 	cwd?: string // Global working directory, inherited by all processes
 	env?: Record<string, string> // Global env vars, merged into each process (process-level overrides)
 	envFile?: string | string[] // Global .env file(s), inherited by processes without their own envFile
-	processes: Record<string, NumuxProcessConfig | string>
+	processes: Record<string, NumuxProcessConfig | NumuxScriptPattern | string>
 }
 
 /** Validated config with all shorthand expanded to full objects */
@@ -29,7 +32,16 @@ export interface ResolvedNumuxConfig {
 	processes: Record<string, NumuxProcessConfig>
 }
 
-export type ProcessStatus = 'pending' | 'starting' | 'ready' | 'running' | 'stopping' | 'stopped' | 'failed' | 'skipped'
+export type ProcessStatus =
+	| 'pending'
+	| 'starting'
+	| 'ready'
+	| 'running'
+	| 'stopping'
+	| 'stopped'
+	| 'finished'
+	| 'failed'
+	| 'skipped'
 
 export interface ProcessState {
 	name: string
