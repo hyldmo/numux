@@ -59,6 +59,15 @@ Then run:
 numux
 ```
 
+### Subcommands
+
+```sh
+numux init         # Create a starter numux.config.ts
+numux validate     # Validate config and show process dependency graph
+```
+
+`validate` respects `--only`/`--exclude` filters and shows processes grouped by dependency tiers.
+
 ### Ad-hoc commands
 
 ```sh
@@ -82,6 +91,16 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |
+
+### Prefix mode
+
+Use `--prefix` (`-p`) for CI or headless environments. Output is printed with colored `[name]` prefixes instead of the TUI:
+
+```sh
+numux --prefix
+```
+
+Auto-exits when all processes finish. Exit code 1 if any process failed.
 
 ## Config reference
 
