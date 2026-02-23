@@ -60,7 +60,7 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		this.tabBar = new TabBar(this.renderer, this.names)
+		this.tabBar = new TabBar(this.renderer, this.names, this.processHexColors)
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
