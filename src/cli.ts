@@ -21,6 +21,7 @@ export interface ParsedArgs {
 	only?: string[]
 	exclude?: string[]
 	colors?: string[]
+	workspace?: string
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }
@@ -73,6 +74,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			result.timestamps = true
 		} else if (arg === '--no-restart') {
 			result.noRestart = true
+		} else if (arg === '-w' || arg === '--workspace') {
+			result.workspace = consumeValue(arg)
 		} else if (arg === '--no-watch') {
 			result.noWatch = true
 		} else if (arg === '--colors') {

@@ -7,6 +7,7 @@ import { expandScriptPatterns } from './config/expand-scripts'
 import { loadConfig } from './config/loader'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
+import { resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig } from './types'
 import { App } from './ui/app'
@@ -23,12 +24,14 @@ Usage:
   numux                          Run processes from config file
   numux <cmd1> <cmd2> ...        Run ad-hoc commands in parallel
   numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
+  numux -w <script>              Run a script across all workspaces
   numux init                     Create a starter config file
   numux validate                 Validate config and show process graph
   numux exec <name> [--] <cmd>   Run a command in a process's environment
   numux completions <shell>      Generate shell completions (bash, zsh, fish)
 
 Options:
+  -w, --workspace <script>   Run a package.json script across all workspaces
   -n, --name <name=command>  Add a named process
   -c, --color <colors>       Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple)
   --colors                   Auto-assign colors to processes based on their name
@@ -170,7 +173,7 @@ async function main() {
 	let config: ResolvedNumuxConfig
 	const warnings: ValidationWarning[] = []
 
-	if (parsed.commands.length > 0 || parsed.named.length > 0) {
+	if (parsed.commands.length > 0 || parsed.named.length > 0 || parsed.workspace) {
 		const isScriptPattern = (c: string) => c.startsWith('npm:') || /[*?[]/.test(c)
 		const hasNpmPatterns = parsed.commands.some(isScriptPattern)
 		if (hasNpmPatterns) {
@@ -199,6 +202,21 @@ async function main() {
 				noRestart: parsed.noRestart,
 				colors: parsed.colors
 			})
+		}
+
+		// Merge workspace processes if -w was specified
+		if (parsed.workspace) {
+			const wsProcesses = resolveWorkspaceProcesses(parsed.workspace, process.cwd())
+			for (const [name, proc] of Object.entries(wsProcesses)) {
+				let finalName = name
+				if (config.processes[finalName]) {
+					let suffix = 1
+					while (config.processes[`${finalName}-${suffix}`]) suffix++
+					finalName = `${finalName}-${suffix}`
+				}
+				if (parsed.noRestart) proc.maxRestarts = 0
+				config.processes[finalName] = proc
+			}
 		}
 	} else {
 		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))

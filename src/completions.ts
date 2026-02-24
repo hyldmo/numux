@@ -30,7 +30,7 @@ _numux() {
       return ;;
     --only|--exclude)
       return ;;
-    -n|--name)
+    -n|--name|-w|--workspace)
       return ;;
     completions)
       COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
@@ -38,7 +38,7 @@ _numux() {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "-h --help -v --version -c --color --colors --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
+    COMPREPLY=( $(compgen -W "-h --help -v --version -w --workspace -c --color --colors --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
   else
     local subcmds="init validate exec completions"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
@@ -63,6 +63,7 @@ _numux() {
   _arguments -s \\
     '(-h --help)'{-h,--help}'[Show help]' \\
     '(-v --version)'{-v,--version}'[Show version]' \\
+    '(-w --workspace)'{-w,--workspace}'[Run script across all workspaces]:script' \\
     '(-c --color)'{-c,--color}'[Comma-separated colors for processes]' \\
     '--colors[Auto-assign colors based on process name]' \\
     '--config[Config file path]:file:_files' \\
@@ -110,6 +111,7 @@ complete -c numux -s v -l version -d 'Show version'
 complete -c numux -s c -l color -r -d 'Comma-separated colors for processes'
 complete -c numux -l colors -d 'Auto-assign colors based on process name'
 complete -c numux -l config -rF -d 'Config file path'
+complete -c numux -s w -l workspace -r -d 'Run script across all workspaces'
 complete -c numux -s n -l name -r -d 'Named process (name=command)'
 complete -c numux -s p -l prefix -d 'Prefixed output mode'
 complete -c numux -l only -r -d 'Only run these processes'
