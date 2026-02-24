@@ -83,6 +83,7 @@ class ColoredSelectRenderable extends SelectRenderable {
 		const visibleCount = Math.min(maxVisibleItems, options.length - scrollOffset)
 		const baseTextColor = (this as any)._focused ? (this as any)._focusedTextColor : (this as any)._textColor
 		const selectedTextColor = (this as any)._selectedTextColor
+		const lineWidth = fb.width
 
 		for (let i = 0; i < visibleCount; i++) {
 			const actualIndex = scrollOffset + i
@@ -92,16 +93,15 @@ class ColoredSelectRenderable extends SelectRenderable {
 			const defaultColor = isSelected ? selectedTextColor : baseTextColor
 			const colors = this._optionColors[actualIndex]
 
-			// Redraw at x=1 to remove the base class's ▶ prefix (background color shows selection)
-			// Trailing spaces clear the 2-char artifact from the shifted text
-			fb.drawText(`${optName}  `, 1, itemY, defaultColor)
+			// Redraw at x=1 to remove the base class's ▶/space prefix.
+			// Pad to full line width so no residual characters from the base render
+			// survive regardless of how the native buffer calculates character widths.
+			const textColor = colors?.name ?? defaultColor
+			fb.drawText(optName.padEnd(lineWidth), 1, itemY, textColor)
 
-			// Layout: "○ name" (icon at x=1, name at x=3)
+			// Override the icon character with its status-specific color
 			if (colors?.icon) {
 				fb.drawText(optName.charAt(0), 1, itemY, colors.icon)
-			}
-			if (colors?.name) {
-				fb.drawText(optName.slice(2), 3, itemY, colors.name)
 			}
 		}
 	}
