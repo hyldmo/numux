@@ -29,6 +29,29 @@ function isGlobPattern(name: string): boolean {
 	return /[*?[]/.test(name)
 }
 
+/** Derive a short display name by stripping the literal prefix & suffix of the
+ *  glob pattern from the matched script name.
+ *  e.g. pattern "dev:*" + script "dev:web" → "web"
+ *       pattern "*:dev" + script "store:dev" → "store" */
+function deriveShortName(pattern: string, scriptName: string): string {
+	let prefixEnd = 0
+	while (prefixEnd < pattern.length && !'*?['.includes(pattern[prefixEnd])) {
+		prefixEnd++
+	}
+	let suffixStart = pattern.length
+	while (suffixStart > 0 && !'*?['.includes(pattern[suffixStart - 1])) {
+		suffixStart--
+	}
+	const prefix = pattern.slice(0, prefixEnd)
+	const suffix = pattern.slice(suffixStart)
+
+	let short = scriptName
+	if (prefix && short.startsWith(prefix)) short = short.slice(prefix.length)
+	if (suffix && short.endsWith(suffix)) short = short.slice(0, short.length - suffix.length)
+
+	return short || scriptName
+}
+
 /** Split a pattern into the glob portion and any trailing args.
  *  Script names never contain spaces, so the first space is unambiguous. */
 function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
@@ -90,15 +113,16 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 
 		for (let i = 0; i < matches.length; i++) {
 			const scriptName = matches[i]
+			const displayName = deriveShortName(globPattern, scriptName)
 
-			if (expanded[scriptName]) {
+			if (expanded[displayName]) {
 				throw new Error(`"${name}": expanded script "${scriptName}" collides with an existing process name`)
 			}
 
 			const color = colors ? colors[i % colors.length] : singleColor
 
 			const { color: _color, ...rest } = template
-			expanded[scriptName] = {
+			expanded[displayName] = {
 				...rest,
 				command: `${pm} run ${scriptName}${extraArgs}`,
 				...(color ? { color } : {})
