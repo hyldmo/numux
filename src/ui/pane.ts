@@ -15,6 +15,10 @@ export class Pane {
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
 
+	// Cached text from getText() FFI — invalidated on feed/clear/resize
+	private _textLines: string[] | null = null
+	private _textLinesLower: string[] | null = null
+
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
@@ -55,11 +59,15 @@ export class Pane {
 	feed(data: Uint8Array): void {
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
+		this._textLines = null
+		this._textLinesLower = null
 	}
 
 	resize(cols: number, rows: number): void {
 		this.terminal.cols = cols
 		this.terminal.rows = rows
+		this._textLines = null
+		this._textLinesLower = null
 	}
 
 	get isAtBottom(): boolean {
@@ -98,15 +106,19 @@ export class Pane {
 
 	search(query: string): SearchMatch[] {
 		if (!query) return []
-		const text = this.terminal.getText()
-		const lines = text.split('\n')
+		// Use cached text to avoid repeated getText() FFI calls
+		if (!this._textLines) {
+			const text = this.terminal.getText()
+			this._textLines = text.split('\n')
+			this._textLinesLower = this._textLines.map(l => l.toLowerCase())
+		}
+		const lines = this._textLinesLower!
 		const matches: SearchMatch[] = []
 		const lowerQuery = query.toLowerCase()
 		for (let line = 0; line < lines.length; line++) {
-			const lowerLine = lines[line].toLowerCase()
 			let pos = 0
 			while (true) {
-				const idx = lowerLine.indexOf(lowerQuery, pos)
+				const idx = lines[line].indexOf(lowerQuery, pos)
 				if (idx === -1) break
 				matches.push({ line, start: idx, end: idx + query.length })
 				pos = idx + 1
@@ -116,12 +128,23 @@ export class Pane {
 	}
 
 	setHighlights(matches: SearchMatch[], currentIndex: number): void {
-		const regions: HighlightRegion[] = matches.map((m, i) => ({
-			line: m.line,
-			start: m.start,
-			end: m.end,
-			backgroundColor: i === currentIndex ? '#b58900' : '#073642'
-		}))
+		// Filter to visible viewport lines to avoid sending thousands of off-screen highlights
+		const firstVisible = Math.max(0, Math.floor(this.scrollBox.scrollTop) - 2)
+		const lastVisible = Math.ceil(this.scrollBox.scrollTop + this.scrollBox.viewport.height) + 2
+		const regions: HighlightRegion[] = []
+		for (let i = 0; i < matches.length; i++) {
+			const m = matches[i]
+			if (m.line < firstVisible || m.line > lastVisible) {
+				// Always include the current match so it highlights even if we're about to scroll to it
+				if (i !== currentIndex) continue
+			}
+			regions.push({
+				line: m.line,
+				start: m.start,
+				end: m.end,
+				backgroundColor: i === currentIndex ? '#b58900' : '#073642'
+			})
+		}
 		this.terminal.highlights = regions
 	}
 
@@ -136,6 +159,8 @@ export class Pane {
 
 	clear(): void {
 		this.terminal.reset()
+		this._textLines = null
+		this._textLinesLower = null
 	}
 
 	destroy(): void {

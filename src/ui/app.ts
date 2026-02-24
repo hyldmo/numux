@@ -24,6 +24,7 @@ export class App {
 	private config: ResolvedNumuxConfig
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
+	private searchTimer: ReturnType<typeof setTimeout> | null = null
 
 	// Search state
 	private searchMode = false
@@ -97,6 +98,11 @@ export class App {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
 			pane.onCopy(() => this.statusBar.showTemporaryMessage('Copied!'))
+			pane.onScroll(() => {
+				if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
+					this.updateSearchHighlights()
+				}
+			})
 			this.panes.set(name, pane)
 			paneContainer.add(pane.scrollBox)
 		}
@@ -349,6 +355,10 @@ export class App {
 		this.searchQuery = ''
 		this.searchMatches = []
 		this.searchIndex = -1
+		if (this.searchTimer) {
+			clearTimeout(this.searchTimer)
+			this.searchTimer = null
+		}
 		if (this.activePane) {
 			this.panes.get(this.activePane)?.clearHighlights()
 		}
@@ -383,7 +393,7 @@ export class App {
 		if (key.name === 'backspace') {
 			if (this.searchQuery.length > 0) {
 				this.searchQuery = this.searchQuery.slice(0, -1)
-				this.runSearch()
+				this.scheduleSearch()
 			}
 			return
 		}
@@ -391,8 +401,18 @@ export class App {
 		// Printable character
 		if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
 			this.searchQuery += key.sequence
-			this.runSearch()
+			this.scheduleSearch()
 		}
+	}
+
+	private scheduleSearch(): void {
+		// Update status bar immediately for responsive feedback
+		this.statusBar.setSearchMode(true, this.searchQuery, this.searchMatches.length, this.searchIndex)
+		if (this.searchTimer) clearTimeout(this.searchTimer)
+		this.searchTimer = setTimeout(() => {
+			this.searchTimer = null
+			this.runSearch()
+		}, 100)
 	}
 
 	private runSearch(): void {
@@ -436,6 +456,10 @@ export class App {
 		if (this.resizeTimer) {
 			clearTimeout(this.resizeTimer)
 			this.resizeTimer = null
+		}
+		if (this.searchTimer) {
+			clearTimeout(this.searchTimer)
+			this.searchTimer = null
 		}
 		// Clear all input-waiting timers
 		for (const timer of this.inputWaitTimers.values()) {
