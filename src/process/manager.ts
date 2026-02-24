@@ -239,6 +239,12 @@ export class ProcessManager {
 	private updateStatus(name: string, status: ProcessStatus): void {
 		const state = this.states.get(name)!
 		state.status = status
+		// Reset backoff counter when a process with readyPattern signals readiness,
+		// meaning it actually stabilized. Processes without readyPattern are immediately
+		// ready on spawn, so we rely on the time-based reset in scheduleAutoRestart instead.
+		if (status === 'ready' && this.config.processes[name].readyPattern) {
+			this.restartAttempts.set(name, 0)
+		}
 		this.emit({ type: 'status', name, status })
 	}
 
