@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { NumuxConfig, NumuxProcessConfig } from '../types'
 import { detectPackageManager, expandScriptPatterns } from './expand-scripts'
 
 const TMP = join(import.meta.dir, '../../.tmp-expand-test')
@@ -26,6 +27,11 @@ function pkgJson(scripts: Record<string, string>, extra?: Record<string, unknown
 	return JSON.stringify({ scripts, ...extra })
 }
 
+/** Narrow an expanded process entry to NumuxProcessConfig for assertions */
+function proc(config: NumuxConfig, name: string): NumuxProcessConfig {
+	return config.processes[name] as NumuxProcessConfig
+}
+
 describe('expandScriptPatterns', () => {
 	test('no wildcards — passthrough', () => {
 		const config = { processes: { web: 'echo hi' } }
@@ -41,9 +47,9 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api:dev', 'store:dev'])
-		expect((result.processes['store:dev'] as { command: string }).command).toBe('npm run store:dev')
-		expect((result.processes['api:dev'] as { command: string }).command).toBe('npm run api:dev')
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(proc(result, 'store').command).toBe('npm run store:dev')
+		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
 
 	test('template properties are inherited', () => {
@@ -53,14 +59,13 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns(
 			{
 				processes: {
-					'npm:*:dev': { env: { NODE_ENV: 'dev' }, dependsOn: ['db'] } as any
+					'npm:*:dev': { env: { NODE_ENV: 'dev' }, dependsOn: ['db'] }
 				}
 			},
 			dir
 		)
-		const proc = result.processes['app:dev'] as any
-		expect(proc.env).toEqual({ NODE_ENV: 'dev' })
-		expect(proc.dependsOn).toEqual(['db'])
+		expect(proc(result, 'app').env).toEqual({ NODE_ENV: 'dev' })
+		expect(proc(result, 'app').dependsOn).toEqual(['db'])
 	})
 
 	test('color array distributes round-robin', () => {
@@ -70,14 +75,14 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns(
 			{
 				processes: {
-					'npm:*:dev': { color: ['#ff0000', '#00ff00'] } as any
+					'npm:*:dev': { color: ['#ff0000', '#00ff00'] }
 				}
 			},
 			dir
 		)
-		expect((result.processes['a:dev'] as any).color).toBe('#ff0000')
-		expect((result.processes['b:dev'] as any).color).toBe('#00ff00')
-		expect((result.processes['c:dev'] as any).color).toBe('#ff0000')
+		expect(proc(result, 'a').color).toBe('#ff0000')
+		expect(proc(result, 'b').color).toBe('#00ff00')
+		expect(proc(result, 'c').color).toBe('#ff0000')
 	})
 
 	test('single color string shared by all', () => {
@@ -87,13 +92,13 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns(
 			{
 				processes: {
-					'npm:*:dev': { color: '#ff0000' } as any
+					'npm:*:dev': { color: '#ff0000' }
 				}
 			},
 			dir
 		)
-		expect((result.processes['a:dev'] as any).color).toBe('#ff0000')
-		expect((result.processes['b:dev'] as any).color).toBe('#ff0000')
+		expect(proc(result, 'a').color).toBe('#ff0000')
+		expect(proc(result, 'b').color).toBe('#ff0000')
 	})
 
 	test('no color — omitted from expanded processes', () => {
@@ -101,7 +106,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'a:dev': 'a' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:*:dev': {} } }, dir)
-		expect((result.processes['a:dev'] as any).color).toBeUndefined()
+		expect(proc(result, 'a').color).toBeUndefined()
 	})
 
 	test('mixed config preserves regular processes', () => {
@@ -118,7 +123,7 @@ describe('expandScriptPatterns', () => {
 			dir
 		)
 		expect(result.processes.db).toBe('docker compose up')
-		expect((result.processes['app:dev'] as any).command).toBe('npm run app:dev')
+		expect(proc(result, 'app').command).toBe('npm run app:dev')
 	})
 
 	test('collision with existing process throws', () => {
@@ -173,11 +178,32 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ dev: 'next dev' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:dev': null as any } }, dir)
-		expect((result.processes.dev as any).command).toBe('npm run dev')
+		expect(proc(result, 'dev').command).toBe('npm run dev')
 	})
 
-	test('multiple wildcards in same config', () => {
+	test('multiple wildcards with distinct short names', () => {
 		const dir = setupDir('multi-wild', {
+			'package.json': pkgJson({
+				'dev:web': 'next dev',
+				'dev:api': 'bun api',
+				'test:unit': 'vitest',
+				'test:e2e': 'playwright'
+			})
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					'npm:dev:*': {},
+					'npm:test:*': {}
+				}
+			},
+			dir
+		)
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'e2e', 'unit', 'web'])
+	})
+
+	test('multiple wildcards with colliding short names throws', () => {
+		const dir = setupDir('multi-wild-collision', {
 			'package.json': pkgJson({
 				'store:dev': 'next dev',
 				'api:dev': 'bun api',
@@ -185,16 +211,17 @@ describe('expandScriptPatterns', () => {
 				'api:build': 'tsc'
 			})
 		})
-		const result = expandScriptPatterns(
-			{
-				processes: {
-					'npm:*:dev': {},
-					'npm:*:build': {}
-				}
-			},
-			dir
-		)
-		expect(Object.keys(result.processes).sort()).toEqual(['api:build', 'api:dev', 'store:build', 'store:dev'])
+		expect(() =>
+			expandScriptPatterns(
+				{
+					processes: {
+						'npm:*:dev': {},
+						'npm:*:build': {}
+					}
+				},
+				dir
+			)
+		).toThrow('collides')
 	})
 
 	test('complex glob pattern', () => {
@@ -206,7 +233,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:app-*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['app-api', 'app-web'])
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'web'])
 		expect(result.processes['lib-core']).toBeUndefined()
 	})
 
@@ -215,7 +242,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ dev: 'next dev' })
 		})
 		const result = expandScriptPatterns({ cwd: dir, processes: { 'npm:dev': {} } })
-		expect((result.processes.dev as any).command).toBe('npm run dev')
+		expect(proc(result, 'dev').command).toBe('npm run dev')
 	})
 
 	test('bare glob pattern expands like npm: prefix', () => {
@@ -227,9 +254,9 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api:dev', 'store:dev'])
-		expect((result.processes['store:dev'] as { command: string }).command).toBe('npm run store:dev')
-		expect((result.processes['api:dev'] as { command: string }).command).toBe('npm run api:dev')
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(proc(result, 'store').command).toBe('npm run store:dev')
+		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
 
 	test('bare glob with template properties', () => {
@@ -239,15 +266,14 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns(
 			{
 				processes: {
-					'*:dev': { env: { NODE_ENV: 'dev' }, dependsOn: ['db'] } as any
+					'*:dev': { env: { NODE_ENV: 'dev' }, dependsOn: ['db'] }
 				}
 			},
 			dir
 		)
-		const proc = result.processes['app:dev'] as any
-		expect(proc.env).toEqual({ NODE_ENV: 'dev' })
-		expect(proc.dependsOn).toEqual(['db'])
-		expect(proc.command).toBe('npm run app:dev')
+		expect(proc(result, 'app').env).toEqual({ NODE_ENV: 'dev' })
+		expect(proc(result, 'app').dependsOn).toEqual(['db'])
+		expect(proc(result, 'app').command).toBe('npm run app:dev')
 	})
 
 	test('bare glob with color array', () => {
@@ -257,14 +283,14 @@ describe('expandScriptPatterns', () => {
 		const result = expandScriptPatterns(
 			{
 				processes: {
-					'*:dev': { color: ['#ff0000', '#00ff00'] } as any
+					'*:dev': { color: ['#ff0000', '#00ff00'] }
 				}
 			},
 			dir
 		)
-		expect((result.processes['a:dev'] as any).color).toBe('#ff0000')
-		expect((result.processes['b:dev'] as any).color).toBe('#00ff00')
-		expect((result.processes['c:dev'] as any).color).toBe('#ff0000')
+		expect(proc(result, 'a').color).toBe('#ff0000')
+		expect(proc(result, 'b').color).toBe('#00ff00')
+		expect(proc(result, 'c').color).toBe('#ff0000')
 	})
 
 	test('bare glob mixed with regular processes', () => {
@@ -281,7 +307,7 @@ describe('expandScriptPatterns', () => {
 			dir
 		)
 		expect(result.processes.db).toBe('docker compose up')
-		expect((result.processes['app:dev'] as any).command).toBe('npm run app:dev')
+		expect(proc(result, 'app').command).toBe('npm run app:dev')
 	})
 
 	test('bare glob no matches throws with available scripts', () => {
@@ -295,14 +321,14 @@ describe('expandScriptPatterns', () => {
 
 	test('bare glob collision with existing process throws', () => {
 		const dir = setupDir('bare-glob-collision', {
-			'package.json': pkgJson({ web: 'next dev' })
+			'package.json': pkgJson({ 'dev:web': 'next dev' })
 		})
 		expect(() =>
 			expandScriptPatterns(
 				{
 					processes: {
 						web: 'echo hi',
-						'w*': {}
+						'dev:*': {}
 					}
 				},
 				dir
@@ -312,10 +338,10 @@ describe('expandScriptPatterns', () => {
 
 	test('bare glob with question mark pattern', () => {
 		const dir = setupDir('bare-glob-question', {
-			'package.json': pkgJson({ 'a1': 'cmd1', 'a2': 'cmd2', 'ab': 'cmd3' })
+			'package.json': pkgJson({ a1: 'cmd1', a2: 'cmd2', ab: 'cmd3' })
 		})
 		const result = expandScriptPatterns({ processes: { 'a?': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['a1', 'a2', 'ab'])
+		expect(Object.keys(result.processes).sort()).toEqual(['1', '2', 'b'])
 	})
 
 	test('bare glob command on wildcard throws', () => {
@@ -329,7 +355,7 @@ describe('expandScriptPatterns', () => {
 
 	test('non-glob names without command are not expanded', () => {
 		// Names like "web" that don't contain glob chars should NOT be treated as patterns
-		const config = { processes: { web: { env: { FOO: 'bar' } } as any } }
+		const config: NumuxConfig = { processes: { web: { env: { FOO: 'bar' } } } }
 		// This should passthrough, not try to expand
 		expect(expandScriptPatterns(config)).toBe(config)
 	})
@@ -339,9 +365,9 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['lint:js', 'lint:ts'])
-		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix')
-		expect((result.processes['lint:ts'] as any).command).toBe('npm run lint:ts --fix')
+		expect(Object.keys(result.processes).sort()).toEqual(['js', 'ts'])
+		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
 	})
 
 	test('npm: prefix with extra args', () => {
@@ -349,8 +375,8 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint:* --fix': {} } }, dir)
-		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix')
-		expect((result.processes['lint:ts'] as any).command).toBe('npm run lint:ts --fix')
+		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
 	})
 
 	test('multiple extra args forwarded', () => {
@@ -358,7 +384,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix --quiet': {} } }, dir)
-		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix --quiet')
+		expect(proc(result, 'js').command).toBe('npm run lint:js --fix --quiet')
 	})
 
 	test('npm: exact script name with extra args', () => {
@@ -366,7 +392,45 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ lint: 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
-		expect((result.processes.lint as any).command).toBe('npm run lint --fix')
+		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
+	})
+
+	test('prefix glob strips common prefix from process names', () => {
+		// numux 'dev:*' should produce tab names "web", "api", "db" not "dev:web", etc.
+		const dir = setupDir('prefix-strip', {
+			'package.json': pkgJson({
+				'dev:web': 'vite',
+				'dev:api': 'bun run api',
+				'dev:db': 'bun run db'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'dev:*': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'web'])
+		// Commands must still reference full script name
+		expect(proc(result, 'web').command).toBe('npm run dev:web')
+		expect(proc(result, 'api').command).toBe('npm run dev:api')
+		expect(proc(result, 'db').command).toBe('npm run dev:db')
+	})
+
+	test('suffix glob strips common suffix from process names', () => {
+		const dir = setupDir('suffix-strip', {
+			'package.json': pkgJson({
+				'store:dev': 'next dev',
+				'api:dev': 'bun run api'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(proc(result, 'store').command).toBe('npm run store:dev')
+		expect(proc(result, 'api').command).toBe('npm run api:dev')
+	})
+
+	test('fully-wildcard pattern keeps full script name', () => {
+		const dir = setupDir('full-wild', {
+			'package.json': pkgJson({ dev: 'vite', build: 'tsc' })
+		})
+		const result = expandScriptPatterns({ processes: { '*': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['build', 'dev'])
 	})
 
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
@@ -380,9 +444,9 @@ describe('expandScriptPatterns', () => {
 				lint: 'biome check'
 			})
 		})
-		const result = expandScriptPatterns({ processes: { '*:dev': { color: ['#00ff00', '#00ffff'] } as any } }, dir)
+		const result = expandScriptPatterns({ processes: { '*:dev': { color: ['#00ff00', '#00ffff'] } } }, dir)
 		const names = Object.keys(result.processes).sort()
-		expect(names).toEqual(['api:dev', 'store:dev'])
+		expect(names).toEqual(['api', 'store'])
 		// "dev" script should NOT match *:dev (no colon)
 		expect(result.processes.dev).toBeUndefined()
 	})
