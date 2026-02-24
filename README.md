@@ -226,6 +226,7 @@ Each process accepts:
 | `color` | `string \| string[]` | auto | Hex (e.g. `"#ff6600"`) or basic name: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple |
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
 | `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
+| `errorMatcher` | `boolean \| string` | — | `true` detects ANSI red output, string = regex pattern — shows error indicator on tab |
 
 ### File watching
 

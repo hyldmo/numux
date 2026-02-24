@@ -1,3 +1,5 @@
+import { FLAGS, type FlagDef, SUBCOMMANDS } from './cli-flags'
+
 const SUPPORTED_SHELLS = ['bash', 'zsh', 'fish'] as const
 
 export function generateCompletions(shell: string): string {
@@ -13,7 +15,36 @@ export function generateCompletions(shell: string): string {
 	}
 }
 
+/** Strip leading dashes: '--foo' → 'foo' */
+function longName(f: FlagDef): string {
+	return f.long.replace(/^-+/, '')
+}
+
+/** Escape single quotes for shell strings: ' → '\'' */
+function sq(s: string): string {
+	return s.replace(/'/g, "'\\''")
+}
+
 function bashCompletions(): string {
+	// Case entries for value flags
+	const caseEntries: string[] = []
+	for (const f of FLAGS) {
+		if (f.type !== 'value') continue
+		const names = f.short ? `${f.short}|${f.long}` : f.long
+		if (f.completionHint === 'file') {
+			caseEntries.push(`    ${names})\n      COMPREPLY=( $(compgen -f -- "$cur") )\n      return ;;`)
+		} else if (f.completionHint === 'directory') {
+			caseEntries.push(`    ${names})\n      COMPREPLY=( $(compgen -d -- "$cur") )\n      return ;;`)
+		} else {
+			caseEntries.push(`    ${names})\n      return ;;`)
+		}
+	}
+	caseEntries.push('    completions)\n      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )\n      return ;;')
+
+	// All flag names for compgen
+	const allFlags = FLAGS.flatMap(f => (f.short ? [f.short, f.long] : [f.long]))
+	const subcmds = SUBCOMMANDS.map(s => s.name)
+
 	return `# numux bash completions
 # Add to ~/.bashrc: eval "$(numux completions bash)"
 _numux() {
@@ -22,25 +53,13 @@ _numux() {
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
   case "$prev" in
-    --config)
-      COMPREPLY=( $(compgen -f -- "$cur") )
-      return ;;
-    --log-dir)
-      COMPREPLY=( $(compgen -d -- "$cur") )
-      return ;;
-    --only|--exclude)
-      return ;;
-    -n|--name|-w|--workspace)
-      return ;;
-    completions)
-      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )
-      return ;;
+${caseEntries.join('\n')}
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=( $(compgen -W "-h --help -v --version -w --workspace -c --color --colors --config -n --name -p --prefix --only --exclude --kill-others --no-restart --no-watch -t --timestamps --log-dir --debug" -- "$cur") )
+    COMPREPLY=( $(compgen -W "${allFlags.join(' ')}" -- "$cur") )
   else
-    local subcmds="init validate exec completions"
+    local subcmds="${subcmds.join(' ')}"
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
   fi
 }
@@ -48,35 +67,48 @@ complete -F _numux numux`
 }
 
 function zshCompletions(): string {
+	const subcmdLines = SUBCOMMANDS.map(s => `    '${s.name}:${sq(s.description)}'`).join('\n')
+
+	const argLines: string[] = []
+	for (const f of FLAGS) {
+		const desc = sq(f.description)
+		if (f.short) {
+			if (f.type === 'value') {
+				let suffix = ''
+				if (f.completionHint === 'file') suffix = ':file:_files'
+				else if (f.completionHint === 'directory') suffix = ':directory:_directories'
+				else suffix = `:${longName(f)}`
+				argLines.push(`    '(${f.short} ${f.long})'{${f.short},${f.long}}'[${desc}]${suffix}'`)
+			} else {
+				argLines.push(`    '(${f.short} ${f.long})'{${f.short},${f.long}}'[${desc}]'`)
+			}
+		} else {
+			if (f.type === 'value') {
+				let suffix = ''
+				if (f.completionHint === 'file') suffix = ':file:_files'
+				else if (f.completionHint === 'directory') suffix = ':directory:_directories'
+				else suffix = `:${longName(f)}`
+				argLines.push(`    '${f.long}[${desc}]${suffix}'`)
+			} else {
+				argLines.push(`    '${f.long}[${desc}]'`)
+			}
+		}
+	}
+
+	// Join with ' \' line continuation
+	const argsBlock = argLines.map(l => `${l} \\`).join('\n')
+
 	return `#compdef numux
 # numux zsh completions
 # Add to ~/.zshrc: eval "$(numux completions zsh)"
 _numux() {
   local -a subcmds
   subcmds=(
-    'init:Create a starter config file'
-    'validate:Validate config and show process graph'
-    'exec:Run a command in a process environment'
-    'completions:Generate shell completions'
+${subcmdLines}
   )
 
   _arguments -s \\
-    '(-h --help)'{-h,--help}'[Show help]' \\
-    '(-v --version)'{-v,--version}'[Show version]' \\
-    '(-w --workspace)'{-w,--workspace}'[Run script across all workspaces]:script' \\
-    '(-c --color)'{-c,--color}'[Comma-separated colors for processes]' \\
-    '--colors[Auto-assign colors based on process name]' \\
-    '--config[Config file path]:file:_files' \\
-    '(-n --name)'{-n,--name}'[Named process (name=command)]:named process' \\
-    '(-p --prefix)'{-p,--prefix}'[Prefixed output mode]' \\
-    '--only[Only run these processes]:processes' \\
-    '--exclude[Exclude these processes]:processes' \\
-    '--kill-others[Kill all when any exits]' \\
-    '--no-restart[Disable auto-restart]' \\
-    '--no-watch[Disable file watching]' \\
-    '(-t --timestamps)'{-t,--timestamps}'[Add timestamps to output]' \\
-    '--log-dir[Log directory]:directory:_directories' \\
-    '--debug[Enable debug logging]' \\
+${argsBlock}
     '1:subcommand:->subcmd' \\
     '*:command' \\
     && return
@@ -91,35 +123,43 @@ _numux`
 }
 
 function fishCompletions(): string {
-	return `# numux fish completions
-# Add to fish: numux completions fish | source
-# Or save to: ~/.config/fish/completions/numux.fish
-complete -c numux -f
+	const lines = [
+		'# numux fish completions',
+		'# Add to fish: numux completions fish | source',
+		'# Or save to: ~/.config/fish/completions/numux.fish',
+		'complete -c numux -f',
+		'',
+		'# Subcommands'
+	]
 
-# Subcommands
-complete -c numux -n __fish_use_subcommand -a init -d 'Create a starter config file'
-complete -c numux -n __fish_use_subcommand -a validate -d 'Validate config and show process graph'
-complete -c numux -n __fish_use_subcommand -a exec -d 'Run a command in a process environment'
-complete -c numux -n __fish_use_subcommand -a completions -d 'Generate shell completions'
+	for (const s of SUBCOMMANDS) {
+		lines.push(`complete -c numux -n __fish_use_subcommand -a ${s.name} -d '${sq(s.description)}'`)
+	}
 
-# Completions subcommand
-complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'
+	lines.push(
+		'',
+		'# Completions subcommand',
+		"complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'",
+		'',
+		'# Options'
+	)
 
-# Options
-complete -c numux -s h -l help -d 'Show help'
-complete -c numux -s v -l version -d 'Show version'
-complete -c numux -s c -l color -r -d 'Comma-separated colors for processes'
-complete -c numux -l colors -d 'Auto-assign colors based on process name'
-complete -c numux -l config -rF -d 'Config file path'
-complete -c numux -s w -l workspace -r -d 'Run script across all workspaces'
-complete -c numux -s n -l name -r -d 'Named process (name=command)'
-complete -c numux -s p -l prefix -d 'Prefixed output mode'
-complete -c numux -l only -r -d 'Only run these processes'
-complete -c numux -l exclude -r -d 'Exclude these processes'
-complete -c numux -l kill-others -d 'Kill all when any exits'
-complete -c numux -l no-restart -d 'Disable auto-restart'
-complete -c numux -l no-watch -d 'Disable file watching'
-complete -c numux -s t -l timestamps -d 'Add timestamps to output'
-complete -c numux -l log-dir -ra '(__fish_complete_directories)' -d 'Log directory'
-complete -c numux -l debug -d 'Enable debug logging'`
+	for (const f of FLAGS) {
+		const parts = ['complete -c numux']
+		if (f.short) parts.push(`-s ${f.short.replace('-', '')}`)
+		parts.push(`-l ${longName(f)}`)
+		if (f.type === 'value') {
+			if (f.completionHint === 'file') {
+				parts.push('-rF')
+			} else if (f.completionHint === 'directory') {
+				parts.push("-ra '(__fish_complete_directories)'")
+			} else {
+				parts.push('-r')
+			}
+		}
+		parts.push(`-d '${sq(f.description)}'`)
+		lines.push(parts.join(' '))
+	}
+
+	return lines.join('\n')
 }
