@@ -98,6 +98,22 @@ numux completions fish | source
 numux completions fish > ~/.config/fish/completions/numux.fish
 ```
 
+### Workspaces
+
+Run a `package.json` script across all workspaces in a monorepo:
+
+```sh
+numux -w dev
+```
+
+Reads the `workspaces` field from your root `package.json`, finds which workspaces have the given script, and spawns `<pm> run <script>` in each. The package manager is auto-detected from `packageManager` field or lockfiles.
+
+Composes with other flags:
+
+```sh
+numux -w dev -n redis="redis-server" --colors
+```
+
 ### Ad-hoc commands
 
 ```sh
@@ -112,6 +128,7 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 
 | Flag | Description |
 |------|-------------|
+| `-w, --workspace <script>` | Run a script across all workspaces |
 | `-c, --config <path>` | Explicit config file path |
 | `-n, --name <name=cmd>` | Add a named process (repeatable) |
 | `-p, --prefix` | Prefixed output mode (no TUI, for CI/scripts) |
