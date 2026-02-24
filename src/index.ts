@@ -239,6 +239,12 @@ async function main() {
 	printWarnings(warnings)
 
 	if (parsed.prefix) {
+		// Default to no restarts in prefix mode (CI/scripts)
+		if (!parsed.noRestart) {
+			for (const proc of Object.values(config.processes)) {
+				proc.maxRestarts ??= 0
+			}
+		}
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
 			killOthers: parsed.killOthers,

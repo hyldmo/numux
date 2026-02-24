@@ -22,7 +22,6 @@ export class PrefixDisplay {
 	private noColor: boolean
 	private decoders = new Map<string, TextDecoder>()
 	private buffers = new Map<string, string>()
-	private maxNameLen: number
 	private logWriter?: LogWriter
 	private killOthers: boolean
 	private timestamps: boolean
@@ -35,7 +34,6 @@ export class PrefixDisplay {
 		this.timestamps = options.timestamps ?? false
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
-		this.maxNameLen = Math.max(...names.map(n => n.length))
 		this.colors = buildProcessColorMap(names, config)
 		for (const name of names) {
 			this.decoders.set(name, new TextDecoder('utf-8', { fatal: false }))
@@ -128,14 +126,13 @@ export class PrefixDisplay {
 	}
 
 	private printLine(name: string, line: string): void {
-		const padded = name.padEnd(this.maxNameLen)
 		const ts = this.timestamps ? `${DIM}[${this.formatTimestamp()}]${RESET} ` : ''
 		const tsPlain = this.timestamps ? `[${this.formatTimestamp()}] ` : ''
 		if (this.noColor) {
-			process.stdout.write(`${tsPlain}[${padded}] ${stripAnsi(line)}\n`)
+			process.stdout.write(`${tsPlain}[${name}] ${stripAnsi(line)}\n`)
 		} else {
 			const color = this.colors.get(name) ?? ''
-			process.stdout.write(`${ts}${color}[${padded}]${RESET} ${line}\n`)
+			process.stdout.write(`${ts}${color}[${name}]${RESET} ${line}\n`)
 		}
 	}
 

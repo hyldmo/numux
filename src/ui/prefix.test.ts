@@ -79,7 +79,7 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(1)
 	}, 10000)
 
-	test('pads process names to equal width', async () => {
+	test('does not pad process names', async () => {
 		const config = writeConfig(
 			'padding.json',
 			JSON.stringify({
@@ -90,9 +90,10 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout } = await runPrefix(config)
-		// "a" should be padded to match "longname" length (8 chars)
-		expect(stdout).toContain('[a       ]')
+		expect(stdout).toContain('[a]')
 		expect(stdout).toContain('[longname]')
+		// Should not have trailing spaces inside brackets
+		expect(stdout).not.toContain('[a ')
 	}, 10000)
 
 	test('respects dependency order', async () => {
