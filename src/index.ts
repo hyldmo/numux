@@ -2,6 +2,7 @@
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
+import { generateHelp } from './cli-flags'
 import { generateCompletions } from './completions'
 import { expandScriptPatterns } from './config/expand-scripts'
 import { loadConfig } from './config/loader'
@@ -18,38 +19,7 @@ import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { setupShutdownHandlers } from './utils/shutdown'
 
-const HELP = `numux — terminal multiplexer with dependency orchestration
-
-Usage:
-  numux                          Run processes from config file
-  numux <cmd1> <cmd2> ...        Run ad-hoc commands in parallel
-  numux -n name1=cmd1 -n name2=cmd2  Named ad-hoc commands
-  numux -w <script>              Run a script across all workspaces
-  numux init                     Create a starter config file
-  numux validate                 Validate config and show process graph
-  numux exec <name> [--] <cmd>   Run a command in a process's environment
-  numux completions <shell>      Generate shell completions (bash, zsh, fish)
-
-Options:
-  -w, --workspace <script>   Run a package.json script across all workspaces
-  -n, --name <name=command>  Add a named process
-  -c, --color <colors>       Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple)
-  --colors                   Auto-assign colors to processes based on their name
-  --config <path>            Config file path (default: auto-detect)
-  -p, --prefix               Prefixed output mode (no TUI, for CI/scripts)
-  --only <a,b,...>           Only run these processes (+ their dependencies)
-  --exclude <a,b,...>        Exclude these processes
-  --kill-others              Kill all processes when any exits
-  --no-restart               Disable auto-restart for crashed processes
-  --no-watch                 Disable file watching even if config has watch patterns
-  -t, --timestamps           Add timestamps to prefixed output lines
-  --log-dir <path>           Write per-process logs to directory
-  --debug                    Enable debug logging to .numux/debug.log
-  -h, --help                 Show this help
-  -v, --version              Show version
-
-Config files (auto-detected):
-  numux.config.ts, numux.config.js`
+const HELP = generateHelp()
 
 const INIT_TEMPLATE = `import { defineConfig } from 'numux'
 

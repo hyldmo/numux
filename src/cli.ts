@@ -1,3 +1,4 @@
+import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
 import type { ResolvedNumuxConfig } from './types'
 
 export interface ParsedArgs {
@@ -26,6 +27,18 @@ export interface ParsedArgs {
 	named: Array<{ name: string; command: string }>
 }
 
+// Build lookup maps once
+const flagByName = new Map<string, FlagDef>()
+for (const f of FLAGS) {
+	flagByName.set(f.long, f)
+	if (f.short) flagByName.set(f.short, f)
+}
+
+const subcommandByName = new Map<string, SubcommandDef>()
+for (const s of SUBCOMMANDS) {
+	subcommandByName.set(s.name, s)
+}
+
 export function parseArgs(argv: string[]): ParsedArgs {
 	const result: ParsedArgs = {
 		help: false,
@@ -48,86 +61,35 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	const args = argv.slice(2) // skip bun + script
 	let i = 0
 
-	/** Consume the next argument as a value for the given flag, erroring if missing */
-	const consumeValue = (flag: string): string => {
-		const next = args[++i]
-		if (next === undefined) {
-			throw new Error(`Missing value for ${flag}`)
-		}
-		return next
-	}
-
 	while (i < args.length) {
 		const arg = args[i]
+		const flag = flagByName.get(arg)
 
-		if (arg === '-h' || arg === '--help') {
-			result.help = true
-		} else if (arg === '-v' || arg === '--version') {
-			result.version = true
-		} else if (arg === '--debug') {
-			result.debug = true
-		} else if (arg === '-p' || arg === '--prefix') {
-			result.prefix = true
-		} else if (arg === '--kill-others') {
-			result.killOthers = true
-		} else if (arg === '-t' || arg === '--timestamps') {
-			result.timestamps = true
-		} else if (arg === '--no-restart') {
-			result.noRestart = true
-		} else if (arg === '-w' || arg === '--workspace') {
-			result.workspace = consumeValue(arg)
-		} else if (arg === '--no-watch') {
-			result.noWatch = true
-		} else if (arg === '--colors') {
-			result.autoColors = true
-		} else if (arg === '--config') {
-			result.configPath = consumeValue(arg)
-		} else if (arg === '-c' || arg === '--color') {
-			result.colors = consumeValue(arg)
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean)
-		} else if (arg === '--log-dir') {
-			result.logDir = consumeValue(arg)
-		} else if (arg === '--only') {
-			result.only = consumeValue(arg)
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean)
-		} else if (arg === '--exclude') {
-			result.exclude = consumeValue(arg)
-				.split(',')
-				.map(s => s.trim())
-				.filter(Boolean)
-		} else if (arg === '-n' || arg === '--name') {
-			const value = consumeValue(arg)
-			const eq = value.indexOf('=')
-			if (eq < 1) {
-				throw new Error(`Invalid --name value: expected "name=command", got "${value}"`)
+		if (flag) {
+			if (flag.type === 'boolean') {
+				;(result as any)[flag.key] = true
+			} else {
+				const next = args[++i]
+				if (next === undefined) {
+					throw new Error(`Missing value for ${arg}`)
+				}
+				const value = flag.parse ? flag.parse(next, arg) : next
+				const current = (result as any)[flag.key]
+				if (Array.isArray(current)) {
+					current.push(value)
+				} else {
+					;(result as any)[flag.key] = value
+				}
 			}
-			result.named.push({
-				name: value.slice(0, eq),
-				command: value.slice(eq + 1)
-			})
-		} else if (arg === 'init' && result.commands.length === 0) {
-			result.init = true
-		} else if (arg === 'validate' && result.commands.length === 0) {
-			result.validate = true
-		} else if (arg === 'exec' && result.commands.length === 0) {
-			result.exec = true
-			const name = args[++i]
-			if (!name) throw new Error('exec requires a process name')
-			result.execName = name
-			// Skip optional --
-			if (args[i + 1] === '--') i++
-			const rest = args.slice(i + 1)
-			if (rest.length === 0) throw new Error('exec requires a command to run')
-			result.execCommand = rest.join(' ')
-			break
-		} else if (arg === 'completions' && result.commands.length === 0) {
-			result.completions = consumeValue(arg)
 		} else if (!arg.startsWith('-')) {
-			result.commands.push(arg)
+			const sub = result.commands.length === 0 ? subcommandByName.get(arg) : undefined
+			if (sub) {
+				const ret = sub.parse(args, i, result)
+				if (ret === 'break') break
+				i = ret
+			} else {
+				result.commands.push(arg)
+			}
 		} else {
 			throw new Error(`Unknown option: ${arg}`)
 		}
