@@ -29,6 +29,14 @@ function isGlobPattern(name: string): boolean {
 	return /[*?[]/.test(name)
 }
 
+/** Split a pattern into the glob portion and any trailing args.
+ *  Script names never contain spaces, so the first space is unambiguous. */
+function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
+	const i = raw.indexOf(' ')
+	if (i === -1) return { glob: raw, extraArgs: '' }
+	return { glob: raw.slice(0, i), extraArgs: raw.slice(i) }
+}
+
 export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxConfig {
 	const entries = Object.entries(config.processes)
 	const hasWildcard = entries.some(([name]) => name.startsWith('npm:') || isGlobPattern(name))
@@ -58,7 +66,8 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			continue
 		}
 
-		const pattern = name.startsWith('npm:') ? name.slice(4) : name
+		const rawPattern = name.startsWith('npm:') ? name.slice(4) : name
+		const { glob: globPattern, extraArgs } = splitPatternArgs(rawPattern)
 		const template = (value ?? {}) as Partial<NumuxProcessConfig>
 
 		if (template.command) {
@@ -67,12 +76,12 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			)
 		}
 
-		const glob = new Bun.Glob(pattern)
+		const glob = new Bun.Glob(globPattern)
 		const matches = scriptNames.filter(s => glob.match(s))
 
 		if (matches.length === 0) {
 			throw new Error(
-				`"${name}": no scripts matched pattern "${pattern}". Available scripts: ${scriptNames.join(', ')}`
+				`"${name}": no scripts matched pattern "${globPattern}". Available scripts: ${scriptNames.join(', ')}`
 			)
 		}
 
@@ -91,7 +100,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			const { color: _color, ...rest } = template
 			expanded[scriptName] = {
 				...rest,
-				command: `${pm} run ${scriptName}`,
+				command: `${pm} run ${scriptName}${extraArgs}`,
 				...(color ? { color } : {})
 			} as NumuxProcessConfig
 		}
