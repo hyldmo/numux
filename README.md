@@ -108,6 +108,34 @@ numux "bun dev:api" "bun dev:web"
 numux -n api="bun dev:api" -n web="bun dev:web"
 ```
 
+### Script patterns
+
+Run multiple package.json scripts matching a glob pattern:
+
+```sh
+numux 'dev:*'             # all scripts matching dev:*
+numux 'npm:*:dev'         # explicit npm: prefix (same behavior)
+```
+
+Extra arguments after the pattern are forwarded to each matched command:
+
+```sh
+numux 'lint:* --fix'      # → bun run lint:js --fix, bun run lint:ts --fix
+```
+
+In a config file, use the pattern as the process name:
+
+```ts
+export default defineConfig({
+  processes: {
+    'dev:*': { color: ['green', 'cyan'] },
+    'lint:* --fix': {},
+  },
+})
+```
+
+Template properties (color, env, dependsOn, etc.) are inherited by all matched processes. Colors given as an array are distributed round-robin.
+
 ### Options
 
 | Flag | Description |

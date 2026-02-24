@@ -334,6 +334,41 @@ describe('expandScriptPatterns', () => {
 		expect(expandScriptPatterns(config)).toBe(config)
 	})
 
+	test('extra args are forwarded to expanded commands', () => {
+		const dir = setupDir('args-basic', {
+			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:* --fix': {} } }, dir)
+		expect(Object.keys(result.processes).sort()).toEqual(['lint:js', 'lint:ts'])
+		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix')
+		expect((result.processes['lint:ts'] as any).command).toBe('npm run lint:ts --fix')
+	})
+
+	test('npm: prefix with extra args', () => {
+		const dir = setupDir('args-npm-prefix', {
+			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:lint:* --fix': {} } }, dir)
+		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix')
+		expect((result.processes['lint:ts'] as any).command).toBe('npm run lint:ts --fix')
+	})
+
+	test('multiple extra args forwarded', () => {
+		const dir = setupDir('args-multi', {
+			'package.json': pkgJson({ 'lint:js': 'eslint' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:* --fix --quiet': {} } }, dir)
+		expect((result.processes['lint:js'] as any).command).toBe('npm run lint:js --fix --quiet')
+	})
+
+	test('npm: exact script name with extra args', () => {
+		const dir = setupDir('args-exact', {
+			'package.json': pkgJson({ lint: 'eslint' })
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
+		expect((result.processes.lint as any).command).toBe('npm run lint --fix')
+	})
+
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
 		// Simulates: numux '*:dev' — should only match scripts containing ":dev"
 		const dir = setupDir('cli-bare-glob', {
