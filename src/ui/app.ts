@@ -162,6 +162,12 @@ export class App {
 			(key: { ctrl: boolean; shift: boolean; meta: boolean; name: string; sequence: string }) => {
 				log(key)
 
+				// Cmd+C: copy selection (macOS)
+				if (key.meta && key.name === 'c') {
+					this.copySelection()
+					return
+				}
+
 				// Ctrl+C: quit (always works)
 				if (key.ctrl && key.name === 'c') {
 					if (this.searchMode) {
