@@ -26,6 +26,7 @@ export class PrefixDisplay {
 	private killOthers: boolean
 	private timestamps: boolean
 	private stopping = false
+	private startTime = 0
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, options: PrefixDisplayOptions = {}) {
 		this.manager = manager
@@ -60,6 +61,7 @@ export class PrefixDisplay {
 			this.shutdown()
 		})
 
+		this.startTime = Date.now()
 		const cols = process.stdout.columns || 80
 		const rows = process.stdout.rows || 24
 		await this.manager.startAll(cols, rows)
@@ -159,6 +161,16 @@ export class PrefixDisplay {
 		})
 	}
 
+	private formatElapsed(): string {
+		const ms = Date.now() - this.startTime
+		if (ms < 1000) return `${ms}ms`
+		const s = ms / 1000
+		if (s < 60) return `${s.toFixed(1)}s`
+		const m = Math.floor(s / 60)
+		const rem = s % 60
+		return `${m}m ${rem.toFixed(0)}s`
+	}
+
 	private printSummary(): void {
 		const states = this.manager.getAllStates()
 		const namePad = Math.max(...states.map(s => s.name.length))
@@ -173,6 +185,12 @@ export class PrefixDisplay {
 				const statusText = ansi ? `${ansi}${s.status}${RESET}` : s.status
 				process.stdout.write(`  ${name}  ${statusText}${exitStr ? `  ${DIM}(${exitStr})${RESET}` : ''}\n`)
 			}
+		}
+		const elapsed = this.formatElapsed()
+		if (this.noColor) {
+			process.stdout.write(`\nDone in ${elapsed}\n`)
+		} else {
+			process.stdout.write(`\n${DIM}Done in ${elapsed}${RESET}\n`)
 		}
 	}
 
