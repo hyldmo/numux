@@ -259,6 +259,27 @@ describe('validateConfig', () => {
 		expect(config.processes.web.envFile).toBeUndefined()
 	})
 
+	test('envFile false disables env file loading', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', envFile: false }
+			}
+		})
+		expect(config.processes.web.envFile).toBe(false)
+	})
+
+	test('envFile false overrides global envFile', () => {
+		const config = validateConfig({
+			envFile: '.env',
+			processes: {
+				a: { command: 'echo a' },
+				b: { command: 'echo b', envFile: false }
+			}
+		})
+		expect(config.processes.a.envFile).toBe('.env')
+		expect(config.processes.b.envFile).toBe(false)
+	})
+
 	test('throws on non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({

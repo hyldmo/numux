@@ -22,7 +22,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 	// Extract global options
 	const globalCwd = typeof config.cwd === 'string' ? config.cwd : undefined
-	const globalEnvFile = validateStringOrStringArray(config.envFile)
+	const globalEnvFile = validateEnvFile(config.envFile)
 	let globalEnv: Record<string, string> | undefined
 	if (config.env && typeof config.env === 'object') {
 		for (const [k, v] of Object.entries(config.env as Record<string, unknown>)) {
@@ -141,7 +141,10 @@ function validateStringOrStringArray(value: unknown): string | string[] | undefi
 	return undefined
 }
 
-const validateEnvFile = validateStringOrStringArray
+function validateEnvFile(value: unknown): string | string[] | false | undefined {
+	if (value === false) return false
+	return validateStringOrStringArray(value)
+}
 
 function validateErrorMatcher(name: string, value: unknown): boolean | string | undefined {
 	if (value === true) return true
