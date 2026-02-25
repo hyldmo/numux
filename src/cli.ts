@@ -23,6 +23,7 @@ export interface ParsedArgs {
 	exclude?: string[]
 	colors?: string[]
 	workspace?: string
+	envFile?: string | false
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }

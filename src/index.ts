@@ -199,6 +199,12 @@ async function main() {
 		}
 	}
 
+	if (parsed.envFile !== undefined) {
+		for (const proc of Object.values(config.processes)) {
+			proc.envFile = parsed.envFile
+		}
+	}
+
 	if (parsed.noWatch) {
 		for (const proc of Object.values(config.processes)) {
 			delete proc.watch

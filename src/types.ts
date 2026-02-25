@@ -2,7 +2,7 @@ export interface NumuxProcessConfig {
 	command: string
 	cwd?: string
 	env?: Record<string, string>
-	envFile?: string | string[] // .env file path(s) to load
+	envFile?: string | string[] | false // .env file path(s) to load, or false to disable
 	dependsOn?: string[]
 	readyPattern?: string
 	persistent?: boolean // default true, false = one-shot
@@ -24,7 +24,7 @@ export type NumuxScriptPattern = Omit<NumuxProcessConfig, 'command'> & { command
 export interface NumuxConfig {
 	cwd?: string // Global working directory, inherited by all processes
 	env?: Record<string, string> // Global env vars, merged into each process (process-level overrides)
-	envFile?: string | string[] // Global .env file(s), inherited by processes without their own envFile
+	envFile?: string | string[] | false // Global .env file(s), inherited by processes without their own envFile; false disables
 	processes: Record<string, NumuxProcessConfig | NumuxScriptPattern | string>
 }
 

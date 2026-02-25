@@ -75,6 +75,18 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv('--config', 'my.config.ts')).configPath).toBe('my.config.ts')
 	})
 
+	test('-e sets env file path', () => {
+		expect(parseArgs(argv('-e', '.env.local')).envFile).toBe('.env.local')
+	})
+
+	test('--env-file sets env file path', () => {
+		expect(parseArgs(argv('--env-file', '.env.local')).envFile).toBe('.env.local')
+	})
+
+	test('-e false disables env file loading', () => {
+		expect(parseArgs(argv('-e', 'false')).envFile).toBe(false)
+	})
+
 	test('-c sets colors', () => {
 		expect(parseArgs(argv('-c', '#ff0000,#00ff00')).colors).toEqual(['#ff0000', '#00ff00'])
 	})

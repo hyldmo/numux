@@ -85,6 +85,16 @@ export const FLAGS: FlagDef[] = [
 	},
 	{
 		type: 'value',
+		long: '--env-file',
+		short: '-e',
+		key: 'envFile',
+		description: 'Env file path, or "false" to disable env file loading',
+		valueName: '<path|false>',
+		completionHint: 'file',
+		parse: (raw: string) => (raw === 'false' ? false : raw)
+	},
+	{
+		type: 'value',
 		long: '--config',
 		key: 'configPath',
 		description: 'Config file path (default: auto-detect)',
