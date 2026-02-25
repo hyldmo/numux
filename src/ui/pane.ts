@@ -36,7 +36,8 @@ export class Pane {
 			rows,
 			persistent: true,
 			showCursor: interactive,
-			trimEnd: true
+			trimEnd: true,
+			flexGrow: 1
 		})
 
 		// Auto-copy to clipboard when mouse selection finishes

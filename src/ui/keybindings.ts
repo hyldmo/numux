@@ -8,7 +8,7 @@ interface Shortcut {
 
 export const SHORTCUTS = {
 	restartAll: { key: 'r', label: 'Shift+R', description: 'restart all', shift: true },
-	copy: { key: 'y', label: 'Y', description: 'copy' },
+	copy: { key: 'y', label: 'Y/⌘C', description: 'copy' },
 	search: { key: 'f', label: 'F', description: 'search' },
 	restart: { key: 'r', label: 'R', description: 'restart' },
 	stopStart: { key: 's', label: 'S', description: 'stop/start' },
