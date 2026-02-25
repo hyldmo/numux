@@ -317,6 +317,26 @@ describe('ProcessRunner — restart', () => {
 
 		await runner.stop()
 	}, 10000)
+
+	test('restart does not emit onExit for the old process', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('srv', { command: 'sleep 60', persistent: true }, handler)
+
+		runner.start(80, 24)
+		await new Promise(r => setTimeout(r, 100))
+		expect(handler.exits).toHaveLength(0)
+
+		await runner.restart(80, 24)
+		// Let microtasks settle
+		await new Promise(r => setTimeout(r, 100))
+
+		// The old process was killed (SIGTERM → non-zero exit), but onExit
+		// should NOT have been called — otherwise the manager would schedule
+		// an unwanted auto-restart.
+		expect(handler.exits).toHaveLength(0)
+
+		await runner.stop()
+	}, 10000)
 })
 
 describe('ProcessRunner — stop', () => {

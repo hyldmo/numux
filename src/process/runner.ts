@@ -112,10 +112,10 @@ export class ProcessRunner {
 					this.handler.onOutput(encoder.encode(msg))
 				}
 
-				// When readyTimeout already marked the process as failed, suppress
-				// duplicate status/exit events to avoid double onStatus('failed')
-				// and unintended auto-restart scheduling.
-				if (!this.readyTimedOut) {
+				// Suppress exit events when the process is being restarted or when
+				// readyTimeout already marked it as failed, to avoid unintended
+				// auto-restart scheduling.
+				if (!(this.readyTimedOut || this.restarting)) {
 					const status: ProcessStatus = this.stopping ? 'stopped' : code === 0 ? 'finished' : 'failed'
 					this.handler.onStatus(status)
 					this.handler.onExit(code)
