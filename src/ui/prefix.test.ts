@@ -110,10 +110,10 @@ describe('PrefixDisplay (integration)', () => {
 		// Both should appear in output
 		expect(stdout).toContain('step1')
 		expect(stdout).toContain('step2')
-		// "first" should reach finished status before "second" starts
-		const firstFinished = stdout.indexOf('finished')
+		// "first" output should appear before "second" output
+		const firstOutput = stdout.indexOf('step1')
 		const secondOutput = stdout.indexOf('step2')
-		expect(firstFinished).toBeLessThan(secondOutput)
+		expect(firstOutput).toBeLessThan(secondOutput)
 		expect(exitCode).toBe(0)
 	}, 10000)
 
@@ -203,8 +203,8 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config)
-		expect(stdout).toContain('[dep')
-		expect(stdout).toContain('[child')
+		// Summary should show dep as failed and child as skipped
+		expect(stdout).toContain('failed')
 		expect(stdout).toContain('skipped')
 		expect(stdout).not.toContain('should not run')
 		expect(exitCode).toBe(1)

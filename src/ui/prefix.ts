@@ -99,22 +99,8 @@ export class PrefixDisplay {
 		}
 	}
 
-	private handleStatus(name: string, status: ProcessStatus): void {
-		if (
-			status === 'ready' ||
-			status === 'failed' ||
-			status === 'finished' ||
-			status === 'stopped' ||
-			status === 'skipped'
-		) {
-			if (this.noColor) {
-				this.printLine(name, `→ ${status}`)
-			} else {
-				const ansi = STATUS_ANSI[status]
-				const statusText = ansi ? `${ansi}${status}${RESET}` : status
-				this.printLine(name, `${DIM}→ ${statusText}${DIM}${RESET}`)
-			}
-		}
+	private handleStatus(_name: string, _status: ProcessStatus): void {
+		// Status messages are not printed in prefix mode — only process output
 	}
 
 	private formatTimestamp(): string {
