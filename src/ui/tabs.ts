@@ -9,7 +9,7 @@ import {
 } from '@opentui/core'
 import type { ProcessStatus } from '../types'
 
-const STATUS_ICONS: Record<ProcessStatus, string> = {
+export const STATUS_ICONS: Record<ProcessStatus, string> = {
 	pending: '○',
 	starting: '◐',
 	running: '◉',
@@ -22,7 +22,7 @@ const STATUS_ICONS: Record<ProcessStatus, string> = {
 }
 
 /** Status-specific icon colors (override process colors) */
-const STATUS_ICON_HEX: Partial<Record<ProcessStatus, string>> = {
+export const STATUS_ICON_HEX: Partial<Record<ProcessStatus, string>> = {
 	ready: '#00cc00',
 	finished: '#66aa66',
 	failed: '#ff5555',
@@ -31,7 +31,48 @@ const STATUS_ICON_HEX: Partial<Record<ProcessStatus, string>> = {
 }
 
 /** Statuses that represent a terminal (done) state — tabs move to bottom */
-const TERMINAL_STATUSES = new Set<ProcessStatus>(['finished', 'stopped', 'failed', 'skipped'])
+export const TERMINAL_STATUSES = new Set<ProcessStatus>(['finished', 'stopped', 'failed', 'skipped'])
+
+export function formatTab(name: string, status: ProcessStatus): string {
+	return `${STATUS_ICONS[status]} ${name}`
+}
+
+export function formatDescription(status: ProcessStatus, exitCode?: number | null, restartCount?: number): string {
+	let desc: string = status
+	if ((status === 'failed' || status === 'stopped') && exitCode != null && exitCode !== 0) {
+		desc = `exit ${exitCode}`
+	}
+	if (restartCount && restartCount > 0) {
+		desc += ` ×${restartCount}`
+	}
+	return desc
+}
+
+export function getDisplayOrder(originalNames: string[], statuses: Map<string, ProcessStatus>): string[] {
+	const active = originalNames.filter(n => !TERMINAL_STATUSES.has(statuses.get(n)!))
+	const terminal = originalNames.filter(n => TERMINAL_STATUSES.has(statuses.get(n)!))
+	return [...active, ...terminal]
+}
+
+export function resolveOptionColors(
+	names: string[],
+	statuses: Map<string, ProcessStatus>,
+	processColors: Map<string, string>,
+	inputWaiting: Set<string>,
+	erroredProcesses: Set<string>
+): Array<{ iconHex: string; nameHex: string | null }> {
+	return names.map(name => {
+		const status = statuses.get(name)!
+		const waiting = inputWaiting.has(name)
+		const errored = erroredProcesses.has(name)
+		const statusHex = waiting ? '#ffaa00' : errored ? '#ff5555' : STATUS_ICON_HEX[status]
+		const processHex = processColors.get(name)
+		return {
+			iconHex: statusHex ?? processHex ?? '#888888',
+			nameHex: processHex ?? null
+		}
+	})
+}
 
 interface OptionColors {
 	icon: RGBA | null
@@ -39,10 +80,11 @@ interface OptionColors {
 }
 
 /**
- * SelectRenderable subclass that supports per-option coloring.
- * The base SelectRenderable draws all option text with a single color.
- * This overrides renderSelf to repaint the icon and name with individual
- * RGBA colors after the base render.
+ * SelectRenderable subclass that renders options with per-option icon/name colors.
+ *
+ * Overrides refreshFrameBuffer to do a single-pass render instead of the base class's
+ * render-then-overdraw approach. This avoids ghost characters that appear when the
+ * base class's "▶ " prefix and the override's text disagree on character widths.
  */
 class ColoredSelectRenderable extends SelectRenderable {
 	private _optionColors: OptionColors[] = []
@@ -52,12 +94,9 @@ class ColoredSelectRenderable extends SelectRenderable {
 		this.requestRender()
 	}
 
-	protected renderSelf(buffer: OptimizedBuffer, deltaTime: number): void {
-		const wasDirty = this.isDirty
-		super.renderSelf(buffer, deltaTime)
-		if (wasDirty && this.frameBuffer && this._optionColors.length > 0) {
-			this.colorizeOptions()
-		}
+	protected renderSelf(_buffer: OptimizedBuffer, _deltaTime: number): void {
+		if (!(this.visible && this.frameBuffer)) return
+		if (this.isDirty) this.renderOptions()
 	}
 
 	protected onMouseEvent(event: MouseEvent): void {
@@ -72,36 +111,57 @@ class ColoredSelectRenderable extends SelectRenderable {
 		}
 	}
 
-	private colorizeOptions(): void {
-		const fb = this.frameBuffer!
-		// Access internal layout state (private in TS, accessible at runtime)
+	/** Single-pass render that draws options with correct colors from the start. */
+	private renderOptions(): void {
+		if (!this.frameBuffer || this.options.length === 0) return
+
+		const fb = this.frameBuffer
+		const bgColor = (this as any)._focused ? (this as any)._focusedBackgroundColor : (this as any)._backgroundColor
+		fb.clear(bgColor)
+
 		const scrollOffset = (this as any).scrollOffset as number
 		const maxVisibleItems = (this as any).maxVisibleItems as number
 		const linesPerItem = (this as any).linesPerItem as number
+		const fontHeight = (this as any).fontHeight as number
 		const selectedIndex = this.getSelectedIndex()
-		const options = this.options
-		const visibleCount = Math.min(maxVisibleItems, options.length - scrollOffset)
-		const baseTextColor = (this as any)._focused ? (this as any)._focusedTextColor : (this as any)._textColor
-		const selectedTextColor = (this as any)._selectedTextColor
-		const lineWidth = fb.width
+		const showDescription = (this as any)._showDescription as boolean
+		const baseTextColor: RGBA = (this as any)._focused ? (this as any)._focusedTextColor : (this as any)._textColor
+		const selectedTextColor: RGBA = (this as any)._selectedTextColor
+		const descColor: RGBA = (this as any)._descriptionColor
+		const selectedDescColor: RGBA = (this as any)._selectedDescriptionColor
+		const selectedBgColor: RGBA = (this as any)._selectedBackgroundColor
+		const itemSpacing = (this as any)._itemSpacing as number
+
+		const visibleCount = Math.min(maxVisibleItems, this.options.length - scrollOffset)
 
 		for (let i = 0; i < visibleCount; i++) {
 			const actualIndex = scrollOffset + i
-			const itemY = i * linesPerItem
-			const optName = options[actualIndex].name
+			const option = this.options[actualIndex]
 			const isSelected = actualIndex === selectedIndex
-			const defaultColor = isSelected ? selectedTextColor : baseTextColor
+			const itemY = i * linesPerItem
+
+			if (itemY + linesPerItem - 1 >= this.height) break
+
+			// Selection highlight background
+			if (isSelected) {
+				fb.fillRect(0, itemY, this.width, linesPerItem - itemSpacing, selectedBgColor)
+			}
+
+			// Draw option name with per-option colors (no ▶ prefix — background shows selection)
 			const colors = this._optionColors[actualIndex]
+			const defaultColor = isSelected ? selectedTextColor : baseTextColor
+			const nameColor = colors?.name ?? defaultColor
+			fb.drawText(option.name, 1, itemY, nameColor)
 
-			// Redraw at x=1 to remove the base class's ▶/space prefix.
-			// Pad to full line width so no residual characters from the base render
-			// survive regardless of how the native buffer calculates character widths.
-			const textColor = colors?.name ?? defaultColor
-			fb.drawText(optName.padEnd(lineWidth), 1, itemY, textColor)
-
-			// Override the icon character with its status-specific color
+			// Overdraw the icon character with its status-specific color
 			if (colors?.icon) {
-				fb.drawText(optName.charAt(0), 1, itemY, colors.icon)
+				fb.drawText(option.name.charAt(0), 1, itemY, colors.icon)
+			}
+
+			// Description
+			if (showDescription && itemY + fontHeight < this.height) {
+				const dc = isSelected ? selectedDescColor : descColor
+				fb.drawText(option.description, 3, itemY + fontHeight, dc)
 			}
 		}
 	}
@@ -129,7 +189,7 @@ export class TabBar {
 			width: '100%',
 			height: '100%',
 			options: names.map(n => ({
-				name: this.formatTab(n, 'pending'),
+				name: formatTab(n, 'pending'),
 				description: 'pending'
 			})),
 			selectedBackgroundColor: '#334455',
@@ -155,7 +215,7 @@ export class TabBar {
 
 	updateStatus(name: string, status: ProcessStatus, exitCode?: number | null, restartCount?: number): void {
 		this.statuses.set(name, status)
-		this.baseDescriptions.set(name, this.formatDescription(status, exitCode, restartCount))
+		this.baseDescriptions.set(name, formatDescription(status, exitCode, restartCount))
 		// Clear input waiting on terminal status changes
 		if (TERMINAL_STATUSES.has(status) || status === 'stopping') {
 			this.inputWaiting.delete(name)
@@ -194,10 +254,10 @@ export class TabBar {
 		const currentName = this.names[currentIdx]
 
 		// Reorder: active first, terminal states at bottom
-		this.names = this.getDisplayOrder()
+		this.names = getDisplayOrder(this.originalNames, this.statuses)
 
 		this.renderable.options = this.names.map(n => ({
-			name: this.formatTab(n, this.statuses.get(n)!),
+			name: formatTab(n, this.statuses.get(n)!),
 			description: this.getDescription(n)
 		}))
 
@@ -210,12 +270,6 @@ export class TabBar {
 		this.updateOptionColors()
 	}
 
-	private getDisplayOrder(): string[] {
-		const active = this.originalNames.filter(n => !TERMINAL_STATUSES.has(this.statuses.get(n)!))
-		const terminal = this.originalNames.filter(n => TERMINAL_STATUSES.has(this.statuses.get(n)!))
-		return [...active, ...terminal]
-	}
-
 	private getDescription(name: string): string {
 		if (this.inputWaiting.has(name)) return 'awaiting input'
 		if (this.erroredProcesses.has(name)) return 'error detected'
@@ -223,34 +277,18 @@ export class TabBar {
 	}
 
 	private updateOptionColors(): void {
-		const colors = this.names.map(name => {
-			const status = this.statuses.get(name)!
-			const waiting = this.inputWaiting.has(name)
-			const errored = this.erroredProcesses.has(name)
-			const statusHex = waiting ? '#ffaa00' : errored ? '#ff5555' : STATUS_ICON_HEX[status]
-			const processHex = this.processColors.get(name)
-			return {
-				icon: parseColor(statusHex ?? processHex ?? '#888888'),
-				name: processHex ? parseColor(processHex) : null
-			}
-		})
+		const resolved = resolveOptionColors(
+			this.names,
+			this.statuses,
+			this.processColors,
+			this.inputWaiting,
+			this.erroredProcesses
+		)
+		const colors = resolved.map(c => ({
+			icon: parseColor(c.iconHex),
+			name: c.nameHex ? parseColor(c.nameHex) : null
+		}))
 		this.renderable.setOptionColors(colors)
-	}
-
-	private formatDescription(status: ProcessStatus, exitCode?: number | null, restartCount?: number): string {
-		let desc: string = status
-		if ((status === 'failed' || status === 'stopped') && exitCode != null && exitCode !== 0) {
-			desc = `exit ${exitCode}`
-		}
-		if (restartCount && restartCount > 0) {
-			desc += ` ×${restartCount}`
-		}
-		return desc
-	}
-
-	private formatTab(name: string, status: ProcessStatus): string {
-		const icon = STATUS_ICONS[status]
-		return `${icon} ${name}`
 	}
 
 	getSelectedIndex(): number {
