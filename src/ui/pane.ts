@@ -1,5 +1,6 @@
 import { type CliRenderer, ScrollBoxRenderable, type Selection } from '@opentui/core'
 import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
 export interface SearchMatch {
 	line: number
@@ -14,6 +15,7 @@ export class Pane {
 
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
+	private _onLinkClick: ((link: DetectedLink) => void) | null = null
 
 	// Cached text from getText() FFI — invalidated on feed/clear/resize
 	private _textLines: string[] | null = null
@@ -58,6 +60,17 @@ export class Pane {
 				}
 			}
 			return result
+		}
+
+		// Ctrl+click to open links
+		this.terminal.onMouseDown = event => {
+			if (event.modifiers.ctrl && event.button === 0) {
+				const link = this.getLinkAtMouse(event.x, event.y)
+				if (link) {
+					event.stopPropagation()
+					this._onLinkClick?.(link)
+				}
+			}
 		}
 
 		this.scrollBox.add(this.terminal)
@@ -105,6 +118,21 @@ export class Pane {
 
 	onCopy(handler: (text: string) => void): void {
 		this._onCopy = handler
+	}
+
+	onLinkClick(handler: (link: DetectedLink) => void): void {
+		this._onLinkClick = handler
+	}
+
+	private getLinkAtMouse(localX: number, localY: number): DetectedLink | null {
+		if (!this._textLines) {
+			const text = this.terminal.getText()
+			this._textLines = text.split('\n')
+			this._textLinesLower = this._textLines.map(l => l.toLowerCase())
+		}
+		const lineIndex = Math.floor(this.scrollBox.scrollTop) + localY
+		if (lineIndex < 0 || lineIndex >= this._textLines.length) return null
+		return findLinkAtPosition(this._textLines[lineIndex], localX)
 	}
 
 	show(): void {
