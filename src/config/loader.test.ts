@@ -90,3 +90,36 @@ describe('loadConfig — auto-detect', () => {
 		await expect(loadConfig(undefined, dir)).rejects.toThrow('No numux config found')
 	})
 })
+
+describe('loadConfig — package.json', () => {
+	test('auto-detects numux config from package.json', async () => {
+		const dir = setupDir('pkg-json', {
+			'package.json': JSON.stringify({
+				name: 'test',
+				numux: { processes: { db: { command: 'echo db' } } }
+			})
+		})
+		const config = await loadConfig(undefined, dir)
+		expect(proc(config.processes.db).command).toBe('echo db')
+	})
+
+	test('numux.config.ts takes precedence over package.json', async () => {
+		const dir = setupDir('pkg-json-precedence', {
+			'numux.config.ts': `export default { processes: { ts: { command: 'echo ts' } } }`,
+			'package.json': JSON.stringify({
+				name: 'test',
+				numux: { processes: { pkg: { command: 'echo pkg' } } }
+			})
+		})
+		const config = await loadConfig(undefined, dir)
+		expect(config.processes.ts).toBeDefined()
+		expect(config.processes.pkg).toBeUndefined()
+	})
+
+	test('ignores package.json without numux key', async () => {
+		const dir = setupDir('pkg-json-no-key', {
+			'package.json': JSON.stringify({ name: 'test', scripts: { dev: 'echo dev' } })
+		})
+		await expect(loadConfig(undefined, dir)).rejects.toThrow('No numux config found')
+	})
+})
