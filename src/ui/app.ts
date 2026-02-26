@@ -205,6 +205,16 @@ export class App {
 				if (!isInteractive) {
 					const name = key.name.toLowerCase()
 
+					if (key.shift && name === SHORTCUTS.scrollToBottom.key) {
+						this.panes.get(this.activePane)?.scrollToBottom()
+						return
+					}
+
+					if (name === SHORTCUTS.scrollToTop.key) {
+						this.panes.get(this.activePane)?.scrollToTop()
+						return
+					}
+
 					if (key.shift && name === SHORTCUTS.restartAll.key) {
 						this.manager.restartAll(this.termCols, this.termRows)
 						return
