@@ -4,8 +4,20 @@
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
 
+MSG="REMINDER: Before committing, check if updated or new features
+should be documented in README.md or CLAUDE.md.
+
+Consider:
+- New CLI flags
+- Changed behavior
+- New config options
+- Refactors that invalidate docs
+
+To confirm you have read this, add 'Learnings considered.'
+to your commit confirmation message."
+
 if [[ "$COMMAND" =~ git.*commit ]]; then
-	jq -n --arg msg "REMINDER: Before committing, check if there are learnings worth saving to memory files or CLAUDE.md. Consider: mistakes made, patterns discovered, user preferences, codebase gotchas, new features to document, or refactors that invalidate docs. To confirm you have read this, add 'Learnings considered.' to your commit confirmation message." '{
+	jq -n --arg msg "$MSG" '{
 		"hookSpecificOutput": {
 			"hookEventName": "PreToolUse",
 			"permissionDecision": "allow",
