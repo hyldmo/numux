@@ -26,6 +26,7 @@ const STATUS_HINTS: [label: string, description: string][] = [
 	[SHORTCUTS.search.label, SHORTCUTS.search.description],
 	[SHORTCUTS.copy.label, SHORTCUTS.copy.description],
 	[SHORTCUTS.clear.label, SHORTCUTS.clear.description],
+	['Ctrl+Click', 'open link'],
 	['Ctrl+C', 'quit']
 ]
 

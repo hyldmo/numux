@@ -7,6 +7,7 @@ import { SHORTCUTS } from './keybindings'
 import { Pane, type SearchMatch } from './pane'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
+import { openLink } from './url-handler'
 
 export class App {
 	private renderer!: CliRenderer
@@ -101,6 +102,10 @@ export class App {
 			pane.onCopy(text => {
 				this.copyToClipboard(text)
 				this.statusBar.showTemporaryMessage('Copied!')
+			})
+			pane.onLinkClick(link => {
+				openLink(link)
+				this.statusBar.showTemporaryMessage(`Opening ${link.url}`)
 			})
 			pane.onScroll(() => {
 				if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
