@@ -1,21 +1,57 @@
 export interface NumuxProcessConfig {
+	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
 	command: string
+	/** Working directory for the process */
 	cwd?: string
+	/**
+	 * Extra environment variables. Values support `$dep.group` references
+	 * from dependency capture groups.
+	 * @example { DB_PORT: '$db.port' }
+	 */
 	env?: Record<string, string>
-	envFile?: string | string[] | false // .env file path(s) to load, or false to disable
+	/** .env file path(s) to load, or `false` to disable */
+	envFile?: string | string[] | false
+	/** Processes that must be ready before this one starts */
 	dependsOn?: string[]
+	/** Regex matched against stdout to signal readiness. Use `RegExp` to capture groups for `$dep.group` expansion */
 	readyPattern?: string | RegExp
-	persistent?: boolean // default true, false = one-shot
-	maxRestarts?: number // default Infinity, limit auto-restart attempts
-	readyTimeout?: number // ms to wait for readyPattern before failing (default: none)
-	delay?: number // ms to wait before starting the process (default: none)
-	condition?: string // env var name (prefix with ! to negate); process skipped if condition is falsy
-	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP' // signal for graceful stop (default: SIGTERM)
+	/**
+	 * Set to `false` for one-shot processes
+	 * @default true
+	 */
+	persistent?: boolean
+	/**
+	 * Limit auto-restart attempts
+	 * @default Infinity
+	 */
+	maxRestarts?: number
+	/** Milliseconds to wait for readyPattern before failing */
+	readyTimeout?: number
+	/** Milliseconds to wait before starting the process */
+	delay?: number
+	/** Env var name (prefix with `!` to negate); process skipped if condition is falsy */
+	condition?: string
+	/**
+	 * Signal for graceful stop
+	 * @default 'SIGTERM'
+	 */
+	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP'
+	/** Hex color (e.g. `"#ff6600"`) or color name. Array for round-robin in script patterns */
 	color?: string | string[]
-	watch?: string | string[] // Glob patterns — restart process when matching files change
-	interactive?: boolean // default false — when true, keyboard input is forwarded to the process
-	errorMatcher?: boolean | string // true = detect ANSI red, string = regex pattern
-	showCommand?: boolean // default true — print the command being run as the first line of output
+	/** Glob patterns — restart process when matching files change */
+	watch?: string | string[]
+	/**
+	 * When true, keyboard input is forwarded to the process
+	 * @default false
+	 */
+	interactive?: boolean
+	/** `true` = detect ANSI red output, string = regex pattern */
+	errorMatcher?: boolean | string
+	/**
+	 * Print the command being run as the first line of output
+	 * @default true
+	 */
+	showCommand?: boolean
 }
 
 /** Config for npm: wildcard entries — command is derived from package.json scripts */
@@ -23,10 +59,17 @@ export type NumuxScriptPattern = Omit<NumuxProcessConfig, 'command'> & { command
 
 /** Raw config as authored — processes can be string shorthand, full objects, or wildcard patterns */
 export interface NumuxConfig {
-	cwd?: string // Global working directory, inherited by all processes
-	env?: Record<string, string> // Global env vars, merged into each process (process-level overrides)
-	envFile?: string | string[] | false // Global .env file(s), inherited by processes without their own envFile; false disables
-	showCommand?: boolean // Global showCommand flag, inherited by all processes (default: true)
+	/** Global working directory, inherited by all processes */
+	cwd?: string
+	/** Global env vars, merged into each process (process-level overrides) */
+	env?: Record<string, string>
+	/** Global .env file(s), inherited by processes without their own envFile; `false` disables */
+	envFile?: string | string[] | false
+	/**
+	 * Global showCommand flag, inherited by all processes
+	 * @default true
+	 */
+	showCommand?: boolean
 	processes: Record<string, NumuxProcessConfig | NumuxScriptPattern | string>
 }
 

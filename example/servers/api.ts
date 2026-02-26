@@ -4,11 +4,13 @@ const statuses = [200, 200, 200, 200, 201, 204, 304, 400, 404, 500] as const
 
 const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]
 
+const port = 3000 + Math.floor(Math.random() * 1000)
+
 console.info('booting API server...')
 await Bun.sleep(300)
 console.info('connecting to database...')
 await Bun.sleep(200)
-console.info('listening on http://localhost:3000')
+console.info(`listening on http://localhost:${port}`)
 
 const requestLoop = setInterval(
 	() => {

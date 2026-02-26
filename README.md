@@ -191,7 +191,8 @@ Top-level options apply to all processes (process-level settings override):
 |-------|------|-------------|
 | `cwd` | `string` | Working directory for all processes (process `cwd` overrides) |
 | `env` | `Record<string, string>` | Environment variables merged into all processes (process `env` overrides per key) |
-| `envFile` | `string \| string[]` | `.env` file(s) for all processes (process `envFile` replaces if set) |
+| `envFile` | `string \| string[] \| false` | `.env` file(s) for all processes (process `envFile` replaces if set; `false` disables) |
+| `showCommand` | `boolean` | Print the command being run as the first line of output (default: `true`) |
 
 ```ts
 export default defineConfig({
@@ -211,10 +212,10 @@ Each process accepts:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `command` | `string` | *required* | Shell command to run |
+| `command` | `string` | *required* | Shell command to run. Supports `$dep.group` references from dependency capture groups |
 | `cwd` | `string` | `process.cwd()` | Working directory |
-| `env` | `Record<string, string>` | — | Extra environment variables |
-| `envFile` | `string \| string[]` | — | `.env` file path(s) to load (relative to `cwd`) |
+| `env` | `Record<string, string>` | — | Extra environment variables. Values support `$dep.group` references from dependency capture groups |
+| `envFile` | `string \| string[] \| false` | — | `.env` file path(s) to load (relative to `cwd`); `false` disables inherited envFile |
 | `dependsOn` | `string[]` | — | Processes that must be ready first |
 | `readyPattern` | `string \| RegExp` | — | Regex matched against stdout to signal readiness. Use `RegExp` to capture groups (see below) |
 | `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
@@ -227,6 +228,7 @@ Each process accepts:
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
 | `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
 | `errorMatcher` | `boolean \| string` | — | `true` detects ANSI red output, string = regex pattern — shows error indicator on tab |
+| `showCommand` | `boolean` | `true` | Print the command being run as the first line of output |
 
 ### File watching
 
