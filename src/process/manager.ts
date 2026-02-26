@@ -24,6 +24,7 @@ export class ProcessManager {
 	private restartTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private startTimes = new Map<string, number>()
 	private pendingReadyResolvers = new Map<string, () => void>()
+	private readyCaptures = new Map<string, Record<string, string>>()
 	private fileWatcher?: FileWatcher
 
 	constructor(config: ResolvedNumuxConfig) {
@@ -117,6 +118,7 @@ export class ProcessManager {
 	}
 
 	private startProcess(name: string, cols: number, rows: number): void {
+		const commandOverride = this.expandDependencyCaptures(name)
 		const delay = this.config.processes[name].delay
 		if (delay) {
 			log(`[${name}] Delaying start by ${delay}ms`)
@@ -124,12 +126,12 @@ export class ProcessManager {
 				this.restartTimers.delete(name)
 				if (this.stopping) return
 				this.startTimes.set(name, Date.now())
-				this.runners.get(name)!.start(cols, rows)
+				this.runners.get(name)!.start(cols, rows, commandOverride)
 			}, delay)
 			this.restartTimers.set(name, timer)
 		} else {
 			this.startTimes.set(name, Date.now())
-			this.runners.get(name)!.start(cols, rows)
+			this.runners.get(name)!.start(cols, rows, commandOverride)
 		}
 	}
 
@@ -148,7 +150,10 @@ export class ProcessManager {
 				}
 				this.scheduleAutoRestart(name, code)
 			},
-			onReady: () => {
+			onReady: captures => {
+				if (captures) {
+					this.readyCaptures.set(name, captures)
+				}
 				if (!readyResolved) {
 					readyResolved = true
 					onInitialReady!()
@@ -238,6 +243,40 @@ export class ProcessManager {
 		}
 	}
 
+	/**
+	 * Replace $dep.group references in a process command with captured values from dependencies.
+	 * Returns the expanded command, or undefined if no expansion was needed.
+	 */
+	private expandDependencyCaptures(name: string): string | undefined {
+		const proc = this.config.processes[name]
+		const deps = proc.dependsOn
+		if (!deps?.length) return undefined
+
+		// Collect all available captures keyed by process name
+		const allCaptures = new Map<string, Record<string, string>>()
+		for (const dep of deps) {
+			const captures = this.readyCaptures.get(dep)
+			if (captures) allCaptures.set(dep, captures)
+		}
+		if (allCaptures.size === 0) return undefined
+
+		// Build a regex that matches $processName.groupKey for all deps with captures
+		const depNames = [...allCaptures.keys()].map(n => escapeRegExp(n)).join('|')
+		const refPattern = new RegExp(`\\$(${depNames})\\.(\\w+)`, 'g')
+
+		let hadReplacement = false
+		const expanded = proc.command.replace(refPattern, (match, dep: string, key: string) => {
+			const captures = allCaptures.get(dep)
+			if (captures && key in captures) {
+				hadReplacement = true
+				return captures[key]
+			}
+			return match // leave unmatched references as-is
+		})
+
+		return hadReplacement ? expanded : undefined
+	}
+
 	private updateStatus(name: string, status: ProcessStatus): void {
 		const state = this.states.get(name)!
 		state.status = status
@@ -269,7 +308,7 @@ export class ProcessManager {
 		state.exitCode = null
 		state.restartCount++
 		this.startTimes.set(name, Date.now())
-		runner.restart(cols, rows)
+		runner.restart(cols, rows, this.expandDependencyCaptures(name))
 	}
 
 	/** Stop a single process. No-op if already stopped or not running. */
@@ -324,7 +363,7 @@ export class ProcessManager {
 		state.exitCode = null
 		state.restartCount++
 		this.startTimes.set(name, Date.now())
-		this.runners.get(name)?.restart(cols, rows)
+		this.runners.get(name)?.restart(cols, rows, this.expandDependencyCaptures(name))
 	}
 
 	/** Restart all processes. Restarts each runner in-place without dependency re-resolution. */
@@ -372,6 +411,10 @@ export class ProcessManager {
 			await Promise.allSettled(tier.map(name => this.runners.get(name)?.stop()).filter(Boolean))
 		}
 	}
+}
+
+function escapeRegExp(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 const FALSY_VALUES = new Set(['', '0', 'false', 'no', 'off'])

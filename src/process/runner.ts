@@ -9,7 +9,7 @@ export type RunnerEventHandler = {
 	onStatus: (status: ProcessStatus) => void
 	onOutput: (data: Uint8Array) => void
 	onExit: (code: number | null) => void
-	onReady: () => void
+	onReady: (captures?: Record<string, string> | null) => void
 	onError: () => void
 }
 
@@ -28,6 +28,7 @@ export class ProcessRunner {
 	private readyTimer: ReturnType<typeof setTimeout> | null = null
 	private restarting = false
 	private readyTimedOut = false
+	private commandOverride: string | undefined
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -45,10 +46,12 @@ export class ProcessRunner {
 		return this.config.stopSignal ?? 'SIGTERM'
 	}
 
-	start(cols: number, rows: number): void {
+	start(cols: number, rows: number, commandOverride?: string): void {
+		if (commandOverride !== undefined) this.commandOverride = commandOverride
+		const command = this.commandOverride ?? this.config.command
 		const gen = ++this.generation
 		this.stopping = false
-		log(`[${this.name}] Starting (gen ${gen}): ${this.config.command}`)
+		log(`[${this.name}] Starting (gen ${gen}): ${command}`)
 		this.handler.onStatus('starting')
 
 		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
@@ -64,7 +67,7 @@ export class ProcessRunner {
 				...this.config.env
 			}
 
-			this.proc = Bun.spawn(['sh', '-c', this.config.command], {
+			this.proc = Bun.spawn(['sh', '-c', command], {
 				cwd,
 				env,
 				terminal: {
@@ -90,7 +93,7 @@ export class ProcessRunner {
 
 		if (this.config.showCommand !== false) {
 			const encoder = new TextEncoder()
-			const msg = `\x1b[2m$ ${this.config.command}\x1b[0m\r\n\r\n`
+			const msg = `\x1b[2m$ ${command}\x1b[0m\r\n\r\n`
 			this.handler.onOutput(encoder.encode(msg))
 		}
 
@@ -181,10 +184,10 @@ export class ProcessRunner {
 		this.clearReadyTimeout()
 		log(`[${this.name}] Ready`)
 		this.handler.onStatus('ready')
-		this.handler.onReady()
+		this.handler.onReady(this.readiness.captures)
 	}
 
-	async restart(cols: number, rows: number): Promise<void> {
+	async restart(cols: number, rows: number, commandOverride?: string): Promise<void> {
 		if (this.restarting) return
 		this.restarting = true
 		log(`[${this.name}] Restarting`)
@@ -208,7 +211,7 @@ export class ProcessRunner {
 		this.readyTimedOut = false
 		this.readiness = createReadinessChecker(this.config)
 		this.errorChecker = createErrorChecker(this.config)
-		this.start(cols, rows)
+		this.start(cols, rows, commandOverride)
 	}
 
 	async stop(timeoutMs = 5000): Promise<void> {

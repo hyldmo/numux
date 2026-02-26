@@ -533,6 +533,35 @@ describe('validateConfig', () => {
 			})
 		).toThrow('not a valid regex')
 	})
+
+	test('throws on invalid readyPattern regex', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', readyPattern: '[invalid' }
+				}
+			})
+		).toThrow('not a valid regex')
+	})
+
+	test('accepts readyPattern with capture groups', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyPattern: 'port (?<port>\\d+)' }
+			}
+		})
+		expect(config.processes.web.readyPattern).toBe('port (?<port>\\d+)')
+	})
+
+	test('accepts RegExp literal as readyPattern', () => {
+		const pattern = /listening at (?<url>http:\/\/\S+)/
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyPattern: pattern }
+			}
+		})
+		expect(config.processes.web.readyPattern).toBe(pattern)
+	})
 })
 
 describe('validateConfig — global options', () => {
