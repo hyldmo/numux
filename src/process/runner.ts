@@ -29,6 +29,7 @@ export class ProcessRunner {
 	private restarting = false
 	private readyTimedOut = false
 	private commandOverride: string | undefined
+	private envOverride: Record<string, string> | undefined
 
 	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
@@ -46,8 +47,9 @@ export class ProcessRunner {
 		return this.config.stopSignal ?? 'SIGTERM'
 	}
 
-	start(cols: number, rows: number, commandOverride?: string): void {
+	start(cols: number, rows: number, commandOverride?: string, envOverride?: Record<string, string>): void {
 		if (commandOverride !== undefined) this.commandOverride = commandOverride
+		if (envOverride !== undefined) this.envOverride = envOverride
 		const command = this.commandOverride ?? this.config.command
 		const gen = ++this.generation
 		this.stopping = false
@@ -64,7 +66,7 @@ export class ProcessRunner {
 				...(noColor ? {} : { FORCE_COLOR: '1' }),
 				TERM: 'xterm-256color',
 				...envFromFile,
-				...this.config.env
+				...(this.envOverride ?? this.config.env)
 			}
 
 			this.proc = Bun.spawn(['sh', '-c', command], {
@@ -187,7 +189,12 @@ export class ProcessRunner {
 		this.handler.onReady(this.readiness.captures)
 	}
 
-	async restart(cols: number, rows: number, commandOverride?: string): Promise<void> {
+	async restart(
+		cols: number,
+		rows: number,
+		commandOverride?: string,
+		envOverride?: Record<string, string>
+	): Promise<void> {
 		if (this.restarting) return
 		this.restarting = true
 		log(`[${this.name}] Restarting`)
@@ -211,7 +218,7 @@ export class ProcessRunner {
 		this.readyTimedOut = false
 		this.readiness = createReadinessChecker(this.config)
 		this.errorChecker = createErrorChecker(this.config)
-		this.start(cols, rows, commandOverride)
+		this.start(cols, rows, commandOverride, envOverride)
 	}
 
 	async stop(timeoutMs = 5000): Promise<void> {

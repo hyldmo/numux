@@ -134,7 +134,7 @@ export class ProcessManager {
 	}
 
 	private startProcess(name: string, cols: number, rows: number): void {
-		const commandOverride = this.expandDependencyCaptures(name)
+		const { command, env } = this.expandDependencyCaptures(name)
 		const delay = this.config.processes[name].delay
 		if (delay) {
 			log(`[${name}] Delaying start by ${delay}ms`)
@@ -142,12 +142,12 @@ export class ProcessManager {
 				this.restartTimers.delete(name)
 				if (this.stopping) return
 				this.startTimes.set(name, Date.now())
-				this.runners.get(name)!.start(cols, rows, commandOverride)
+				this.runners.get(name)!.start(cols, rows, command, env)
 			}, delay)
 			this.restartTimers.set(name, timer)
 		} else {
 			this.startTimes.set(name, Date.now())
-			this.runners.get(name)!.start(cols, rows, commandOverride)
+			this.runners.get(name)!.start(cols, rows, command, env)
 		}
 	}
 
@@ -260,13 +260,16 @@ export class ProcessManager {
 	}
 
 	/**
-	 * Replace $dep.group references in a process command with captured values from dependencies.
-	 * Returns the expanded command, or undefined if no expansion was needed.
+	 * Replace $dep.group references in a process command and env with captured values from dependencies.
+	 * Returns expanded command/env, with undefined fields when no expansion was needed.
 	 */
-	private expandDependencyCaptures(name: string): string | undefined {
+	private expandDependencyCaptures(name: string): {
+		command?: string
+		env?: Record<string, string>
+	} {
 		const proc = this.config.processes[name]
 		const deps = proc.dependsOn
-		if (!deps?.length) return undefined
+		if (!deps?.length) return {}
 
 		// Collect all available captures keyed by process name
 		const allCaptures = new Map<string, Record<string, string>>()
@@ -274,23 +277,35 @@ export class ProcessManager {
 			const captures = this.readyCaptures.get(dep)
 			if (captures) allCaptures.set(dep, captures)
 		}
-		if (allCaptures.size === 0) return undefined
+		if (allCaptures.size === 0) return {}
 
 		// Build a regex that matches $processName.groupKey for all deps with captures
 		const depNames = [...allCaptures.keys()].map(n => escapeRegExp(n)).join('|')
 		const refPattern = new RegExp(`\\$(${depNames})\\.(\\w+)`, 'g')
 
-		let hadReplacement = false
-		const expanded = proc.command.replace(refPattern, (match, dep: string, key: string) => {
+		const replacer = (match: string, dep: string, key: string) => {
 			const captures = allCaptures.get(dep)
-			if (captures && key in captures) {
-				hadReplacement = true
-				return captures[key]
-			}
+			if (captures && key in captures) return captures[key]
 			return match // leave unmatched references as-is
-		})
+		}
 
-		return hadReplacement ? expanded : undefined
+		let command: string | undefined
+		const expandedCmd = proc.command.replace(refPattern, replacer)
+		if (expandedCmd !== proc.command) command = expandedCmd
+
+		let env: Record<string, string> | undefined
+		if (proc.env) {
+			const expandedEnv: Record<string, string> = {}
+			let hadReplacement = false
+			for (const [k, v] of Object.entries(proc.env)) {
+				const expanded = v.replace(refPattern, replacer)
+				expandedEnv[k] = expanded
+				if (expanded !== v) hadReplacement = true
+			}
+			if (hadReplacement) env = expandedEnv
+		}
+
+		return { command, env }
 	}
 
 	private updateStatus(name: string, status: ProcessStatus): void {
@@ -324,7 +339,8 @@ export class ProcessManager {
 		state.exitCode = null
 		state.restartCount++
 		this.startTimes.set(name, Date.now())
-		runner.restart(cols, rows, this.expandDependencyCaptures(name))
+		const { command, env } = this.expandDependencyCaptures(name)
+		runner.restart(cols, rows, command, env)
 	}
 
 	/** Stop a single process. No-op if already stopped or not running. */
@@ -379,7 +395,8 @@ export class ProcessManager {
 		state.exitCode = null
 		state.restartCount++
 		this.startTimes.set(name, Date.now())
-		this.runners.get(name)?.restart(cols, rows, this.expandDependencyCaptures(name))
+		const { command, env } = this.expandDependencyCaptures(name)
+		this.runners.get(name)?.restart(cols, rows, command, env)
 	}
 
 	/** Restart all processes. Restarts each runner in-place without dependency re-resolution. */
