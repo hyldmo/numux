@@ -22,7 +22,7 @@ This creates a starter `numux.config.ts` with commented-out examples. Edit it, t
 
 ### Config file
 
-Create `numux.config.ts` (or `.js`):
+Create `numux.config.ts` (or `.js`), or add a `"numux"` key to your `package.json`:
 
 ```ts
 import { defineConfig } from 'numux'
@@ -56,6 +56,22 @@ export default defineConfig({
 ```
 
 The `defineConfig()` helper is optional — it provides type checking for your config.
+
+For simpler setups, you can define the same config in `package.json`:
+
+```json
+{
+  "numux": {
+    "processes": {
+      "db": { "command": "docker compose up postgres" },
+      "api": { "command": "bun run dev:api", "dependsOn": ["db"] },
+      "web": "bun run dev:web"
+    }
+  }
+}
+```
+
+Config files (`numux.config.ts` / `.js`) take precedence over `package.json` if both exist.
 
 Processes can be a string (shorthand for `{ command: "..." }`) or a full config object.
 
