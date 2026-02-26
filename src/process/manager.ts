@@ -71,49 +71,65 @@ export class ProcessManager {
 		this.lastCols = cols
 		this.lastRows = rows
 
-		for (const tier of this.tiers) {
-			const readyPromises: Promise<void>[] = []
+		// Create a ready promise per process — each resolves when that process is ready
+		const readyPromises = new Map<string, Promise<void>>()
+		const readyResolvers = new Map<string, () => void>()
 
-			for (const name of tier) {
-				const proc = this.config.processes[name]
-
-				// Evaluate condition
-				if (proc.condition && !evaluateCondition(proc.condition)) {
-					log(`Skipping ${name}: condition "${proc.condition}" not met`)
-					this.updateStatus(name, 'skipped')
-					continue
-				}
-
-				// Check if any dependency failed or was skipped
-				const deps = proc.dependsOn ?? []
-				const failedDep = deps.find(d => {
-					const s = this.states.get(d)!.status
-					return s === 'failed' || s === 'skipped'
-				})
-
-				if (failedDep) {
-					log(`Skipping ${name}: dependency ${failedDep} failed`)
-					this.updateStatus(name, 'skipped')
-					continue
-				}
-
-				const { promise, resolve } = Promise.withResolvers<void>()
-				readyPromises.push(promise)
-
-				this.pendingReadyResolvers.set(name, resolve)
-				this.createRunner(name, () => {
-					this.pendingReadyResolvers.delete(name)
-					resolve()
-				})
-				this.startProcess(name, cols, rows)
-			}
-
-			// Wait for all processes in this tier to become ready
-			if (readyPromises.length > 0) {
-				await Promise.all(readyPromises)
-			}
+		for (const name of this.tiers.flat()) {
+			const { promise, resolve } = Promise.withResolvers<void>()
+			readyPromises.set(name, promise)
+			readyResolvers.set(name, resolve)
 		}
 
+		// Launch all processes concurrently; each waits only for its declared dependencies
+		const launches = this.tiers.flat().map(async name => {
+			const proc = this.config.processes[name]
+			const resolve = readyResolvers.get(name)!
+
+			// Wait for declared dependencies only
+			const deps = proc.dependsOn ?? []
+			if (deps.length > 0) {
+				await Promise.all(deps.map(d => readyPromises.get(d)!))
+			}
+
+			if (this.stopping) {
+				resolve()
+				return
+			}
+
+			// Evaluate condition
+			if (proc.condition && !evaluateCondition(proc.condition)) {
+				log(`Skipping ${name}: condition "${proc.condition}" not met`)
+				this.updateStatus(name, 'skipped')
+				resolve()
+				return
+			}
+
+			// Check if any dependency failed or was skipped
+			const failedDep = deps.find(d => {
+				const s = this.states.get(d)!.status
+				return s === 'failed' || s === 'skipped'
+			})
+
+			if (failedDep) {
+				log(`Skipping ${name}: dependency ${failedDep} failed`)
+				this.updateStatus(name, 'skipped')
+				resolve()
+				return
+			}
+
+			this.pendingReadyResolvers.set(name, resolve)
+			this.createRunner(name, () => {
+				this.pendingReadyResolvers.delete(name)
+				resolve()
+			})
+			this.startProcess(name, cols, rows)
+
+			// Wait for this process to become ready before completing
+			await readyPromises.get(name)!
+		})
+
+		await Promise.all(launches)
 		this.setupWatchers()
 	}
 

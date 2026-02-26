@@ -129,6 +129,35 @@ describe('ProcessManager — startAll', () => {
 		expect(readyOrder.indexOf('dep')).toBeLessThan(readyOrder.indexOf('child'))
 		await mgr.stopAll()
 	}, 5000)
+
+	test('starts dependent as soon as its dependency is ready, not entire tier', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				fast: { command: 'true', persistent: false },
+				slow: { command: 'sleep 60', persistent: true },
+				child: { command: 'true', persistent: false, dependsOn: ['fast'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const startTimes: Record<string, number> = {}
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') {
+				startTimes[e.name] = Date.now()
+			}
+		})
+
+		// Start in background since slow blocks indefinitely
+		const startPromise = mgr.startAll(80, 24)
+
+		// Wait for child to start — should happen quickly after fast finishes
+		await new Promise(r => setTimeout(r, 1000))
+
+		// child should have started without waiting for slow
+		expect(startTimes.child).toBeDefined()
+		expect(startTimes.child - startTimes.fast).toBeLessThan(500)
+		await mgr.stopAll()
+		await startPromise
+	}, 10000)
 })
 
 describe('ProcessManager — skip propagation', () => {
