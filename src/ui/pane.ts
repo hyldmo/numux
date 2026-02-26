@@ -48,6 +48,10 @@ export class Pane {
 				const text = selection.getSelectedText()
 				if (text) {
 					this._onCopy?.(text)
+				} else {
+					// Click without drag — clear the empty selection to prevent
+					// visual block artifacts from the text buffer's highlight
+					queueMicrotask(() => renderer.clearSelection())
 				}
 			}
 			return result
