@@ -45,7 +45,10 @@ export class Pane {
 		this.terminal.onSelectionChanged = (selection: Selection | null): boolean => {
 			const result = origOnSelectionChanged(selection)
 			if (selection?.isActive && !selection.isDragging) {
-				const text = selection.getSelectedText()
+				// Use terminal's local getSelectedText() instead of the global
+				// selection's, since _selectedRenderables may not be updated yet
+				// during the walk that triggers this callback.
+				const text = this.terminal.getSelectedText()
 				if (text) {
 					this._onCopy?.(text)
 				}
@@ -90,6 +93,10 @@ export class Pane {
 
 	onScroll(handler: () => void): void {
 		this._onScroll = handler
+	}
+
+	getText(): string {
+		return this.terminal.getText()
 	}
 
 	onCopy(handler: (text: string) => void): void {

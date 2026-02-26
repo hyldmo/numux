@@ -173,12 +173,6 @@ export class App {
 			}) => {
 				log(key)
 
-				// Cmd+C: copy selection (macOS, requires kitty keyboard protocol)
-				if (key.super && key.name === 'c') {
-					this.copySelection()
-					return
-				}
-
 				// Ctrl+C: quit (always works)
 				if (key.ctrl && key.name === 'c') {
 					if (this.searchMode) {
@@ -211,7 +205,7 @@ export class App {
 					}
 
 					if (name === SHORTCUTS.copy.key) {
-						this.copySelection()
+						this.copyAllText()
 						return
 					}
 
@@ -358,22 +352,32 @@ export class App {
 					: null
 		if (cmd) {
 			const [bin, ...args] = cmd.split(' ')
-			const proc = Bun.spawn([bin, ...args], { stdin: 'pipe' })
-			proc.stdin.write(text)
-			proc.stdin.end()
+			try {
+				const proc = Bun.spawn([bin, ...args], { stdin: 'pipe' })
+				proc.stdin.write(text)
+				proc.stdin.end()
+				proc.exited.catch(() => {
+					/* ignore */
+				})
+			} catch {
+				// Native clipboard tool not available, OSC 52 is the fallback
+			}
 		}
 	}
 
-	/** Copy selected text to clipboard. Returns true if there was a selection to copy. */
-	private copySelection(): boolean {
-		const selection = this.renderer.getSelection()
-		if (!selection?.isActive) return false
-		const text = selection.getSelectedText()
-		if (!text) return false
+	/** Copy all text in the active pane to clipboard. */
+	private copyAllText(): void {
+		if (!this.activePane) return
+		const pane = this.panes.get(this.activePane)
+		if (!pane) return
+
+		const text = pane.getText()
+		if (!text) {
+			this.statusBar.showTemporaryMessage('No output to copy')
+			return
+		}
 		this.copyToClipboard(text)
-		this.renderer.clearSelection()
-		this.statusBar.showTemporaryMessage('Copied!')
-		return true
+		this.statusBar.showTemporaryMessage('Copied all output!')
 	}
 
 	private enterSearch(): void {
