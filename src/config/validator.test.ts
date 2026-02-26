@@ -280,15 +280,25 @@ describe('validateConfig', () => {
 		expect(config.processes.b.envFile).toBe(false)
 	})
 
-	test('throws on non-array dependsOn', () => {
+	test('normalizes string dependsOn to array', () => {
+		const config = validateConfig({
+			processes: {
+				db: { command: 'echo db' },
+				web: { command: 'echo hi', dependsOn: 'db' as any }
+			}
+		})
+		expect(config.processes.web.dependsOn).toEqual(['db'])
+	})
+
+	test('throws on non-string non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({
 				processes: {
 					db: { command: 'echo db' },
-					web: { command: 'echo hi', dependsOn: 'db' }
+					web: { command: 'echo hi', dependsOn: 123 as any }
 				}
 			})
-		).toThrow('dependsOn must be an array')
+		).toThrow('dependsOn must be a string or array')
 	})
 
 	test('accepts string shorthand for processes', () => {

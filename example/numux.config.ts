@@ -17,12 +17,12 @@ export default defineConfig({
 		},
 		migrate: {
 			command: 'bun servers/migrate.ts',
-			dependsOn: ['db'],
+			dependsOn: 'db',
 			persistent: false
 		},
 		api: {
 			command: 'bun servers/api.ts',
-			dependsOn: ['migrate'],
+			dependsOn: 'migrate',
 			readyPattern: /listening on (?<url>http:\/\/\S+)/,
 			errorMatcher: true,
 			stopSignal: 'SIGINT',
@@ -31,13 +31,13 @@ export default defineConfig({
 		},
 		worker: {
 			command: 'bun servers/worker.ts',
-			dependsOn: ['db'],
+			dependsOn: 'db',
 			maxRestarts: 5,
 			color: '#ce93d8'
 		},
 		e2e: {
 			command: 'bun servers/e2e.ts',
-			dependsOn: ['api'],
+			dependsOn: ['api', 'db'],
 			env: { BASE_URL: '$api.url' },
 			persistent: false,
 			condition: 'RUN_E2E',

@@ -1,4 +1,4 @@
-import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
+import type { ResolvedNumuxConfig, ResolvedProcessConfig } from '../types'
 import { isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
@@ -34,7 +34,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		globalEnv = config.env as Record<string, string>
 	}
 
-	const validated: Record<string, NumuxProcessConfig> = {}
+	const validated: Record<string, ResolvedProcessConfig> = {}
 
 	for (const name of names) {
 		let proc = processes[name]
@@ -56,8 +56,9 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		// Validate dependsOn references
 		if (p.dependsOn !== undefined) {
+			if (typeof p.dependsOn === 'string') p.dependsOn = [p.dependsOn]
 			if (!Array.isArray(p.dependsOn)) {
-				throw new Error(`Process "${name}".dependsOn must be an array`)
+				throw new Error(`Process "${name}".dependsOn must be a string or array`)
 			}
 			for (const dep of p.dependsOn) {
 				if (typeof dep !== 'string') {

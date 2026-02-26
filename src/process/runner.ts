@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import type { NumuxProcessConfig, ProcessStatus } from '../types'
+import type { ProcessStatus, ResolvedProcessConfig } from '../types'
 import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
 import { createErrorChecker } from './error'
@@ -15,7 +15,7 @@ export type RunnerEventHandler = {
 
 export class ProcessRunner {
 	readonly name: string
-	private config: NumuxProcessConfig
+	private config: ResolvedProcessConfig
 	private handler: RunnerEventHandler
 	private proc: ReturnType<typeof Bun.spawn> | null = null
 	private readiness: ReturnType<typeof createReadinessChecker>
@@ -31,7 +31,7 @@ export class ProcessRunner {
 	private commandOverride: string | undefined
 	private envOverride: Record<string, string> | undefined
 
-	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
+	constructor(name: string, config: ResolvedProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
 		this.config = config
 		this.handler = handler

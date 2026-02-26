@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
-import type { NumuxProcessConfig } from '../types'
+import type { ResolvedProcessConfig } from '../types'
 import { detectPackageManager } from './expand-scripts'
 
-export function resolveWorkspaceProcesses(script: string, cwd: string): Record<string, NumuxProcessConfig> {
+export function resolveWorkspaceProcesses(script: string, cwd: string): Record<string, ResolvedProcessConfig> {
 	const pkgPath = resolve(cwd, 'package.json')
 	if (!existsSync(pkgPath)) {
 		throw new Error(`No package.json found in ${cwd}`)
@@ -37,7 +37,7 @@ export function resolveWorkspaceProcesses(script: string, cwd: string): Record<s
 	}
 
 	// Build process configs for workspaces that have the script
-	const processes: Record<string, NumuxProcessConfig> = {}
+	const processes: Record<string, ResolvedProcessConfig> = {}
 	const usedNames = new Set<string>()
 
 	for (const dir of dirs) {

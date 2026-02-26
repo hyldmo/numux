@@ -1,4 +1,4 @@
-import type { NumuxProcessConfig } from '../types'
+import type { ResolvedProcessConfig } from '../types'
 import { stripAnsi } from '../utils/color'
 
 /** Keep the last 64 KB of output for pattern matching */
@@ -32,7 +32,7 @@ function extractCaptures(match: RegExpExecArray): Record<string, string> | null 
  * Determines when a process should be considered "ready"
  * based on its configuration.
  */
-export function createReadinessChecker(config: NumuxProcessConfig) {
+export function createReadinessChecker(config: ResolvedProcessConfig) {
 	const shouldCapture = config.readyPattern instanceof RegExp
 	const pattern: RegExp | null = config.readyPattern
 		? config.readyPattern instanceof RegExp

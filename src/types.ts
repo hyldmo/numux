@@ -1,4 +1,4 @@
-export interface NumuxProcessConfig {
+export interface NumuxProcessConfig<K extends string = string> {
 	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
 	command: string
 	/** Working directory for the process */
@@ -12,7 +12,7 @@ export interface NumuxProcessConfig {
 	/** .env file path(s) to load, or `false` to disable */
 	envFile?: string | string[] | false
 	/** Processes that must be ready before this one starts */
-	dependsOn?: string[]
+	dependsOn?: NoInfer<K> | NoInfer<K>[]
 	/** Regex matched against stdout to signal readiness. Use `RegExp` to capture groups for `$dep.group` expansion */
 	readyPattern?: string | RegExp
 	/**
@@ -55,10 +55,10 @@ export interface NumuxProcessConfig {
 }
 
 /** Config for npm: wildcard entries — command is derived from package.json scripts */
-export type NumuxScriptPattern = Omit<NumuxProcessConfig, 'command'> & { command?: never }
+export type NumuxScriptPattern<K extends string = string> = Omit<NumuxProcessConfig<K>, 'command'> & { command?: never }
 
 /** Raw config as authored — processes can be string shorthand, full objects, or wildcard patterns */
-export interface NumuxConfig {
+export interface NumuxConfig<K extends string = string> {
 	/** Global working directory, inherited by all processes */
 	cwd?: string
 	/** Global env vars, merged into each process (process-level overrides) */
@@ -70,12 +70,17 @@ export interface NumuxConfig {
 	 * @default true
 	 */
 	showCommand?: boolean
-	processes: Record<string, NumuxProcessConfig | NumuxScriptPattern | string>
+	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
+}
+
+/** Process config after validation — dependsOn is always normalized to an array */
+export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn'> {
+	dependsOn?: string[]
 }
 
 /** Validated config with all shorthand expanded to full objects */
 export interface ResolvedNumuxConfig {
-	processes: Record<string, NumuxProcessConfig>
+	processes: Record<string, ResolvedProcessConfig>
 }
 
 export type ProcessStatus =
@@ -91,7 +96,7 @@ export type ProcessStatus =
 
 export interface ProcessState {
 	name: string
-	config: NumuxProcessConfig
+	config: ResolvedProcessConfig
 	status: ProcessStatus
 	exitCode: number | null
 	restartCount: number
