@@ -767,6 +767,41 @@ describe('ProcessManager — condition', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — dependency capture expansion in env', () => {
+	test('expands $dep.group references in env values', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: {
+					command: "echo 'listening on http://localhost:4000' && sleep 60",
+					persistent: true,
+					readyPattern: /listening on (?<url>http:\/\/[^ ]+)/
+				},
+				client: {
+					command: 'echo $API_URL',
+					persistent: false,
+					dependsOn: ['server'],
+					env: { API_URL: '$server.url', STATIC: 'keep' }
+				}
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const outputs: string[] = []
+		const decoder = new TextDecoder()
+		mgr.on(e => {
+			if (e.type === 'output' && e.name === 'client') {
+				outputs.push(decoder.decode(e.data))
+			}
+		})
+
+		await mgr.startAll(80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		const allOutput = outputs.join('')
+		expect(allOutput).toContain('http://localhost:4000')
+		await mgr.stopAll()
+	}, 10000)
+})
+
 describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {
