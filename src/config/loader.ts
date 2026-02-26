@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { NumuxConfig } from '../types'
 import { log } from '../utils/logger'
@@ -40,5 +40,16 @@ async function autoDetectConfig(cwd: string): Promise<NumuxConfig> {
 		}
 	}
 
-	throw new Error(`No numux config found. Create one of: ${CONFIG_FILES.join(', ')}`)
+	const pkgPath = resolve(cwd, 'package.json')
+	if (existsSync(pkgPath)) {
+		const pkgJson = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
+		if (pkgJson.numux && typeof pkgJson.numux === 'object') {
+			log(`Found numux config in package.json`)
+			return interpolateConfig(pkgJson.numux as NumuxConfig)
+		}
+	}
+
+	throw new Error(
+		`No numux config found. Create one of: ${CONFIG_FILES.join(', ')}, or add a "numux" key to package.json`
+	)
 }
