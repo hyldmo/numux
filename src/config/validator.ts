@@ -22,6 +22,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 	// Extract global options
 	const globalCwd = typeof config.cwd === 'string' ? config.cwd : undefined
+	const globalShowCommand = typeof config.showCommand === 'boolean' ? config.showCommand : undefined
 	const globalEnvFile = validateEnvFile(config.envFile)
 	let globalEnv: Record<string, string> | undefined
 	if (config.env && typeof config.env === 'object') {
@@ -112,6 +113,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		const processEnv = p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined
 		const processEnvFile = validateEnvFile(p.envFile)
 
+		const showCommand = typeof p.showCommand === 'boolean' ? p.showCommand : (globalShowCommand ?? true)
+
 		validated[name] = {
 			command: p.command,
 			cwd: processCwd ?? globalCwd,
@@ -128,7 +131,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
 			watch: validateStringOrStringArray(p.watch),
 			interactive: typeof p.interactive === 'boolean' ? p.interactive : false,
-			errorMatcher: validateErrorMatcher(name, p.errorMatcher)
+			errorMatcher: validateErrorMatcher(name, p.errorMatcher),
+			showCommand
 		}
 	}
 

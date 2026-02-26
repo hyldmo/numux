@@ -88,6 +88,12 @@ export class ProcessRunner {
 			return
 		}
 
+		if (this.config.showCommand !== false) {
+			const encoder = new TextEncoder()
+			const msg = `\x1b[2m$ ${this.config.command}\x1b[0m\r\n\r\n`
+			this.handler.onOutput(encoder.encode(msg))
+		}
+
 		this.handler.onStatus(this.config.persistent !== false ? 'running' : 'starting')
 
 		if (this.readiness.isImmediatelyReady) {
