@@ -15,6 +15,7 @@ export interface NumuxProcessConfig {
 	watch?: string | string[] // Glob patterns — restart process when matching files change
 	interactive?: boolean // default false — when true, keyboard input is forwarded to the process
 	errorMatcher?: boolean | string // true = detect ANSI red, string = regex pattern
+	showCommand?: boolean // default true — print the command being run as the first line of output
 }
 
 /** Config for npm: wildcard entries — command is derived from package.json scripts */
@@ -25,6 +26,7 @@ export interface NumuxConfig {
 	cwd?: string // Global working directory, inherited by all processes
 	env?: Record<string, string> // Global env vars, merged into each process (process-level overrides)
 	envFile?: string | string[] | false // Global .env file(s), inherited by processes without their own envFile; false disables
+	showCommand?: boolean // Global showCommand flag, inherited by all processes (default: true)
 	processes: Record<string, NumuxProcessConfig | NumuxScriptPattern | string>
 }
 

@@ -621,4 +621,35 @@ describe('validateConfig — global options', () => {
 		expect(config.processes.a.env).toBeUndefined()
 		expect(config.processes.a.envFile).toBeUndefined()
 	})
+
+	test('showCommand defaults to true', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.showCommand).toBe(true)
+	})
+
+	test('global showCommand: false is inherited', () => {
+		const config = validateConfig({
+			showCommand: false,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.showCommand).toBe(false)
+		expect(config.processes.b.showCommand).toBe(false)
+	})
+
+	test('process showCommand overrides global showCommand', () => {
+		const config = validateConfig({
+			showCommand: false,
+			processes: {
+				a: { command: 'echo a', showCommand: true },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.showCommand).toBe(true)
+		expect(config.processes.b.showCommand).toBe(false)
+	})
 })
