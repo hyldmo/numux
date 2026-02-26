@@ -180,9 +180,11 @@ export class ProcessManager {
 		const maxRestarts = proc.maxRestarts
 		if (maxRestarts !== undefined && attempt >= maxRestarts) {
 			log(`[${name}] Reached maxRestarts limit (${maxRestarts}), not restarting`)
-			const encoder = new TextEncoder()
-			const msg = `\r\n\x1b[31m[numux] reached restart limit (${maxRestarts}), giving up\x1b[0m\r\n`
-			this.emit({ type: 'output', name, data: encoder.encode(msg) })
+			if (maxRestarts > 0) {
+				const encoder = new TextEncoder()
+				const msg = `\r\n\x1b[31m[numux] reached restart limit (${maxRestarts}), giving up\x1b[0m\r\n`
+				this.emit({ type: 'output', name, data: encoder.encode(msg) })
+			}
 			return
 		}
 

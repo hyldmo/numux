@@ -327,7 +327,7 @@ describe('ProcessManager — maxRestarts', () => {
 		await new Promise(r => setTimeout(r, 500))
 
 		const allOutput = outputs.join('')
-		expect(allOutput).toContain('reached restart limit')
+		expect(allOutput).not.toContain('reached restart limit')
 		expect(allOutput).not.toContain('restarting in')
 
 		await mgr.stopAll()
