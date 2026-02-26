@@ -216,7 +216,7 @@ Each process accepts:
 | `env` | `Record<string, string>` | — | Extra environment variables |
 | `envFile` | `string \| string[]` | — | `.env` file path(s) to load (relative to `cwd`) |
 | `dependsOn` | `string[]` | — | Processes that must be ready first |
-| `readyPattern` | `string` | — | Regex matched against stdout to signal readiness |
+| `readyPattern` | `string \| RegExp` | — | Regex matched against stdout to signal readiness. Use `RegExp` to capture groups (see below) |
 | `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
 | `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
 | `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
@@ -308,6 +308,29 @@ A process becomes **ready** when:
 - **non-persistent** — exits with code 0
 
 Persistent processes that crash are auto-restarted with exponential backoff (1s–30s). Backoff resets after 10s of uptime.
+
+### Dependency output capture
+
+When `readyPattern` is a `RegExp` (not a string), capture groups are extracted on match and expanded into dependent process commands using `$process.group` syntax:
+
+```ts
+export default defineConfig({
+  processes: {
+    db: {
+      command: 'docker compose up postgres',
+      readyPattern: /ready to accept connections on port (?<port>\d+)/,
+    },
+    api: {
+      command: 'node server.js --db-port $db.port',
+      dependsOn: ['db'],
+    },
+  },
+})
+```
+
+Both named (`$db.port`) and positional (`$db.1`) references work. Named groups also populate positional slots, so `$db.port` and `$db.1` both resolve to the same value above.
+
+Unmatched references are left as-is (the shell will expand `$db` as empty + `.port` literal, making the issue visible). String `readyPattern` values work as before — readiness detection only, no capture extraction.
 
 ## Keybindings
 
