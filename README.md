@@ -311,7 +311,7 @@ Persistent processes that crash are auto-restarted with exponential backoff (1sâ
 
 ### Dependency output capture
 
-When `readyPattern` is a `RegExp` (not a string), capture groups are extracted on match and expanded into dependent process commands using `$process.group` syntax:
+When `readyPattern` is a `RegExp` (not a string), capture groups are extracted on match and expanded into dependent process `command` and `env` values using `$process.group` syntax:
 
 ```ts
 export default defineConfig({
@@ -323,6 +323,7 @@ export default defineConfig({
     api: {
       command: 'node server.js --db-port $db.port',
       dependsOn: ['db'],
+      env: { DB_PORT: '$db.port' },
     },
   },
 })

@@ -41,7 +41,7 @@ src/
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor
 - Set `errorMatcher: true` to detect ANSI red output, or a regex string to match custom patterns — shows a red indicator on the tab while the process keeps running
-- `readyPattern` accepts `string` (simple match) or `RegExp` (match + capture groups). RegExp captures are expanded into dependent commands via `$dep.group` syntax (e.g. `$odoo.url`)
+- `readyPattern` accepts `string` (simple match) or `RegExp` (match + capture groups). RegExp captures are expanded into dependent `command` and `env` values via `$dep.group` syntax (e.g. `$odoo.url`)
 
 ## CI
 
