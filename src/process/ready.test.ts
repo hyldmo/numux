@@ -114,6 +114,31 @@ describe('createReadinessChecker', () => {
 		})
 	})
 
+	test('matches pattern against ANSI-stripped text', () => {
+		const checker = createReadinessChecker({
+			command: 'echo hi',
+			persistent: true,
+			readyPattern: '- Local:\\s+http://localhost:\\d+'
+		})
+		// Simulate Next.js colored output: "- Local:" is green, then reset before spaces
+		expect(checker.feedOutput('\x1b[32m- Local:\x1b[0m        http://localhost:3000')).toBe(true)
+	})
+
+	test('RegExp captures from ANSI-stripped text', () => {
+		const checker = createReadinessChecker({
+			command: 'echo hi',
+			persistent: true,
+			readyPattern: /- Local:\s+(?<url>http:\/\/localhost:(?<port>\d+))/
+		})
+		expect(checker.feedOutput('\x1b[32m- Local:\x1b[0m        http://localhost:3000')).toBe(true)
+		expect(checker.captures).toEqual({
+			url: 'http://localhost:3000',
+			port: '3000',
+			'1': 'http://localhost:3000',
+			'2': '3000'
+		})
+	})
+
 	test('buffer is capped to prevent unbounded memory growth', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',

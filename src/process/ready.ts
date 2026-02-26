@@ -1,4 +1,5 @@
 import type { NumuxProcessConfig } from '../types'
+import { stripAnsi } from '../utils/color'
 
 /** Keep the last 64 KB of output for pattern matching */
 const BUFFER_CAP = 65_536
@@ -53,8 +54,9 @@ export function createReadinessChecker(config: NumuxProcessConfig) {
 			if (outputBuffer.length > BUFFER_CAP) {
 				outputBuffer = outputBuffer.slice(-BUFFER_CAP)
 			}
-			if (!shouldCapture) return pattern.test(outputBuffer)
-			const match = pattern.exec(outputBuffer)
+			const clean = stripAnsi(outputBuffer)
+			if (!shouldCapture) return pattern.test(clean)
+			const match = pattern.exec(clean)
 			if (match) {
 				_captures = extractCaptures(match)
 				return true
