@@ -300,7 +300,7 @@ Falsy values: unset, empty string, `"0"`, `"false"`, `"no"`, `"off"` (case-insen
 
 ### Dependency orchestration
 
-Processes are grouped into tiers by topological sort. Each tier starts after the previous tier is ready. If a process fails, its dependents are skipped.
+Each process starts as soon as its declared `dependsOn` dependencies are ready — it does not wait for unrelated processes. If a process fails, its dependents are skipped.
 
 A process becomes **ready** when:
 - **persistent + readyPattern** — the pattern matches in stdout
