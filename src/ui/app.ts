@@ -45,7 +45,8 @@ export class App {
 	async start(): Promise<void> {
 		this.renderer = await createCliRenderer({
 			exitOnCtrlC: false,
-			useMouse: true
+			useMouse: true,
+			useKittyKeyboard: {}
 		})
 
 		const { width, height } = this.renderer
@@ -97,7 +98,10 @@ export class App {
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
-			pane.onCopy(() => this.statusBar.showTemporaryMessage('Copied!'))
+			pane.onCopy(text => {
+				this.copyToClipboard(text)
+				this.statusBar.showTemporaryMessage('Copied!')
+			})
 			pane.onScroll(() => {
 				if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
 					this.updateSearchHighlights()
@@ -159,11 +163,18 @@ export class App {
 		// Global keyboard handler
 		this.renderer.keyInput.on(
 			'keypress',
-			(key: { ctrl: boolean; shift: boolean; meta: boolean; name: string; sequence: string }) => {
+			(key: {
+				ctrl: boolean
+				shift: boolean
+				meta: boolean
+				super?: boolean
+				name: string
+				sequence: string
+			}) => {
 				log(key)
 
-				// Cmd+C: copy selection (macOS)
-				if (key.meta && key.name === 'c') {
+				// Cmd+C: copy selection (macOS, requires kitty keyboard protocol)
+				if (key.super && key.name === 'c') {
 					this.copySelection()
 					return
 				}
@@ -336,13 +347,30 @@ export class App {
 		}
 	}
 
+	/** Copy text to system clipboard via native CLI tool, with OSC 52 as fallback. */
+	private copyToClipboard(text: string): void {
+		this.renderer.copyToClipboardOSC52(text)
+		const cmd =
+			process.platform === 'darwin'
+				? 'pbcopy'
+				: process.platform === 'linux'
+					? 'xclip -selection clipboard'
+					: null
+		if (cmd) {
+			const [bin, ...args] = cmd.split(' ')
+			const proc = Bun.spawn([bin, ...args], { stdin: 'pipe' })
+			proc.stdin.write(text)
+			proc.stdin.end()
+		}
+	}
+
 	/** Copy selected text to clipboard. Returns true if there was a selection to copy. */
 	private copySelection(): boolean {
 		const selection = this.renderer.getSelection()
 		if (!selection?.isActive) return false
 		const text = selection.getSelectedText()
 		if (!text) return false
-		this.renderer.copyToClipboardOSC52(text)
+		this.copyToClipboard(text)
 		this.renderer.clearSelection()
 		this.statusBar.showTemporaryMessage('Copied!')
 		return true

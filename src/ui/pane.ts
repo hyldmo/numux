@@ -47,7 +47,6 @@ export class Pane {
 			if (selection?.isActive && !selection.isDragging) {
 				const text = selection.getSelectedText()
 				if (text) {
-					renderer.copyToClipboardOSC52(text)
 					this._onCopy?.(text)
 				}
 			}
