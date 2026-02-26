@@ -353,7 +353,7 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 
 ### ghostty-opentui
 
-Despite the name, [`ghostty-opentui`](https://github.com/user/ghostty-opentui) is **not** a compatibility layer for the [Ghostty](https://ghostty.org) terminal. It uses Ghostty's Zig-based VT parser as the ANSI terminal emulation engine for OpenTUI's terminal renderable. It works in any terminal emulator (iTerm, Kitty, Alacritty, WezTerm, etc.) and adds ~8MB to install size due to native binaries.
+Despite the name, [`ghostty-opentui`](https://github.com/remorses/ghostty-opentui) is **not** a compatibility layer for the [Ghostty](https://ghostty.org) terminal. It uses Ghostty's Zig-based VT parser as the ANSI terminal emulation engine for OpenTUI's terminal renderable. It works in any terminal emulator (iTerm, Kitty, Alacritty, WezTerm, etc.) and adds ~8MB to install size due to native binaries.
 
 ## License
 
