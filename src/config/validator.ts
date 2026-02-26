@@ -90,7 +90,22 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		}
 
 		const persistent = typeof p.persistent === 'boolean' ? p.persistent : true
-		const readyPattern = typeof p.readyPattern === 'string' ? p.readyPattern : undefined
+		const readyPattern =
+			p.readyPattern instanceof RegExp
+				? p.readyPattern
+				: typeof p.readyPattern === 'string'
+					? p.readyPattern
+					: undefined
+
+		if (typeof readyPattern === 'string') {
+			try {
+				new RegExp(readyPattern)
+			} catch (err) {
+				throw new Error(`Process "${name}".readyPattern is not a valid regex: "${readyPattern}"`, {
+					cause: err
+				})
+			}
+		}
 
 		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
 		if (readyPattern && !persistent) {
