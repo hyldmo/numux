@@ -223,6 +223,7 @@ Each process accepts:
 | `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
 | `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
+| `platform` | `string \| string[]` | — | OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; dependents still start |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
 | `color` | `string \| string[]` | auto | Hex (e.g. `"#ff6600"`) or basic name: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple |
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |

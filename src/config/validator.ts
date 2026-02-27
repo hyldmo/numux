@@ -131,6 +131,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		const showCommand = typeof p.showCommand === 'boolean' ? p.showCommand : (globalShowCommand ?? true)
 
+		const platform = validatePlatform(name, p.platform)
+
 		validated[name] = {
 			command: p.command,
 			cwd: processCwd ?? globalCwd,
@@ -143,6 +145,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
+			platform,
 			stopSignal: validateStopSignal(p.stopSignal),
 			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
 			watch: validateStringOrStringArray(p.watch),
@@ -180,6 +183,22 @@ function validateErrorMatcher(name: string, value: unknown): boolean | string | 
 		throw new Error(`Process "${name}".errorMatcher must be true or a regex string`)
 	}
 	return undefined
+}
+
+const VALID_PLATFORMS = new Set(['aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', 'win32'])
+
+function validatePlatform(name: string, value: unknown): string | string[] | undefined {
+	const arr = validateStringOrStringArray(value)
+	if (arr === undefined) return undefined
+	const values = typeof arr === 'string' ? [arr] : arr
+	for (const v of values) {
+		if (!VALID_PLATFORMS.has(v)) {
+			throw new Error(
+				`Process "${name}".platform "${v}" is not valid. Must be one of: ${[...VALID_PLATFORMS].join(', ')}`
+			)
+		}
+	}
+	return arr
 }
 
 const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])

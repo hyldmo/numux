@@ -6,6 +6,7 @@ import { generateHelp } from './cli-flags'
 import { generateCompletions } from './completions'
 import { expandScriptPatterns } from './config/expand-scripts'
 import { loadConfig } from './config/loader'
+import { filterByPlatform } from './config/platform'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
 import { resolveWorkspaceProcesses } from './config/workspaces'
@@ -78,6 +79,7 @@ async function main() {
 		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		const warnings: ValidationWarning[] = []
 		let config = validateConfig(raw, warnings)
+		config = filterByPlatform(config)
 
 		if (parsed.only || parsed.exclude) {
 			config = filterConfig(config, parsed.only, parsed.exclude)
@@ -97,6 +99,10 @@ async function main() {
 				if (proc.persistent === false) flags.push('one-shot')
 				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
 				if (proc.condition) flags.push(`if: ${proc.condition}`)
+				if (proc.platform) {
+					const p = Array.isArray(proc.platform) ? proc.platform : [proc.platform]
+					flags.push(`platform: ${p.join(', ')}`)
+				}
 				if (proc.watch) {
 					const patterns = Array.isArray(proc.watch) ? proc.watch : [proc.watch]
 					flags.push(`watch: ${patterns.join(', ')}`)
@@ -191,6 +197,7 @@ async function main() {
 	} else {
 		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		config = validateConfig(raw, warnings)
+		config = filterByPlatform(config)
 
 		if (parsed.noRestart) {
 			for (const proc of Object.values(config.processes)) {

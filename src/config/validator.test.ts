@@ -572,6 +572,44 @@ describe('validateConfig', () => {
 		})
 		expect(config.processes.web.readyPattern).toBe(pattern)
 	})
+
+	test('preserves valid platform string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', platform: 'darwin' }
+			}
+		})
+		expect(config.processes.web.platform).toBe('darwin')
+	})
+
+	test('preserves valid platform array', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', platform: ['darwin', 'linux'] }
+			}
+		})
+		expect(config.processes.web.platform).toEqual(['darwin', 'linux'])
+	})
+
+	test('throws on invalid platform string', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', platform: 'macos' }
+				}
+			})
+		).toThrow('not valid')
+	})
+
+	test('throws on invalid entry in platform array', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', platform: ['darwin', 'macos'] }
+				}
+			})
+		).toThrow('not valid')
+	})
 })
 
 describe('validateConfig — global options', () => {

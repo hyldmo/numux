@@ -31,6 +31,8 @@ export interface NumuxProcessConfig<K extends string = string> {
 	delay?: number
 	/** Env var name (prefix with `!` to negate); process skipped if condition is falsy */
 	condition?: string
+	/** OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed, their dependents still start */
+	platform?: string | string[]
 	/**
 	 * Signal for graceful stop
 	 * @default 'SIGTERM'
