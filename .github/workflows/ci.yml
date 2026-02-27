@@ -13,6 +13,6 @@ jobs:
         with:
           bun-version: "1.x"
       - run: bun install --frozen-lockfile
-      - run: bunx tsc --noEmit
-      - run: bun run lint
+      - run: bun run typecheck
+      - run: bunx biome ci
       - run: bun test
