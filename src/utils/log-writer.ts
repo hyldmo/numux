@@ -64,7 +64,9 @@ export class LogWriter {
 		if (!path) return []
 
 		try {
-			const proc = Bun.spawn(['grep', '-inF', query, path], {
+			const cmd =
+				process.platform === 'win32' ? ['findstr', '/i', '/n', query, path] : ['grep', '-inF', query, path]
+			const proc = Bun.spawn(cmd, {
 				stdout: 'pipe',
 				stderr: 'ignore'
 			})
