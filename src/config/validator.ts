@@ -42,6 +42,11 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 	}
 
 	const sort = validateSort(config.sort)
+	const prefix = config.prefix === true ? true : undefined
+	const timestamps = config.timestamps === true ? true : undefined
+	const killOthers = config.killOthers === true ? true : undefined
+	const noWatch = config.noWatch === true ? true : undefined
+	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
 
 	const validated: Record<string, ResolvedProcessConfig> = {}
 
@@ -176,7 +181,15 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		}
 	}
 
-	return { ...(sort ? { sort } : {}), processes: validated }
+	return {
+		...(sort ? { sort } : {}),
+		...(prefix ? { prefix } : {}),
+		...(timestamps ? { timestamps } : {}),
+		...(killOthers ? { killOthers } : {}),
+		...(noWatch ? { noWatch } : {}),
+		...(logDir ? { logDir } : {}),
+		processes: validated
+	}
 }
 
 function validateStringOrStringArray(value: unknown): string | string[] | undefined {

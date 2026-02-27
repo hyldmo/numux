@@ -96,6 +96,25 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default 'config'
 	 */
 	sort?: SortOrder
+	/**
+	 * Use prefixed output mode instead of TUI (for CI/scripts)
+	 * @default false
+	 */
+	prefix?: boolean
+	/** Add timestamps to prefixed output lines (only applies when `prefix` is true) */
+	timestamps?: boolean
+	/**
+	 * Kill all processes when any one exits
+	 * @default false
+	 */
+	killOthers?: boolean
+	/**
+	 * Disable file watching even if processes have watch patterns
+	 * @default false
+	 */
+	noWatch?: boolean
+	/** Directory to write per-process log files */
+	logDir?: string
 	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
 }
 
@@ -109,6 +128,11 @@ export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'depends
 /** Validated config with all shorthand expanded to full objects */
 export interface ResolvedNumuxConfig {
 	sort?: SortOrder
+	prefix?: boolean
+	timestamps?: boolean
+	killOthers?: boolean
+	noWatch?: boolean
+	logDir?: string
 	processes: Record<string, ResolvedProcessConfig>
 }
 
