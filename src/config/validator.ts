@@ -24,6 +24,13 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 	const globalCwd = typeof config.cwd === 'string' ? config.cwd : undefined
 	const globalShowCommand = typeof config.showCommand === 'boolean' ? config.showCommand : undefined
 	const globalEnvFile = validateEnvFile(config.envFile)
+	const globalMaxRestarts =
+		typeof config.maxRestarts === 'number' && config.maxRestarts >= 0 ? config.maxRestarts : undefined
+	const globalReadyTimeout =
+		typeof config.readyTimeout === 'number' && config.readyTimeout > 0 ? config.readyTimeout : undefined
+	const globalStopSignal = validateStopSignal(config.stopSignal)
+	const globalErrorMatcher = validateErrorMatcher('(global)', config.errorMatcher)
+	const globalWatch = validateStringOrStringArray(config.watch)
 	let globalEnv: Record<string, string> | undefined
 	if (config.env && typeof config.env === 'object') {
 		for (const [k, v] of Object.entries(config.env as Record<string, unknown>)) {
@@ -133,6 +140,13 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		const platform = validatePlatform(name, p.platform)
 
+		const processMaxRestarts = typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined
+		const processReadyTimeout =
+			typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined
+		const processStopSignal = validateStopSignal(p.stopSignal)
+		const processErrorMatcher = validateErrorMatcher(name, p.errorMatcher)
+		const processWatch = validateStringOrStringArray(p.watch)
+
 		validated[name] = {
 			command: p.command,
 			cwd: processCwd ?? globalCwd,
@@ -141,16 +155,16 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern,
 			persistent,
-			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
-			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
+			maxRestarts: processMaxRestarts ?? globalMaxRestarts,
+			readyTimeout: processReadyTimeout ?? globalReadyTimeout,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			platform,
-			stopSignal: validateStopSignal(p.stopSignal),
+			stopSignal: processStopSignal ?? globalStopSignal,
 			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
-			watch: validateStringOrStringArray(p.watch),
+			watch: processWatch ?? globalWatch,
 			interactive: typeof p.interactive === 'boolean' ? p.interactive : false,
-			errorMatcher: validateErrorMatcher(name, p.errorMatcher),
+			errorMatcher: processErrorMatcher ?? globalErrorMatcher,
 			showCommand
 		}
 	}
