@@ -11,6 +11,7 @@ export class StatusBar {
 	private _searchQuery = ''
 	private _searchMatchCount = 0
 	private _searchCurrentIndex = -1
+	private _crossProcessInfo?: { totalMatches: number; processCount: number }
 	private _tempMessage: string | null = null
 	private _tempTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -25,11 +26,18 @@ export class StatusBar {
 		})
 	}
 
-	setSearchMode(active: boolean, query = '', matchCount = 0, currentIndex = -1): void {
+	setSearchMode(
+		active: boolean,
+		query = '',
+		matchCount = 0,
+		currentIndex = -1,
+		crossProcessInfo?: { totalMatches: number; processCount: number }
+	): void {
 		this._searchMode = active
 		this._searchQuery = query
 		this._searchMatchCount = matchCount
 		this._searchCurrentIndex = currentIndex
+		this._crossProcessInfo = crossProcessInfo
 		this.renderable.content = this.buildContent()
 	}
 
@@ -56,20 +64,27 @@ export class StatusBar {
 
 	private buildSearchContent(): StyledText {
 		const chunks: TextChunk[] = []
+		const isAllMode = !!this._crossProcessInfo
 		chunks.push(yellow('/'))
 		if (this._searchQuery) chunks.push(plain(this._searchQuery))
 		chunks.push(reverse(' '))
 		if (this._searchMatchCount === 0 && this._searchQuery) {
 			chunks.push(plain('  '))
 			chunks.push(red('no matches'))
-			chunks.push(plain('  Esc: close'))
 		} else if (this._searchMatchCount > 0) {
 			chunks.push(plain('  '))
-			chunks.push(cyan(`${this._searchCurrentIndex + 1}/${this._searchMatchCount}`))
-			chunks.push(plain('  Enter/Shift+Enter: next/prev  Esc: close'))
+			if (isAllMode) {
+				const { totalMatches, processCount } = this._crossProcessInfo!
+				chunks.push(cyan(`${this._searchCurrentIndex + 1}/${this._searchMatchCount}`))
+				chunks.push(plain(`  ${totalMatches} in ${processCount} process${processCount === 1 ? '' : 'es'}`))
+			} else {
+				chunks.push(cyan(`${this._searchCurrentIndex + 1}/${this._searchMatchCount}`))
+			}
+			chunks.push(plain('  Enter: next'))
 		} else {
-			chunks.push(plain('  Enter: next  Esc: close'))
+			chunks.push(plain('  Enter: next'))
 		}
+		chunks.push(plain(`  Tab: ${isAllMode ? 'single' : 'all'}  Esc: close`))
 		return new StyledText(chunks)
 	}
 }
