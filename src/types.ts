@@ -88,8 +88,16 @@ export interface NumuxConfig<K extends string = string> {
 	errorMatcher?: boolean | string
 	/** Global watch patterns, inherited by processes without their own watch */
 	watch?: string | string[]
+	/**
+	 * Tab display order. `'config'` preserves definition order (package.json script order for wildcards),
+	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers.
+	 * @default 'config'
+	 */
+	sort?: SortOrder
 	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
 }
+
+export type SortOrder = 'config' | 'alphabetical' | 'topological'
 
 /** Process config after validation — dependsOn is always normalized to an array */
 export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn'> {
@@ -98,6 +106,7 @@ export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'depends
 
 /** Validated config with all shorthand expanded to full objects */
 export interface ResolvedNumuxConfig {
+	sort?: SortOrder
 	processes: Record<string, ResolvedProcessConfig>
 }
 

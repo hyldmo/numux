@@ -41,8 +41,46 @@ describe('ProcessManager — initialization', () => {
 		expect(mgr.getState('nonexistent')).toBeUndefined()
 	})
 
-	test('getProcessNames returns topological order', () => {
+	test('getProcessNames returns config definition order by default', () => {
 		const config: ResolvedNumuxConfig = {
+			processes: {
+				web: { command: 'echo web', dependsOn: ['api'] },
+				api: { command: 'echo api', dependsOn: ['db'] },
+				db: { command: 'echo db' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['web', 'api', 'db'])
+	})
+
+	test('getProcessNames preserves config order for independent processes', () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				a: { command: 'echo a' },
+				b: { command: 'echo b' },
+				c: { command: 'echo c', dependsOn: ['a', 'b'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['a', 'b', 'c'])
+	})
+
+	test('sort: alphabetical returns alphabetically sorted names', () => {
+		const config: ResolvedNumuxConfig = {
+			sort: 'alphabetical',
+			processes: {
+				web: { command: 'echo web' },
+				api: { command: 'echo api' },
+				db: { command: 'echo db' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['api', 'db', 'web'])
+	})
+
+	test('sort: topological returns dependency-first order', () => {
+		const config: ResolvedNumuxConfig = {
+			sort: 'topological',
 			processes: {
 				web: { command: 'echo web', dependsOn: ['api'] },
 				api: { command: 'echo api', dependsOn: ['db'] },
@@ -53,21 +91,6 @@ describe('ProcessManager — initialization', () => {
 		const names = mgr.getProcessNames()
 		expect(names.indexOf('db')).toBeLessThan(names.indexOf('api'))
 		expect(names.indexOf('api')).toBeLessThan(names.indexOf('web'))
-	})
-
-	test('getProcessNames groups independent processes in same tier', () => {
-		const config: ResolvedNumuxConfig = {
-			processes: {
-				a: { command: 'echo a' },
-				b: { command: 'echo b' },
-				c: { command: 'echo c', dependsOn: ['a', 'b'] }
-			}
-		}
-		const mgr = new ProcessManager(config)
-		const names = mgr.getProcessNames()
-		// a and b should both come before c
-		expect(names.indexOf('a')).toBeLessThan(names.indexOf('c'))
-		expect(names.indexOf('b')).toBeLessThan(names.indexOf('c'))
 	})
 })
 

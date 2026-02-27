@@ -1,4 +1,4 @@
-import type { ResolvedNumuxConfig, ResolvedProcessConfig } from '../types'
+import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
 import { isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
@@ -40,6 +40,8 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		}
 		globalEnv = config.env as Record<string, string>
 	}
+
+	const sort = validateSort(config.sort)
 
 	const validated: Record<string, ResolvedProcessConfig> = {}
 
@@ -169,7 +171,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		}
 	}
 
-	return { processes: validated }
+	return { ...(sort ? { sort } : {}), processes: validated }
 }
 
 function validateStringOrStringArray(value: unknown): string | string[] | undefined {
@@ -195,6 +197,18 @@ function validateErrorMatcher(name: string, value: unknown): boolean | string | 
 	}
 	if (value !== undefined && value !== false) {
 		throw new Error(`Process "${name}".errorMatcher must be true or a regex string`)
+	}
+	return undefined
+}
+
+const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological'])
+
+function validateSort(value: unknown): SortOrder | undefined {
+	if (typeof value === 'string') {
+		if (!VALID_SORT_VALUES.has(value)) {
+			throw new Error(`sort must be one of: ${[...VALID_SORT_VALUES].join(', ')}. Got "${value}"`)
+		}
+		return value as SortOrder
 	}
 	return undefined
 }

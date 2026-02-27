@@ -11,7 +11,7 @@ import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
 import { resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
-import type { NumuxProcessConfig, ResolvedNumuxConfig } from './types'
+import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
 import { colorFromName } from './utils/color'
@@ -204,6 +204,10 @@ async function main() {
 				proc.maxRestarts = 0
 			}
 		}
+	}
+
+	if (parsed.sort) {
+		config.sort = parsed.sort as SortOrder
 	}
 
 	if (parsed.envFile !== undefined) {

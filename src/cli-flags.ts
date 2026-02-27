@@ -43,6 +43,15 @@ const commaSplit = (raw: string): string[] =>
 export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
+		long: '--sort',
+		short: '-s',
+		key: 'sort',
+		description: 'Tab display order',
+		valueName: '<config|alphabetical|topological>',
+		completionHint: 'none'
+	},
+	{
+		type: 'value',
 		long: '--workspace',
 		short: '-w',
 		key: 'workspace',

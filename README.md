@@ -164,6 +164,7 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `--exclude <a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits |
 | `--no-restart` | Disable auto-restart for crashed processes |
+| `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |
 | `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |
 | `--log-dir <path>` | Write per-process output to `<path>/<name>.log` |
@@ -198,6 +199,7 @@ Top-level options apply to all processes (process-level settings override):
 | `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Stop signal for all processes (default: `'SIGTERM'`) |
 | `errorMatcher` | `boolean \| string` | Error detection for all processes (`true` = ANSI red, string = regex) |
 | `watch` | `string \| string[]` | Watch patterns for all processes (process `watch` replaces if set) |
+| `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order (default: `'config'` — definition order) |
 
 ```ts
 export default defineConfig({

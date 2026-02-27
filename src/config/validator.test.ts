@@ -612,6 +612,56 @@ describe('validateConfig', () => {
 	})
 })
 
+describe('validateConfig — sort', () => {
+	test('sort defaults to undefined', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBeUndefined()
+	})
+
+	test('preserves sort: config', () => {
+		const config = validateConfig({
+			sort: 'config',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('config')
+	})
+
+	test('preserves sort: alphabetical', () => {
+		const config = validateConfig({
+			sort: 'alphabetical',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('alphabetical')
+	})
+
+	test('preserves sort: topological', () => {
+		const config = validateConfig({
+			sort: 'topological',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('topological')
+	})
+
+	test('throws on invalid sort value', () => {
+		expect(() =>
+			validateConfig({
+				sort: 'random',
+				processes: { a: { command: 'echo a' } }
+			})
+		).toThrow('sort must be one of')
+	})
+
+	test('ignores non-string sort value', () => {
+		const config = validateConfig({
+			sort: 123,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBeUndefined()
+	})
+})
+
 describe('validateConfig — global options', () => {
 	test('global cwd is inherited by all processes', () => {
 		const config = validateConfig({
