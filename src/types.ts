@@ -73,6 +73,22 @@ export interface NumuxConfig<K extends string = string> {
 	 */
 	showCommand?: boolean
 	/**
+	 * Global restart limit, inherited by all processes
+	 * @default Infinity
+	 */
+	maxRestarts?: number
+	/** Global ready timeout (ms), inherited by all processes */
+	readyTimeout?: number
+	/**
+	 * Global stop signal, inherited by all processes
+	 * @default 'SIGTERM'
+	 */
+	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP'
+	/** Global error matcher, inherited by all processes. `true` = detect ANSI red output, string = regex */
+	errorMatcher?: boolean | string
+	/** Global watch patterns, inherited by processes without their own watch */
+	watch?: string | string[]
+	/**
 	 * Tab display order. `'config'` preserves definition order (package.json script order for wildcards),
 	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers.
 	 * @default 'config'
