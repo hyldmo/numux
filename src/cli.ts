@@ -21,6 +21,7 @@ export interface ParsedArgs {
 	logDir?: string
 	only?: string[]
 	exclude?: string[]
+	sort?: string
 	colors?: string[]
 	workspace?: string
 	envFile?: string | false

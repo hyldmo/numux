@@ -47,7 +47,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -199,7 +199,7 @@ describe('expandScriptPatterns', () => {
 			},
 			dir
 		)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'e2e', 'unit', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api', 'unit', 'e2e'])
 	})
 
 	test('multiple wildcards with colliding short names throws', () => {
@@ -233,7 +233,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:app-*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api'])
 		expect(result.processes['lib-core']).toBeUndefined()
 	})
 
@@ -254,7 +254,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -405,7 +405,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'dev:*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api', 'db'])
 		// Commands must still reference full script name
 		expect(proc(result, 'web').command).toBe('npm run dev:web')
 		expect(proc(result, 'api').command).toBe('npm run dev:api')
@@ -420,7 +420,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -430,7 +430,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ dev: 'vite', build: 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { '*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['build', 'dev'])
+		expect(Object.keys(result.processes)).toEqual(['dev', 'build'])
 	})
 
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
@@ -445,8 +445,8 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': { color: ['#00ff00', '#00ffff'] } } }, dir)
-		const names = Object.keys(result.processes).sort()
-		expect(names).toEqual(['api', 'store'])
+		const names = Object.keys(result.processes)
+		expect(names).toEqual(['store', 'api'])
 		// "dev" script should NOT match *:dev (no colon)
 		expect(result.processes.dev).toBeUndefined()
 	})

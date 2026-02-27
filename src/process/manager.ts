@@ -61,9 +61,16 @@ export class ProcessManager {
 		return [...this.states.values()]
 	}
 
-	/** Names in display order (topological) */
+	/** Names in display order (determined by config.sort) */
 	getProcessNames(): string[] {
-		return this.tiers.flat()
+		switch (this.config.sort) {
+			case 'alphabetical':
+				return Object.keys(this.config.processes).sort()
+			case 'topological':
+				return this.tiers.flat()
+			default:
+				return Object.keys(this.config.processes)
+		}
 	}
 
 	async startAll(cols: number, rows: number): Promise<void> {

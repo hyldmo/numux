@@ -207,6 +207,18 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).noWatch).toBe(false)
 	})
 
+	test('-s sets sort', () => {
+		expect(parseArgs(argv('-s', 'alphabetical')).sort).toBe('alphabetical')
+	})
+
+	test('--sort sets sort', () => {
+		expect(parseArgs(argv('--sort', 'topological')).sort).toBe('topological')
+	})
+
+	test('sort is undefined by default', () => {
+		expect(parseArgs(argv()).sort).toBeUndefined()
+	})
+
 	test('--colors sets autoColors flag', () => {
 		expect(parseArgs(argv('--colors')).autoColors).toBe(true)
 	})
