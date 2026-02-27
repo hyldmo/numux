@@ -4,6 +4,11 @@ export default defineConfig({
 	env: {
 		NODE_ENV: 'development'
 	},
+	maxRestarts: 5,
+	readyTimeout: 30000,
+	stopSignal: 'SIGINT',
+	errorMatcher: true,
+	watch: ['.env'],
 	processes: {
 		debug: {
 			command: 'mkdir -p .numux && touch .numux/debug.log && tail -f .numux/debug.log',
@@ -24,15 +29,12 @@ export default defineConfig({
 			command: 'bun servers/api.ts',
 			dependsOn: 'migrate',
 			readyPattern: /listening on (?<url>http:\/\/\S+)/,
-			errorMatcher: true,
-			stopSignal: 'SIGINT',
 			watch: ['servers/**/*.ts'],
 			color: '#81c784'
 		},
 		worker: {
 			command: 'bun servers/worker.ts',
 			dependsOn: 'db',
-			maxRestarts: 5,
 			color: '#ce93d8'
 		},
 		e2e: {

@@ -729,4 +729,178 @@ describe('validateConfig — global options', () => {
 		expect(config.processes.a.showCommand).toBe(true)
 		expect(config.processes.b.showCommand).toBe(false)
 	})
+
+	test('global maxRestarts is inherited by all processes', () => {
+		const config = validateConfig({
+			maxRestarts: 3,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(3)
+		expect(config.processes.b.maxRestarts).toBe(3)
+	})
+
+	test('process maxRestarts overrides global maxRestarts', () => {
+		const config = validateConfig({
+			maxRestarts: 3,
+			processes: {
+				a: { command: 'echo a', maxRestarts: 10 },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(10)
+		expect(config.processes.b.maxRestarts).toBe(3)
+	})
+
+	test('process maxRestarts: 0 overrides global maxRestarts', () => {
+		const config = validateConfig({
+			maxRestarts: 5,
+			processes: {
+				a: { command: 'echo a', maxRestarts: 0 }
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(0)
+	})
+
+	test('global readyTimeout is inherited by all processes', () => {
+		const config = validateConfig({
+			readyTimeout: 5000,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.readyTimeout).toBe(5000)
+		expect(config.processes.b.readyTimeout).toBe(5000)
+	})
+
+	test('process readyTimeout overrides global readyTimeout', () => {
+		const config = validateConfig({
+			readyTimeout: 5000,
+			processes: {
+				a: { command: 'echo a', readyTimeout: 30000 },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.readyTimeout).toBe(30000)
+		expect(config.processes.b.readyTimeout).toBe(5000)
+	})
+
+	test('global stopSignal is inherited by all processes', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGINT',
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.stopSignal).toBe('SIGINT')
+		expect(config.processes.b.stopSignal).toBe('SIGINT')
+	})
+
+	test('process stopSignal overrides global stopSignal', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGINT',
+			processes: {
+				a: { command: 'echo a', stopSignal: 'SIGHUP' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.stopSignal).toBe('SIGHUP')
+		expect(config.processes.b.stopSignal).toBe('SIGINT')
+	})
+
+	test('global errorMatcher is inherited by all processes', () => {
+		const config = validateConfig({
+			errorMatcher: true,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe(true)
+		expect(config.processes.b.errorMatcher).toBe(true)
+	})
+
+	test('global errorMatcher regex string is inherited', () => {
+		const config = validateConfig({
+			errorMatcher: 'ERROR:',
+			processes: {
+				a: { command: 'echo a' }
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe('ERROR:')
+	})
+
+	test('process errorMatcher overrides global errorMatcher', () => {
+		const config = validateConfig({
+			errorMatcher: true,
+			processes: {
+				a: { command: 'echo a', errorMatcher: 'FATAL' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe('FATAL')
+		expect(config.processes.b.errorMatcher).toBe(true)
+	})
+
+	test('global watch is inherited by all processes', () => {
+		const config = validateConfig({
+			watch: '.env',
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.watch).toBe('.env')
+		expect(config.processes.b.watch).toBe('.env')
+	})
+
+	test('global watch array is inherited', () => {
+		const config = validateConfig({
+			watch: ['.env', 'config.json'],
+			processes: {
+				a: { command: 'echo a' }
+			}
+		})
+		expect(config.processes.a.watch).toEqual(['.env', 'config.json'])
+	})
+
+	test('process watch overrides global watch', () => {
+		const config = validateConfig({
+			watch: '.env',
+			processes: {
+				a: { command: 'echo a', watch: 'src/**/*.ts' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.watch).toBe('src/**/*.ts')
+		expect(config.processes.b.watch).toBe('.env')
+	})
+
+	test('invalid global maxRestarts is ignored', () => {
+		const config = validateConfig({
+			maxRestarts: -1,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.maxRestarts).toBeUndefined()
+	})
+
+	test('invalid global readyTimeout is ignored', () => {
+		const config = validateConfig({
+			readyTimeout: 0,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.readyTimeout).toBeUndefined()
+	})
+
+	test('invalid global stopSignal is ignored', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGKILL',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.stopSignal).toBeUndefined()
+	})
 })

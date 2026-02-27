@@ -193,6 +193,11 @@ Top-level options apply to all processes (process-level settings override):
 | `env` | `Record<string, string>` | Environment variables merged into all processes (process `env` overrides per key) |
 | `envFile` | `string \| string[] \| false` | `.env` file(s) for all processes (process `envFile` replaces if set; `false` disables) |
 | `showCommand` | `boolean` | Print the command being run as the first line of output (default: `true`) |
+| `maxRestarts` | `number` | Restart limit for all processes (default: `Infinity`) |
+| `readyTimeout` | `number` | Ready timeout in ms for all processes |
+| `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Stop signal for all processes (default: `'SIGTERM'`) |
+| `errorMatcher` | `boolean \| string` | Error detection for all processes (`true` = ANSI red, string = regex) |
+| `watch` | `string \| string[]` | Watch patterns for all processes (process `watch` replaces if set) |
 
 ```ts
 export default defineConfig({
