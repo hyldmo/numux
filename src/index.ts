@@ -14,7 +14,7 @@ import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
-import { colorFromName } from './utils/color'
+import { Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
@@ -159,7 +159,7 @@ async function main() {
 			const processes: Record<string, NumuxProcessConfig | string> = {}
 			for (const pattern of npmPatterns) {
 				const entry: Partial<NumuxProcessConfig> = {}
-				if (parsed.colors?.length) entry.color = parsed.colors
+				if (parsed.colors?.length) entry.color = parsed.colors as Color[]
 				processes[pattern] = entry as NumuxProcessConfig
 			}
 			for (let i = 0; i < otherCommands.length; i++) {
@@ -176,7 +176,7 @@ async function main() {
 		} else {
 			config = buildConfigFromArgs(parsed.commands, parsed.named, {
 				noRestart: parsed.noRestart,
-				colors: parsed.colors
+				colors: parsed.colors as Color[]
 			})
 		}
 

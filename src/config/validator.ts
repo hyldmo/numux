@@ -1,5 +1,5 @@
 import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
-import { isValidColor } from '../utils/color'
+import { Color, isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
 
@@ -163,7 +163,12 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
 			platform,
 			stopSignal: processStopSignal ?? globalStopSignal,
-			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
+			color:
+				typeof p.color === 'string'
+					? (p.color as Color)
+					: Array.isArray(p.color)
+						? (p.color as Color[])
+						: undefined,
 			watch: processWatch ?? globalWatch,
 			interactive: typeof p.interactive === 'boolean' ? p.interactive : false,
 			errorMatcher: processErrorMatcher ?? globalErrorMatcher,

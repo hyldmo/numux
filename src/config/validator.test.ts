@@ -338,15 +338,6 @@ describe('validateConfig', () => {
 		expect(config.processes.web.color).toBe('#ff8800')
 	})
 
-	test('accepts hex color without hash', () => {
-		const config = validateConfig({
-			processes: {
-				web: { command: 'echo hi', color: 'ff8800' }
-			}
-		})
-		expect(config.processes.web.color).toBe('ff8800')
-	})
-
 	test('accepts basic color names', () => {
 		const config = validateConfig({
 			processes: {

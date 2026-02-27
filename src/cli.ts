@@ -1,5 +1,6 @@
 import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
 import type { ResolvedNumuxConfig } from './types'
+import type { Color } from './utils/color'
 
 export interface ParsedArgs {
 	help: boolean
@@ -105,7 +106,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export function buildConfigFromArgs(
 	commands: string[],
 	named: Array<{ name: string; command: string }>,
-	options?: { noRestart?: boolean; colors?: string[] }
+	options?: { noRestart?: boolean; colors?: Color[] }
 ): ResolvedNumuxConfig {
 	const processes: ResolvedNumuxConfig['processes'] = {}
 	const maxRestarts = options?.noRestart ? 0 : undefined

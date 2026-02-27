@@ -53,12 +53,12 @@ describe('resolveToHex', () => {
 
 	test('returns hex for basic color names', () => {
 		expect(resolveToHex('black')).toBe('#000000')
-		expect(resolveToHex('red')).toBe('#ff0000')
-		expect(resolveToHex('green')).toBe('#00ff00')
-		expect(resolveToHex('yellow')).toBe('#ffff00')
-		expect(resolveToHex('blue')).toBe('#0000ff')
-		expect(resolveToHex('magenta')).toBe('#ff00ff')
-		expect(resolveToHex('cyan')).toBe('#00ffff')
+		expect(resolveToHex('red')).toBe('#ff5555')
+		expect(resolveToHex('green')).toBe('#00cc00')
+		expect(resolveToHex('yellow')).toBe('#cccc00')
+		expect(resolveToHex('blue')).toBe('#0000cc')
+		expect(resolveToHex('magenta')).toBe('#cc00cc')
+		expect(resolveToHex('cyan')).toBe('#00cccc')
 		expect(resolveToHex('white')).toBe('#ffffff')
 		expect(resolveToHex('gray')).toBe('#808080')
 		expect(resolveToHex('grey')).toBe('#808080')
@@ -67,7 +67,7 @@ describe('resolveToHex', () => {
 	})
 
 	test('is case-insensitive for names', () => {
-		expect(resolveToHex('RED')).toBe('#ff0000')
+		expect(resolveToHex('RED')).toBe('#ff5555')
 	})
 
 	test('returns empty string for invalid', () => {
@@ -99,11 +99,11 @@ describe('colorFromName', () => {
 	test('returns consistent colors for known names', () => {
 		expect(colorFromName('api')).toBe('#cc00cc')
 		expect(colorFromName('web')).toBe('#00cc00')
-		expect(colorFromName('db')).toBe('#ffff55')
+		expect(colorFromName('db')).toBe('#ffa500')
 		expect(colorFromName('worker')).toBe('#cc00cc')
 		expect(colorFromName('redis')).toBe('#0000cc')
 		expect(colorFromName('migrate')).toBe('#0000cc')
-		expect(colorFromName('proxy')).toBe('#ffff55')
+		expect(colorFromName('proxy')).toBe('#ffa500')
 		expect(colorFromName('cache')).toBe('#cc00cc')
 	})
 

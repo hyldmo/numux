@@ -1,3 +1,5 @@
+import type { Color } from './utils/color'
+
 export interface NumuxProcessConfig<K extends string = string> {
 	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
 	command: string
@@ -39,7 +41,7 @@ export interface NumuxProcessConfig<K extends string = string> {
 	 */
 	stopSignal?: 'SIGTERM' | 'SIGINT' | 'SIGHUP'
 	/** Hex color (e.g. `"#ff6600"`) or color name. Array for round-robin in script patterns */
-	color?: string | string[]
+	color?: Color | Color[]
 	/** Glob patterns — restart process when matching files change */
 	watch?: string | string[]
 	/**

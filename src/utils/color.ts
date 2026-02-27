@@ -1,18 +1,22 @@
-/** Basic color names mapped to hex (lowercase keys) — 8 ANSI base + gray/orange */
-export const BASIC_COLORS: Record<string, string> = {
+/** Basic color names mapped to muted hex tones (lowercase keys) */
+
+export type BasicColor = keyof typeof BASIC_COLORS
+export type Color = `#${string}` | BasicColor
+
+export const BASIC_COLORS = {
 	black: '#000000',
-	red: '#ff0000',
-	green: '#00ff00',
-	yellow: '#ffff00',
-	blue: '#0000ff',
-	magenta: '#ff00ff',
-	cyan: '#00ffff',
+	red: '#ff5555',
+	green: '#00cc00',
+	yellow: '#cccc00',
+	blue: '#0000cc',
+	magenta: '#cc00cc',
+	cyan: '#00cccc',
 	white: '#ffffff',
 	gray: '#808080',
 	grey: '#808080',
 	orange: '#ffa500',
 	purple: '#800080'
-}
+} as const satisfies Record<string, string>
 
 /** Check if a string is a valid color (hex or basic name) */
 export function isValidColor(color: string): boolean {
@@ -23,7 +27,7 @@ export function isValidColor(color: string): boolean {
 /** Resolve any color (hex or basic name) to normalized hex (#rrggbb) */
 export function resolveToHex(color: string): string {
 	if (HEX_COLOR_RE.test(color)) return color.startsWith('#') ? color : `#${color}`
-	const hex = BASIC_COLORS[color.toLowerCase()]
+	const hex = BASIC_COLORS[color.toLowerCase() as BasicColor]
 	return hex ?? ''
 }
 
@@ -47,12 +51,12 @@ import type { ProcessStatus, ResolvedNumuxConfig } from '../types'
 
 /** ANSI color codes for process statuses */
 export const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
-	ready: '\x1b[32m',
-	running: '\x1b[36m',
-	finished: '\x1b[32m',
-	failed: '\x1b[31m',
-	stopped: '\x1b[90m',
-	skipped: '\x1b[90m'
+	ready: hexToAnsi(BASIC_COLORS.green),
+	running: hexToAnsi(BASIC_COLORS.cyan),
+	finished: hexToAnsi(BASIC_COLORS.green),
+	failed: hexToAnsi(BASIC_COLORS.red),
+	stopped: hexToAnsi(BASIC_COLORS.gray),
+	skipped: hexToAnsi(BASIC_COLORS.gray)
 }
 
 export const ANSI_RESET = '\x1b[0m'
@@ -65,28 +69,26 @@ export function stripAnsi(str: string): string {
 	return str.replace(ANSI_RE, '')
 }
 
-/** Default palette as ANSI codes (for prefix mode stdout output) */
-const DEFAULT_ANSI_COLORS = [
-	'\x1b[36m',
-	'\x1b[33m',
-	'\x1b[35m',
-	'\x1b[34m',
-	'\x1b[32m',
-	'\x1b[91m',
-	'\x1b[93m',
-	'\x1b[95m'
-]
-
-/** Default palette as hex colors (for styled text rendering) */
-const DEFAULT_HEX_COLORS = ['#00cccc', '#cccc00', '#cc00cc', '#0000cc', '#00cc00', '#ff5555', '#ffff55', '#ff55ff']
+/** Default palette for automatic process color assignment — cycles through BASIC_COLORS */
+const DEFAULT_PALETTE = [
+	BASIC_COLORS.cyan,
+	BASIC_COLORS.yellow,
+	BASIC_COLORS.magenta,
+	BASIC_COLORS.blue,
+	BASIC_COLORS.green,
+	BASIC_COLORS.red,
+	BASIC_COLORS.orange,
+	BASIC_COLORS.purple
+] as const
+const DEFAULT_ANSI_COLORS = DEFAULT_PALETTE.map(hexToAnsi)
 
 /** Pick a deterministic color from the default palette based on the process name */
-export function colorFromName(name: string): string {
+export function colorFromName(name: string): Color {
 	let hash = 0
 	for (let i = 0; i < name.length; i++) {
 		hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
 	}
-	return DEFAULT_HEX_COLORS[Math.abs(hash) % DEFAULT_HEX_COLORS.length]
+	return DEFAULT_PALETTE[Math.abs(hash) % DEFAULT_PALETTE.length]
 }
 
 /** Resolve a color value (string or array) to a single hex string, or undefined. */
@@ -125,9 +127,9 @@ export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxCo
 		if (explicit) {
 			const hex = resolveToHex(explicit)
 			if (hex) map.set(name, hex)
-			else map.set(name, DEFAULT_HEX_COLORS[paletteIndex++ % DEFAULT_HEX_COLORS.length])
+			else map.set(name, DEFAULT_PALETTE[paletteIndex++ % DEFAULT_PALETTE.length])
 		} else {
-			map.set(name, DEFAULT_HEX_COLORS[paletteIndex % DEFAULT_HEX_COLORS.length])
+			map.set(name, DEFAULT_PALETTE[paletteIndex % DEFAULT_PALETTE.length])
 			paletteIndex++
 		}
 	}
