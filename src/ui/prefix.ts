@@ -140,7 +140,7 @@ export class PrefixDisplay {
 		)
 		if (allDone) {
 			this.printSummary()
-			this.logWriter?.close()
+			this.logWriter?.cleanup()
 			const anyFailed = states.some(s => s.status === 'failed')
 			process.exit(anyFailed ? 1 : 0)
 		}
@@ -156,7 +156,7 @@ export class PrefixDisplay {
 				this.flushBuffer(name)
 			}
 			this.printSummary()
-			this.logWriter?.close()
+			this.logWriter?.cleanup()
 			process.exit(code === 0 ? 0 : 1)
 		})
 	}
@@ -201,7 +201,7 @@ export class PrefixDisplay {
 		for (const name of this.manager.getProcessNames()) {
 			this.flushBuffer(name)
 		}
-		this.logWriter?.close()
+		this.logWriter?.cleanup()
 		const anyFailed = this.manager.getAllStates().some(s => s.status === 'failed')
 		process.exit(anyFailed ? 1 : 0)
 	}

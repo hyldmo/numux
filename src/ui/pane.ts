@@ -17,10 +17,6 @@ export class Pane {
 	private _onCopy: ((text: string) => void) | null = null
 	private _onLinkClick: ((link: DetectedLink) => void) | null = null
 
-	// Cached text from getText() FFI — invalidated on feed/clear/resize
-	private _textLines: string[] | null = null
-	private _textLinesLower: string[] | null = null
-
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
@@ -79,15 +75,11 @@ export class Pane {
 	feed(data: Uint8Array): void {
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
-		this._textLines = null
-		this._textLinesLower = null
 	}
 
 	resize(cols: number, rows: number): void {
 		this.terminal.cols = cols
 		this.terminal.rows = rows
-		this._textLines = null
-		this._textLinesLower = null
 	}
 
 	get isAtBottom(): boolean {
@@ -125,14 +117,11 @@ export class Pane {
 	}
 
 	private getLinkAtMouse(localX: number, localY: number): DetectedLink | null {
-		if (!this._textLines) {
-			const text = this.terminal.getText()
-			this._textLines = text.split('\n')
-			this._textLinesLower = this._textLines.map(l => l.toLowerCase())
-		}
+		const text = this.terminal.getText()
+		const lines = text.split('\n')
 		const lineIndex = Math.floor(this.scrollBox.scrollTop) + localY
-		if (lineIndex < 0 || lineIndex >= this._textLines.length) return null
-		return findLinkAtPosition(this._textLines[lineIndex], localX)
+		if (lineIndex < 0 || lineIndex >= lines.length) return null
+		return findLinkAtPosition(lines[lineIndex], localX)
 	}
 
 	show(): void {
@@ -141,29 +130,6 @@ export class Pane {
 
 	hide(): void {
 		this.scrollBox.visible = false
-	}
-
-	search(query: string): SearchMatch[] {
-		if (!query) return []
-		// Use cached text to avoid repeated getText() FFI calls
-		if (!this._textLines) {
-			const text = this.terminal.getText()
-			this._textLines = text.split('\n')
-			this._textLinesLower = this._textLines.map(l => l.toLowerCase())
-		}
-		const lines = this._textLinesLower!
-		const matches: SearchMatch[] = []
-		const lowerQuery = query.toLowerCase()
-		for (let line = 0; line < lines.length; line++) {
-			let pos = 0
-			while (true) {
-				const idx = lines[line].indexOf(lowerQuery, pos)
-				if (idx === -1) break
-				matches.push({ line, start: idx, end: idx + query.length })
-				pos = idx + 1
-			}
-		}
-		return matches
 	}
 
 	setHighlights(matches: SearchMatch[], currentIndex: number): void {
@@ -198,8 +164,6 @@ export class Pane {
 
 	clear(): void {
 		this.terminal.reset()
-		this._textLines = null
-		this._textLinesLower = null
 	}
 
 	destroy(): void {

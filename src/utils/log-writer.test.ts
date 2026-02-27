@@ -68,4 +68,107 @@ describe('LogWriter', () => {
 
 		expect(existsSync(join(nested, 'api.log'))).toBe(true)
 	})
+
+	test('getLogPath returns path for known process', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello'))
+
+		expect(writer.getLogPath('api')).toBe(join(dir, 'api.log'))
+		expect(writer.getLogPath('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('search finds matches in log file', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello world\n'))
+		writer.handleEvent(outputEvent('api', 'foo bar\n'))
+		writer.handleEvent(outputEvent('api', 'hello again\n'))
+
+		const matches = await writer.search('api', 'hello')
+		expect(matches.length).toBe(2)
+		expect(matches[0]).toEqual({ line: 0, start: 0, end: 5 })
+		expect(matches[1]).toEqual({ line: 2, start: 0, end: 5 })
+		writer.close()
+	})
+
+	test('search is case-insensitive', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'Hello World\n'))
+		writer.handleEvent(outputEvent('api', 'HELLO again\n'))
+
+		const matches = await writer.search('api', 'hello')
+		expect(matches.length).toBe(2)
+		writer.close()
+	})
+
+	test('search returns empty for unknown process', async () => {
+		const writer = new LogWriter(dir)
+		const matches = await writer.search('unknown', 'test')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('search returns empty for empty query', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello\n'))
+		const matches = await writer.search('api', '')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('search finds multiple matches on same line', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'foo foo foo\n'))
+
+		const matches = await writer.search('api', 'foo')
+		expect(matches.length).toBe(3)
+		expect(matches[0]).toEqual({ line: 0, start: 0, end: 3 })
+		expect(matches[1]).toEqual({ line: 0, start: 4, end: 7 })
+		expect(matches[2]).toEqual({ line: 0, start: 8, end: 11 })
+		writer.close()
+	})
+
+	test('truncate clears log file', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'old content\n'))
+
+		const contentBefore = readFileSync(join(dir, 'api.log'), 'utf-8')
+		expect(contentBefore).toContain('old content')
+
+		writer.truncate('api')
+		writer.handleEvent(outputEvent('api', 'new content\n'))
+		writer.close()
+
+		const contentAfter = readFileSync(join(dir, 'api.log'), 'utf-8')
+		expect(contentAfter).toBe('new content\n')
+		expect(contentAfter).not.toContain('old content')
+	})
+
+	test('createTemp creates a temp directory', () => {
+		const writer = LogWriter.createTemp()
+		writer.handleEvent(outputEvent('api', 'test'))
+		const path = writer.getLogPath('api')
+		expect(path).toBeDefined()
+		expect(existsSync(path!)).toBe(true)
+		writer.cleanup()
+	})
+
+	test('cleanup removes temp directory', () => {
+		const writer = LogWriter.createTemp()
+		writer.handleEvent(outputEvent('api', 'test'))
+		const path = writer.getLogPath('api')!
+		expect(existsSync(path)).toBe(true)
+
+		writer.cleanup()
+		expect(existsSync(path)).toBe(false)
+	})
+
+	test('cleanup does not remove user-specified directory', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'test'))
+		writer.cleanup()
+
+		// Directory still exists (only files closed, dir not removed)
+		expect(existsSync(dir)).toBe(true)
+	})
 })
