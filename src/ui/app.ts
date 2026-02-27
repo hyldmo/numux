@@ -2,6 +2,7 @@ import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/cor
 import type { ProcessManager } from '../process/manager'
 import type { ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
+import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
 import { SHORTCUTS } from './keybindings'
 import { Pane, type SearchMatch } from './pane'
@@ -23,6 +24,7 @@ export class App {
 	private sidebarWidth = 20
 
 	private config: ResolvedNumuxConfig
+	private logWriter: LogWriter
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 	private searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -37,9 +39,10 @@ export class App {
 	private inputWaitTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private awaitingInput = new Set<string>()
 
-	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
+	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, logWriter: LogWriter) {
 		this.manager = manager
 		this.config = config
+		this.logWriter = logWriter
 		this.names = manager.getProcessNames()
 	}
 
@@ -246,6 +249,7 @@ export class App {
 
 					if (name === SHORTCUTS.clear.key) {
 						this.panes.get(this.activePane)?.clear()
+						this.logWriter.truncate(this.activePane)
 						return
 					}
 
@@ -468,13 +472,19 @@ export class App {
 		}, 100)
 	}
 
-	private runSearch(): void {
+	private async runSearch(): Promise<void> {
 		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
 
-		this.searchMatches = pane.search(this.searchQuery)
-		this.searchIndex = this.searchMatches.length > 0 ? 0 : -1
+		const query = this.searchQuery
+		const activeName = this.activePane
+
+		const matches = await this.logWriter.search(activeName, query)
+
+		// Discard if search state changed while awaiting grep
+		if (!this.searchMode || this.searchQuery !== query || this.activePane !== activeName) return
+
+		this.searchMatches = matches
+		this.searchIndex = matches.length > 0 ? 0 : -1
 
 		this.updateSearchHighlights()
 		if (this.searchIndex >= 0) {

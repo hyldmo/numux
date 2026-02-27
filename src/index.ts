@@ -14,7 +14,7 @@ import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
-import { Color, colorFromName } from './utils/color'
+import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
@@ -236,10 +236,7 @@ async function main() {
 
 	const manager = new ProcessManager(config)
 
-	let logWriter: LogWriter | undefined
-	if (parsed.logDir) {
-		logWriter = new LogWriter(parsed.logDir)
-	}
+	const logWriter = parsed.logDir ? new LogWriter(parsed.logDir) : LogWriter.createTemp()
 
 	printWarnings(warnings)
 
@@ -257,10 +254,8 @@ async function main() {
 		})
 		await display.start()
 	} else {
-		if (logWriter) {
-			manager.on(logWriter.handleEvent)
-		}
-		const app = new App(manager, config)
+		manager.on(logWriter.handleEvent)
+		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)
 		await app.start()
 	}

@@ -11,7 +11,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 		}
 		shuttingDown = true
 		app.shutdown().finally(() => {
-			logWriter?.close()
+			logWriter?.cleanup()
 			process.exit(app.hasFailures() ? 1 : 0)
 		})
 	}
@@ -22,7 +22,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 		log('Uncaught exception:', err?.message ?? err)
 		process.stderr.write(`numux: unexpected error: ${err?.stack ?? err}\n`)
 		app.shutdown().finally(() => {
-			logWriter?.close()
+			logWriter?.cleanup()
 			process.exit(1)
 		})
 	})
@@ -32,7 +32,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 		log('Unhandled rejection:', message)
 		process.stderr.write(`numux: unhandled rejection: ${message}\n`)
 		app.shutdown().finally(() => {
-			logWriter?.close()
+			logWriter?.cleanup()
 			process.exit(1)
 		})
 	})

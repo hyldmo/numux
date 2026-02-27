@@ -1,5 +1,5 @@
 import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
-import { Color, isValidColor } from '../utils/color'
+import { type Color, isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
 
