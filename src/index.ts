@@ -216,7 +216,7 @@ async function main() {
 		}
 	}
 
-	if (parsed.noWatch) {
+	if (parsed.noWatch || config.noWatch) {
 		for (const proc of Object.values(config.processes)) {
 			delete proc.watch
 		}
@@ -236,11 +236,13 @@ async function main() {
 
 	const manager = new ProcessManager(config)
 
-	const logWriter = parsed.logDir ? new LogWriter(parsed.logDir) : LogWriter.createTemp()
+	const logDir = parsed.logDir ?? config.logDir
+	const logWriter = logDir ? new LogWriter(logDir) : LogWriter.createTemp()
 
 	printWarnings(warnings)
 
-	if (parsed.prefix) {
+	const usePrefix = parsed.prefix || config.prefix
+	if (usePrefix) {
 		// Default to no restarts in prefix mode (CI/scripts)
 		if (!parsed.noRestart) {
 			for (const proc of Object.values(config.processes)) {
@@ -249,8 +251,8 @@ async function main() {
 		}
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
-			killOthers: parsed.killOthers,
-			timestamps: parsed.timestamps
+			killOthers: parsed.killOthers || config.killOthers,
+			timestamps: parsed.timestamps || config.timestamps
 		})
 		await display.start()
 	} else {
