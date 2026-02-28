@@ -921,6 +921,30 @@ describe('validateConfig — global options', () => {
 		expect(config.processes.b.watch).toBe('.env')
 	})
 
+	test('global persistent: false is inherited by all processes', () => {
+		const config = validateConfig({
+			persistent: false,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.persistent).toBe(false)
+		expect(config.processes.b.persistent).toBe(false)
+	})
+
+	test('process persistent overrides global persistent', () => {
+		const config = validateConfig({
+			persistent: false,
+			processes: {
+				a: { command: 'echo a', persistent: true },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.persistent).toBe(true)
+		expect(config.processes.b.persistent).toBe(false)
+	})
+
 	test('invalid global maxRestarts is ignored', () => {
 		const config = validateConfig({
 			maxRestarts: -1,

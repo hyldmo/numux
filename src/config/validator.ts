@@ -28,6 +28,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		typeof config.maxRestarts === 'number' && config.maxRestarts >= 0 ? config.maxRestarts : undefined
 	const globalReadyTimeout =
 		typeof config.readyTimeout === 'number' && config.readyTimeout > 0 ? config.readyTimeout : undefined
+	const globalPersistent = typeof config.persistent === 'boolean' ? config.persistent : undefined
 	const globalStopSignal = validateStopSignal(config.stopSignal)
 	const globalErrorMatcher = validateErrorMatcher('(global)', config.errorMatcher)
 	const globalWatch = validateStringOrStringArray(config.watch)
@@ -104,7 +105,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
-		const persistent = typeof p.persistent === 'boolean' ? p.persistent : true
+		const persistent = typeof p.persistent === 'boolean' ? p.persistent : (globalPersistent ?? true)
 		const readyPattern =
 			p.readyPattern instanceof RegExp
 				? p.readyPattern

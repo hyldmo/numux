@@ -82,6 +82,12 @@ export interface NumuxConfig<K extends string = string> {
 	/** Global ready timeout (ms), inherited by all processes */
 	readyTimeout?: number
 	/**
+	 * Set to `false` to make all processes non-persistent (one-shot) by default.
+	 * Individual processes can still override with their own `persistent` value.
+	 * @default true
+	 */
+	persistent?: boolean
+	/**
 	 * Global stop signal, inherited by all processes
 	 * @default 'SIGTERM'
 	 */
