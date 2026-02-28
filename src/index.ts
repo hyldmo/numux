@@ -175,7 +175,6 @@ async function main() {
 			config = validateConfig(expanded, warnings)
 		} else {
 			config = buildConfigFromArgs(parsed.commands, parsed.named, {
-				noRestart: parsed.noRestart,
 				colors: parsed.colors as Color[]
 			})
 		}
@@ -190,7 +189,6 @@ async function main() {
 					while (config.processes[`${finalName}-${suffix}`]) suffix++
 					finalName = `${finalName}-${suffix}`
 				}
-				if (parsed.noRestart) proc.maxRestarts = 0
 				config.processes[finalName] = proc
 			}
 		}
@@ -198,12 +196,6 @@ async function main() {
 		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
 		config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
-
-		if (parsed.noRestart) {
-			for (const proc of Object.values(config.processes)) {
-				proc.maxRestarts = 0
-			}
-		}
 	}
 
 	if (parsed.sort) {
@@ -213,6 +205,12 @@ async function main() {
 	if (parsed.envFile !== undefined) {
 		for (const proc of Object.values(config.processes)) {
 			proc.envFile = parsed.envFile
+		}
+	}
+
+	if (parsed.maxRestarts !== undefined) {
+		for (const proc of Object.values(config.processes)) {
+			proc.maxRestarts = parsed.maxRestarts
 		}
 	}
 
@@ -244,10 +242,8 @@ async function main() {
 	const usePrefix = parsed.prefix || config.prefix
 	if (usePrefix) {
 		// Default to no restarts in prefix mode (CI/scripts)
-		if (!parsed.noRestart) {
-			for (const proc of Object.values(config.processes)) {
-				proc.maxRestarts ??= 0
-			}
+		for (const proc of Object.values(config.processes)) {
+			proc.maxRestarts ??= 0
 		}
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,

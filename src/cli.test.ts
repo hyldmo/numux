@@ -199,12 +199,24 @@ describe('parseArgs', () => {
 		expect(() => parseArgs(argv('completions'))).toThrow('Missing value for completions')
 	})
 
-	test('--no-restart sets noRestart flag', () => {
-		expect(parseArgs(argv('--no-restart')).noRestart).toBe(true)
+	test('--max-restarts parses integer', () => {
+		expect(parseArgs(argv('--max-restarts', '3')).maxRestarts).toBe(3)
 	})
 
-	test('noRestart is false by default', () => {
-		expect(parseArgs(argv()).noRestart).toBe(false)
+	test('--max-restarts 0 is valid', () => {
+		expect(parseArgs(argv('--max-restarts', '0')).maxRestarts).toBe(0)
+	})
+
+	test('--max-restarts rejects negative', () => {
+		expect(() => parseArgs(argv('--max-restarts', '-1'))).toThrow('non-negative integer')
+	})
+
+	test('--max-restarts rejects non-integer', () => {
+		expect(() => parseArgs(argv('--max-restarts', 'abc'))).toThrow('non-negative integer')
+	})
+
+	test('maxRestarts is undefined by default', () => {
+		expect(parseArgs(argv()).maxRestarts).toBeUndefined()
 	})
 
 	test('--no-watch sets noWatch flag', () => {
@@ -326,12 +338,6 @@ describe('buildConfigFromArgs', () => {
 	test('named and positional can be mixed', () => {
 		const config = buildConfigFromArgs(['echo hello'], [{ name: 'api', command: 'bun dev' }])
 		expect(Object.keys(config.processes).sort()).toEqual(['api', 'echo'])
-	})
-
-	test('noRestart sets maxRestarts: 0 on all processes', () => {
-		const config = buildConfigFromArgs(['echo hello'], [{ name: 'api', command: 'bun dev' }], { noRestart: true })
-		expect(config.processes.echo.maxRestarts).toBe(0)
-		expect(config.processes.api.maxRestarts).toBe(0)
 	})
 
 	test('maxRestarts is undefined by default', () => {

@@ -148,10 +148,17 @@ export const FLAGS: FlagDef[] = [
 		description: 'Kill all processes when any exits with non-zero code'
 	},
 	{
-		type: 'boolean',
-		long: '--no-restart',
-		key: 'noRestart',
-		description: 'Disable auto-restart for crashed processes'
+		type: 'value',
+		long: '--max-restarts',
+		key: 'maxRestarts',
+		description: 'Max auto-restarts for crashed processes',
+		valueName: '<n>',
+		completionHint: 'none',
+		parse(raw: string, flag: string) {
+			const n = Number(raw)
+			if (!Number.isInteger(n) || n < 0) throw new Error(`${flag} must be a non-negative integer, got "${raw}"`)
+			return n
+		}
 	},
 	{
 		type: 'boolean',
