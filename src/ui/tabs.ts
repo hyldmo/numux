@@ -291,6 +291,34 @@ export class TabBar {
 		this.renderable.setOptionColors(colors)
 	}
 
+	/** Add a new process tab. */
+	addProcess(name: string, color?: string): void {
+		this.originalNames.push(name)
+		this.statuses.set(name, 'pending')
+		this.baseDescriptions.set(name, 'pending')
+		if (color) this.processColors.set(name, color)
+		this.refreshOptions()
+	}
+
+	/** Remove a process tab. Returns the name of the newly selected tab if selection changed. */
+	removeProcess(name: string): string | null {
+		const wasSelected = this.names[this.renderable.getSelectedIndex()] === name
+		this.originalNames = this.originalNames.filter(n => n !== name)
+		this.statuses.delete(name)
+		this.baseDescriptions.delete(name)
+		this.processColors.delete(name)
+		this.inputWaiting.delete(name)
+		this.erroredProcesses.delete(name)
+		this.refreshOptions()
+
+		if (wasSelected && this.names.length > 0) {
+			const newIdx = Math.min(this.renderable.getSelectedIndex(), this.names.length - 1)
+			this.renderable.setSelectedIndex(newIdx)
+			return this.names[newIdx]
+		}
+		return null
+	}
+
 	getSelectedIndex(): number {
 		return this.renderable.getSelectedIndex()
 	}

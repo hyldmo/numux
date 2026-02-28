@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import type { ConfigDiff } from '../config/diff'
 import { resolveDependencyTiers } from '../config/resolver'
 import type { ProcessEvent, ProcessState, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { log } from '../utils/logger'
@@ -333,6 +334,130 @@ export class ProcessManager {
 		for (const name of this.tiers.flat()) {
 			this.restart(name, cols, rows)
 		}
+	}
+
+	/** Apply an incremental config change: stop removed, restart modified, start added processes. */
+	async applyConfigChange(newConfig: ResolvedNumuxConfig, diff: ConfigDiff): Promise<void> {
+		if (this.stopping) return
+		const encoder = new TextEncoder()
+
+		// 1. Stop and remove removed processes
+		for (const name of diff.removed) {
+			log(`[config-watch] Removing process: ${name}`)
+			await this.stopAndCleanup(name)
+			this.emit({ type: 'removed', name })
+		}
+
+		// 2. Restart modified processes with new config
+		for (const name of diff.modified) {
+			log(`[config-watch] Restarting modified process: ${name}`)
+			const msg = `\r\n\x1b[36m[numux] config changed, restarting...\x1b[0m\r\n`
+			this.emit({ type: 'output', name, data: encoder.encode(msg) })
+
+			// Stop old runner
+			const runner = this.runners.get(name)
+			if (runner) {
+				await runner.stop()
+				this.runners.delete(name)
+			}
+
+			// Update config and state
+			const proc = newConfig.processes[name]
+			const state = this.states.get(name)
+			if (state) {
+				state.config = proc
+				state.exitCode = null
+				state.restartCount++
+			}
+
+			// Cancel pending timers
+			this.clearTimers(name)
+
+			// Create new runner and start
+			this.createRunner(name)
+			this.startTimes.set(name, Date.now())
+			this.runners.get(name)!.restart(this.lastCols, this.lastRows)
+		}
+
+		// 3. Add and start new processes
+		for (const name of diff.added) {
+			log(`[config-watch] Adding new process: ${name}`)
+			const proc = newConfig.processes[name]
+
+			this.states.set(name, {
+				name,
+				config: proc,
+				status: 'pending',
+				exitCode: null,
+				restartCount: 0
+			})
+
+			this.emit({ type: 'added', name, config: proc })
+		}
+
+		// Update config and re-resolve tiers before starting added processes
+		this.config = newConfig
+		this.tiers = resolveDependencyTiers(newConfig)
+		log(`[config-watch] Re-resolved ${this.tiers.length} dependency tiers:`, this.tiers)
+
+		// Start added processes (respecting conditions and dependencies)
+		for (const name of diff.added) {
+			const proc = newConfig.processes[name]
+
+			if (proc.condition && !evaluateCondition(proc.condition)) {
+				log(`[config-watch] Skipping ${name}: condition "${proc.condition}" not met`)
+				this.updateStatus(name, 'skipped')
+				continue
+			}
+
+			const deps = proc.dependsOn ?? []
+			const failedDep = deps.find(d => {
+				const s = this.states.get(d)
+				return s && (s.status === 'failed' || s.status === 'skipped')
+			})
+			if (failedDep) {
+				log(`[config-watch] Skipping ${name}: dependency ${failedDep} failed`)
+				this.updateStatus(name, 'skipped')
+				continue
+			}
+
+			this.createRunner(name)
+			this.startProcess(name, this.lastCols, this.lastRows)
+		}
+
+		// 4. Re-setup file watchers
+		this.fileWatcher?.close()
+		this.fileWatcher = undefined
+		this.setupWatchers()
+	}
+
+	private async stopAndCleanup(name: string): Promise<void> {
+		this.clearTimers(name)
+
+		const runner = this.runners.get(name)
+		if (runner) {
+			await runner.stop()
+			this.runners.delete(name)
+		}
+
+		this.states.delete(name)
+		this.restartAttempts.delete(name)
+		this.startTimes.delete(name)
+
+		const resolver = this.pendingReadyResolvers.get(name)
+		if (resolver) {
+			resolver()
+			this.pendingReadyResolvers.delete(name)
+		}
+	}
+
+	private clearTimers(name: string): void {
+		const timer = this.restartTimers.get(name)
+		if (timer) {
+			clearTimeout(timer)
+			this.restartTimers.delete(name)
+		}
+		this.restartAttempts.set(name, 0)
 	}
 
 	resize(name: string, cols: number, rows: number): void {

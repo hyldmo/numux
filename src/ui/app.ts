@@ -1,6 +1,7 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
+import type { ConfigWatcher } from '../config/config-watcher'
 import type { ProcessManager } from '../process/manager'
-import type { ResolvedNumuxConfig } from '../types'
+import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import { log } from '../utils/logger'
 import { SHORTCUTS } from './keybindings'
@@ -20,8 +21,10 @@ export class App {
 	private termCols = 80
 	private termRows = 24
 	private sidebarWidth = 20
+	private paneContainer!: BoxRenderable
 
 	private config: ResolvedNumuxConfig
+	private configWatcher?: ConfigWatcher
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 	private searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -88,7 +91,7 @@ export class App {
 		sidebar.add(this.tabBar.renderable)
 
 		// Pane container
-		const paneContainer = new BoxRenderable(this.renderer, {
+		this.paneContainer = new BoxRenderable(this.renderer, {
 			id: 'pane-container',
 			flexGrow: 1,
 			border: false
@@ -96,19 +99,7 @@ export class App {
 
 		// Create a pane per process
 		for (const name of this.names) {
-			const interactive = this.config.processes[name].interactive === true
-			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
-			pane.onCopy(text => {
-				this.copyToClipboard(text)
-				this.statusBar.showTemporaryMessage('Copied!')
-			})
-			pane.onScroll(() => {
-				if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
-					this.updateSearchHighlights()
-				}
-			})
-			this.panes.set(name, pane)
-			paneContainer.add(pane.scrollBox)
+			this.createPane(name)
 		}
 
 		// Status bar (only visible during search)
@@ -116,7 +107,7 @@ export class App {
 
 		// Assemble layout
 		contentRow.add(sidebar)
-		contentRow.add(paneContainer)
+		contentRow.add(this.paneContainer)
 		layout.add(contentRow)
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
@@ -143,6 +134,10 @@ export class App {
 				if (event.status !== 'running' && event.status !== 'ready') {
 					this.clearInputWaiting(event.name)
 				}
+			} else if (event.type === 'added') {
+				this.addProcessPane(event.name, event.config)
+			} else if (event.type === 'removed') {
+				this.removeProcessPane(event.name)
 			}
 		})
 
@@ -295,6 +290,15 @@ export class App {
 		await this.manager.startAll(termCols, termRows)
 	}
 
+	setConfigWatcher(watcher: ConfigWatcher): void {
+		this.configWatcher = watcher
+	}
+
+	/** Update the config reference (called after config reload). */
+	updateConfig(config: ResolvedNumuxConfig): void {
+		this.config = config
+	}
+
 	private switchPane(name: string): void {
 		if (this.activePane === name) return
 		// Clear search when switching panes
@@ -306,6 +310,68 @@ export class App {
 		}
 		this.activePane = name
 		this.panes.get(name)?.show()
+	}
+
+	private createPane(name: string): Pane {
+		const interactive = this.config.processes[name]?.interactive === true
+		const pane = new Pane(this.renderer, name, this.termCols, this.termRows, interactive)
+		pane.onCopy(text => {
+			this.copyToClipboard(text)
+			this.statusBar.showTemporaryMessage('Copied!')
+		})
+		pane.onScroll(() => {
+			if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
+				this.updateSearchHighlights()
+			}
+		})
+		this.panes.set(name, pane)
+		this.paneContainer.add(pane.scrollBox)
+		return pane
+	}
+
+	private addProcessPane(name: string, procConfig: NumuxProcessConfig): void {
+		this.names.push(name)
+		this.createPane(name)
+
+		// Resolve hex color for the new tab
+		const hexColors = buildProcessHexColorMap([name], { processes: { [name]: procConfig } })
+		this.tabBar.addProcess(name, hexColors.get(name))
+
+		log(`[config-watch] Added pane for ${name}`)
+	}
+
+	private removeProcessPane(name: string): void {
+		// Switch away if this is the active pane
+		if (this.activePane === name) {
+			const remaining = this.names.filter(n => n !== name)
+			if (remaining.length > 0) {
+				this.switchPane(remaining[0])
+			} else {
+				this.activePane = null
+			}
+		}
+
+		// Destroy pane and remove from container
+		const pane = this.panes.get(name)
+		if (pane) {
+			this.paneContainer.remove(pane.scrollBox.id)
+			pane.destroy()
+			this.panes.delete(name)
+		}
+
+		// Remove from names
+		this.names = this.names.filter(n => n !== name)
+
+		// Clean up timers
+		this.clearInputWaiting(name)
+
+		// Update tab bar — if it returns a new selection, switch to it
+		const newSelection = this.tabBar.removeProcess(name)
+		if (newSelection && this.activePane !== newSelection) {
+			this.switchPane(newSelection)
+		}
+
+		log(`[config-watch] Removed pane for ${name}`)
 	}
 
 	/** Detect when an interactive process is likely waiting for user input */
@@ -487,6 +553,7 @@ export class App {
 	async shutdown(): Promise<void> {
 		if (this.destroyed) return
 		this.destroyed = true
+		this.configWatcher?.close()
 		if (this.resizeTimer) {
 			clearTimeout(this.resizeTimer)
 			this.resizeTimer = null

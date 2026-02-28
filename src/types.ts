@@ -57,3 +57,5 @@ export type ProcessEvent =
 	| { type: 'output'; name: string; data: Uint8Array }
 	| { type: 'exit'; name: string; code: number | null }
 	| { type: 'error'; name: string }
+	| { type: 'added'; name: string; config: NumuxProcessConfig }
+	| { type: 'removed'; name: string }

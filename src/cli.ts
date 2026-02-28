@@ -16,6 +16,7 @@ export interface ParsedArgs {
 	timestamps: boolean
 	noRestart: boolean
 	noWatch: boolean
+	noConfigWatch: boolean
 	autoColors: boolean
 	configPath?: string
 	logDir?: string
@@ -53,6 +54,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		timestamps: false,
 		noRestart: false,
 		noWatch: false,
+		noConfigWatch: false,
 		autoColors: false,
 		configPath: undefined,
 		commands: [],

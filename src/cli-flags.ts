@@ -146,6 +146,12 @@ export const FLAGS: FlagDef[] = [
 	},
 	{
 		type: 'boolean',
+		long: '--no-config-watch',
+		key: 'noConfigWatch',
+		description: 'Disable automatic config file watching for live reloads'
+	},
+	{
+		type: 'boolean',
 		long: '--timestamps',
 		short: '-t',
 		key: 'timestamps',
