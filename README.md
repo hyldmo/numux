@@ -164,7 +164,8 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `-p, --prefix` | Prefixed output mode (no TUI, for CI/scripts) |
 | `--only <a,b,...>` | Only run these processes (+ their dependencies) |
 | `--exclude <a,b,...>` | Exclude these processes |
-| `--kill-others` | Kill all processes when any exits |
+| `--kill-others` | Kill all processes when any exits (regardless of exit code) |
+| `--kill-others-on-fail` | Kill all processes when any exits with a non-zero exit code |
 | `--no-restart` | Disable auto-restart for crashed processes |
 | `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |
