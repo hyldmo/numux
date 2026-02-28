@@ -1,6 +1,8 @@
 # numux
 
-Terminal multiplexer with dependency orchestration. Run multiple processes in a tabbed TUI with a dependency graph controlling startup order.
+Terminal multiplexer with dependency orchestration. Run multiple processes in a tabbed TUI with a dependency graph controlling startup order, readiness detection, and output capture between processes.
+
+Works with zero configuration — pass commands as arguments, run a script across monorepo workspaces with `-w`, or match multiple scripts with glob patterns like `'dev:*'`. For advanced setups, define a typed config with conditional processes, file watching with auto-restart, error detection, log persistence, and output capture — e.g. extract a port from one process's stdout and pass it to another process's command or env.
 
 Inspired by `sst dev` and `concurrently`
 
