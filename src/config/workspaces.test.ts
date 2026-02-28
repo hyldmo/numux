@@ -142,14 +142,43 @@ describe('resolveWorkspaceProcesses', () => {
 		expect(Object.keys(result)).toEqual(['web'])
 	})
 
-	test('error when no workspaces matched', () => {
+	test('error when no script and not a built-in command', () => {
 		const dir = setupMonorepo('no-match', {
 			rootPkg: { workspaces: ['packages/*'] },
 			workspaces: {
 				'packages/web': { name: 'web', scripts: { build: 'tsc' } }
 			}
 		})
-		expect(() => resolveWorkspaceProcesses('dev', dir)).toThrow('No workspaces have a "dev" script')
+		expect(() => resolveWorkspaceProcesses('xyznotacommand', dir)).toThrow('is not a built-in npm command')
+	})
+
+	test('built-in PM command runs in all workspaces', () => {
+		const dir = setupMonorepo('builtin-cmd', {
+			rootPkg: { workspaces: ['packages/*'] },
+			workspaces: {
+				'packages/web': { name: 'web', scripts: { dev: 'next dev' } },
+				'packages/api': { name: 'api', scripts: { dev: 'bun run api' } }
+			}
+		})
+		const result = resolveWorkspaceProcesses('install', dir)
+		expect(Object.keys(result).sort()).toEqual(['api', 'web'])
+		expect(result.web.command).toBe('npm install')
+		expect(result.web.persistent).toBe(false)
+	})
+
+	test('script takes priority over built-in command', () => {
+		const dir = setupMonorepo('script-priority', {
+			rootPkg: { workspaces: ['packages/*'] },
+			workspaces: {
+				'packages/web': { name: 'web', scripts: { test: 'vitest' } },
+				'packages/api': { name: 'api', scripts: { dev: 'bun run api' } }
+			}
+		})
+		// "test" is a built-in npm command, but web has a test script — so only web runs
+		const result = resolveWorkspaceProcesses('test', dir)
+		expect(Object.keys(result)).toEqual(['web'])
+		expect(result.web.command).toBe('npm run test')
+		expect(result.web.persistent).toBe(true)
 	})
 
 	test('PM detection reflected in command string', () => {
