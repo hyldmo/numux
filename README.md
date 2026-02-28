@@ -165,7 +165,7 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `--only <a,b,...>` | Only run these processes (+ their dependencies) |
 | `--exclude <a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits |
-| `--no-restart` | Disable auto-restart for crashed processes |
+| `--max-restarts <n>` | Max auto-restarts for crashed processes |
 | `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |
 | `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |

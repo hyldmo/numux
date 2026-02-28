@@ -15,8 +15,8 @@ export interface ParsedArgs {
 	prefix: boolean
 	killOthers: boolean
 	timestamps: boolean
-	noRestart: boolean
 	noWatch: boolean
+	maxRestarts?: number
 	autoColors: boolean
 	configPath?: string
 	logDir?: string
@@ -53,7 +53,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		prefix: false,
 		killOthers: false,
 		timestamps: false,
-		noRestart: false,
 		noWatch: false,
 		autoColors: false,
 		configPath: undefined,
@@ -106,16 +105,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export function buildConfigFromArgs(
 	commands: string[],
 	named: Array<{ name: string; command: string }>,
-	options?: { noRestart?: boolean; colors?: Color[] }
+	options?: { colors?: Color[] }
 ): ResolvedNumuxConfig {
 	const processes: ResolvedNumuxConfig['processes'] = {}
-	const maxRestarts = options?.noRestart ? 0 : undefined
 	const colors = options?.colors
 	let colorIndex = 0
 
 	for (const { name, command } of named) {
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command, persistent: true, maxRestarts, ...(color ? { color } : {}) }
+		processes[name] = { command, persistent: true, ...(color ? { color } : {}) }
 	}
 
 	for (let i = 0; i < commands.length; i++) {
@@ -126,7 +124,7 @@ export function buildConfigFromArgs(
 			name = `${name}-${i}`
 		}
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command: cmd, persistent: true, maxRestarts, ...(color ? { color } : {}) }
+		processes[name] = { command: cmd, persistent: true, ...(color ? { color } : {}) }
 	}
 
 	return { processes }
