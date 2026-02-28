@@ -55,7 +55,7 @@ export const FLAGS: FlagDef[] = [
 		long: '--workspace',
 		short: '-w',
 		key: 'workspace',
-		description: 'Run a package.json script across all workspaces',
+		description: 'Run a script or package manager command across all workspaces',
 		valueName: '<script>',
 		completionHint: 'none'
 	},
