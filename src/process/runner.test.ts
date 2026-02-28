@@ -46,30 +46,13 @@ function waitForExit(handler: ReturnType<typeof createHandler>, timeoutMs = 5000
 	})
 }
 
-describe('ProcessRunner — persistent process', () => {
-	test('becomes ready immediately when no readyPattern', async () => {
-		const handler = createHandler()
-		const runner = new ProcessRunner('srv', { command: 'sleep 10', persistent: true }, handler)
-
-		runner.start(80, 24)
-		// Wait a tick for status events
-		await new Promise(r => setTimeout(r, 50))
-
-		expect(handler.statuses).toContain('running')
-		expect(handler.statuses).toContain('ready')
-		expect(runner.isReady).toBe(true)
-		expect(handler.readyCount).toBe(1)
-
-		await runner.stop()
-	}, 5000)
-
+describe('ProcessRunner — process with readyPattern', () => {
 	test('becomes ready when readyPattern matches output', async () => {
 		const handler = createHandler()
 		const runner = new ProcessRunner(
 			'srv',
 			{
 				command: "echo 'server listening on port 3000' && sleep 10",
-				persistent: true,
 				readyPattern: 'listening on port \\d+'
 			},
 			handler
@@ -88,6 +71,7 @@ describe('ProcessRunner — persistent process', () => {
 			check()
 		})
 
+		expect(handler.statuses).toContain('running')
 		expect(handler.statuses).toContain('ready')
 		expect(handler.readyCount).toBe(1)
 
@@ -96,7 +80,7 @@ describe('ProcessRunner — persistent process', () => {
 
 	test('reports failed status on non-zero exit', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('fail', { command: "sh -c 'exit 1'", persistent: true }, handler)
+		const runner = new ProcessRunner('fail', { command: "sh -c 'exit 1'" }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
@@ -107,7 +91,7 @@ describe('ProcessRunner — persistent process', () => {
 
 	test('reports finished status on clean exit', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('ok', { command: 'true', persistent: true }, handler)
+		const runner = new ProcessRunner('ok', { command: 'true' }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
@@ -117,23 +101,24 @@ describe('ProcessRunner — persistent process', () => {
 	}, 5000)
 })
 
-describe('ProcessRunner — non-persistent process', () => {
+describe('ProcessRunner — process without readyPattern (one-shot)', () => {
 	test('becomes ready on exit code 0', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('task', { command: 'true', persistent: false }, handler)
+		const runner = new ProcessRunner('task', { command: 'true' }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
 
 		expect(runner.isReady).toBe(true)
 		expect(handler.readyCount).toBe(1)
+		expect(handler.statuses).toContain('starting')
 		expect(handler.statuses).toContain('ready')
 		expect(handler.statuses).toContain('finished')
 	}, 5000)
 
 	test('does not become ready on non-zero exit', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('task', { command: "sh -c 'exit 1'", persistent: false }, handler)
+		const runner = new ProcessRunner('task', { command: "sh -c 'exit 1'" }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
@@ -151,7 +136,6 @@ describe('ProcessRunner — readyTimeout', () => {
 			'srv',
 			{
 				command: 'sleep 60',
-				persistent: true,
 				readyPattern: 'will_never_match',
 				readyTimeout: 200
 			},
@@ -179,7 +163,6 @@ describe('ProcessRunner — readyTimeout', () => {
 			'srv',
 			{
 				command: 'sleep 0.5',
-				persistent: true,
 				readyPattern: 'will_never_match',
 				readyTimeout: 200
 			},
@@ -205,7 +188,6 @@ describe('ProcessRunner — readyTimeout', () => {
 			'srv',
 			{
 				command: "echo 'ready!' && sleep 60",
-				persistent: true,
 				readyPattern: 'ready!',
 				readyTimeout: 5000
 			},
@@ -231,13 +213,12 @@ describe('ProcessRunner — readyTimeout', () => {
 		await runner.stop()
 	}, 5000)
 
-	test('does not apply timeout to non-persistent processes', async () => {
+	test('does not apply timeout to processes without readyPattern', async () => {
 		const handler = createHandler()
 		const runner = new ProcessRunner(
 			'task',
 			{
 				command: 'true',
-				persistent: false,
 				readyTimeout: 100
 			},
 			handler
@@ -255,7 +236,7 @@ describe('ProcessRunner — readyTimeout', () => {
 describe('ProcessRunner — spawn errors', () => {
 	test('shows hint on exit code 127 (command not found)', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('bad', { command: 'nonexistent_cmd_xyz', persistent: true }, handler)
+		const runner = new ProcessRunner('bad', { command: 'nonexistent_cmd_xyz' }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
@@ -268,11 +249,7 @@ describe('ProcessRunner — spawn errors', () => {
 
 	test('handles invalid cwd gracefully', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner(
-			'bad',
-			{ command: 'echo hello', persistent: true, cwd: '/nonexistent_dir_xyz' },
-			handler
-		)
+		const runner = new ProcessRunner('bad', { command: 'echo hello', cwd: '/nonexistent_dir_xyz' }, handler)
 
 		runner.start(80, 24)
 
@@ -288,7 +265,7 @@ describe('ProcessRunner — spawn errors', () => {
 describe('ProcessRunner — output', () => {
 	test('captures process output', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('echo', { command: 'echo hello_world', persistent: false }, handler)
+		const runner = new ProcessRunner('echo', { command: 'echo hello_world' }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
@@ -301,14 +278,34 @@ describe('ProcessRunner — output', () => {
 describe('ProcessRunner — restart', () => {
 	test('restart stops and re-starts the process', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('srv', { command: 'sleep 60', persistent: true }, handler)
+		const runner = new ProcessRunner('srv', { command: "echo 'ready' && sleep 60", readyPattern: 'ready' }, handler)
 
 		runner.start(80, 24)
-		await new Promise(r => setTimeout(r, 100))
+
+		// Wait for readyPattern match
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out waiting for ready'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
 		expect(runner.isReady).toBe(true)
 
 		await runner.restart(80, 24)
-		await new Promise(r => setTimeout(r, 100))
+
+		// Wait for readyPattern match again
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (handler.statuses.filter(s => s === 'ready').length >= 2) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out waiting for ready'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
 
 		// Should have gone through stopping → starting → running → ready again
 		expect(handler.statuses).toContain('stopping')
@@ -320,10 +317,20 @@ describe('ProcessRunner — restart', () => {
 
 	test('restart does not emit onExit for the old process', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('srv', { command: 'sleep 60', persistent: true }, handler)
+		const runner = new ProcessRunner('srv', { command: "echo 'ready' && sleep 60", readyPattern: 'ready' }, handler)
 
 		runner.start(80, 24)
-		await new Promise(r => setTimeout(r, 100))
+
+		// Wait for ready
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out waiting for ready'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
 		expect(handler.exits).toHaveLength(0)
 
 		await runner.restart(80, 24)
@@ -342,7 +349,7 @@ describe('ProcessRunner — restart', () => {
 describe('ProcessRunner — stop', () => {
 	test('stop is a no-op when no process is running', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('srv', { command: 'sleep 10', persistent: true }, handler)
+		const runner = new ProcessRunner('srv', { command: 'sleep 10' }, handler)
 
 		// Never started — stop should not throw
 		await runner.stop()
@@ -351,10 +358,20 @@ describe('ProcessRunner — stop', () => {
 
 	test('stop sends SIGTERM and process exits gracefully', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('srv', { command: 'sleep 60', persistent: true }, handler)
+		const runner = new ProcessRunner('srv', { command: "echo 'ready' && sleep 60", readyPattern: 'ready' }, handler)
 
 		runner.start(80, 24)
-		await new Promise(r => setTimeout(r, 100))
+
+		// Wait for ready
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out waiting for ready'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
 
 		await runner.stop()
 

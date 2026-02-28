@@ -96,7 +96,7 @@ async function main() {
 				const flags: string[] = []
 				if (proc.dependsOn?.length) flags.push(`depends on: ${proc.dependsOn.join(', ')}`)
 				if (proc.readyPattern) flags.push(`ready: /${proc.readyPattern}/`)
-				if (proc.persistent === false) flags.push('one-shot')
+				if (!proc.readyPattern) flags.push('one-shot')
 				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
 				if (proc.condition) flags.push(`if: ${proc.condition}`)
 				if (proc.platform) {
@@ -241,10 +241,6 @@ async function main() {
 
 	const usePrefix = parsed.prefix || config.prefix
 	if (usePrefix) {
-		// Default to no restarts in prefix mode (CI/scripts)
-		for (const proc of Object.values(config.processes)) {
-			proc.maxRestarts ??= 0
-		}
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
 			killOthers: parsed.killOthers || config.killOthers,

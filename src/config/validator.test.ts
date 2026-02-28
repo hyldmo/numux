@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { type ValidationWarning, validateConfig } from './validator'
+import { validateConfig } from './validator'
 
 describe('validateConfig', () => {
 	test('accepts a valid config', () => {
@@ -9,7 +9,7 @@ describe('validateConfig', () => {
 			}
 		})
 		expect(config.processes.web.command).toBe('echo hello')
-		expect(config.processes.web.persistent).toBe(true)
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('applies defaults for optional fields', () => {
@@ -22,17 +22,8 @@ describe('validateConfig', () => {
 		expect(config.processes.web.env).toBeUndefined()
 		expect(config.processes.web.dependsOn).toBeUndefined()
 		expect(config.processes.web.readyPattern).toBeUndefined()
-		expect(config.processes.web.persistent).toBe(true)
+		expect(config.processes.web.maxRestarts).toBe(0)
 		expect(config.processes.web.color).toBeUndefined()
-	})
-
-	test('preserves explicit persistent: false', () => {
-		const config = validateConfig({
-			processes: {
-				migrate: { command: 'bun run migrate', persistent: false }
-			}
-		})
-		expect(config.processes.migrate.persistent).toBe(false)
 	})
 
 	test('preserves dependsOn array', () => {
@@ -110,7 +101,7 @@ describe('validateConfig', () => {
 				web: { command: 'echo hi', maxRestarts: -1 }
 			}
 		})
-		expect(config.processes.web.maxRestarts).toBeUndefined()
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('ignores non-number maxRestarts', () => {
@@ -119,7 +110,7 @@ describe('validateConfig', () => {
 				web: { command: 'echo hi', maxRestarts: 'abc' }
 			}
 		})
-		expect(config.processes.web.maxRestarts).toBeUndefined()
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('preserves explicit readyTimeout', () => {
@@ -309,7 +300,6 @@ describe('validateConfig', () => {
 			}
 		})
 		expect(config.processes.web.command).toBe('bun dev:web')
-		expect(config.processes.web.persistent).toBe(true)
 		expect(config.processes.api.command).toBe('bun dev:api')
 	})
 
@@ -367,35 +357,6 @@ describe('validateConfig', () => {
 		).toThrow('basic name')
 	})
 
-	test('warns when readyPattern is set on non-persistent process', () => {
-		const warnings: ValidationWarning[] = []
-		const config = validateConfig(
-			{
-				processes: {
-					migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
-				}
-			},
-			warnings
-		)
-		expect(config.processes.migrate.readyPattern).toBe('done')
-		expect(warnings).toHaveLength(1)
-		expect(warnings[0].process).toBe('migrate')
-		expect(warnings[0].message).toContain('readyPattern is ignored')
-	})
-
-	test('no warning when readyPattern is set on persistent process', () => {
-		const warnings: ValidationWarning[] = []
-		validateConfig(
-			{
-				processes: {
-					web: { command: 'echo hi', readyPattern: 'ready' }
-				}
-			},
-			warnings
-		)
-		expect(warnings).toHaveLength(0)
-	})
-
 	test('throws on non-string env values', () => {
 		expect(() =>
 			validateConfig({
@@ -419,7 +380,7 @@ describe('validateConfig', () => {
 		// Should not throw when warnings param is omitted
 		const config = validateConfig({
 			processes: {
-				migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
+				migrate: { command: 'bun migrate', readyPattern: 'done' }
 			}
 		})
 		expect(config.processes.migrate.readyPattern).toBe('done')
@@ -921,36 +882,12 @@ describe('validateConfig — global options', () => {
 		expect(config.processes.b.watch).toBe('.env')
 	})
 
-	test('global persistent: false is inherited by all processes', () => {
-		const config = validateConfig({
-			persistent: false,
-			processes: {
-				a: { command: 'echo a' },
-				b: 'echo b'
-			}
-		})
-		expect(config.processes.a.persistent).toBe(false)
-		expect(config.processes.b.persistent).toBe(false)
-	})
-
-	test('process persistent overrides global persistent', () => {
-		const config = validateConfig({
-			persistent: false,
-			processes: {
-				a: { command: 'echo a', persistent: true },
-				b: { command: 'echo b' }
-			}
-		})
-		expect(config.processes.a.persistent).toBe(true)
-		expect(config.processes.b.persistent).toBe(false)
-	})
-
 	test('invalid global maxRestarts is ignored', () => {
 		const config = validateConfig({
 			maxRestarts: -1,
 			processes: { a: { command: 'echo a' } }
 		})
-		expect(config.processes.a.maxRestarts).toBeUndefined()
+		expect(config.processes.a.maxRestarts).toBe(0)
 	})
 
 	test('invalid global readyTimeout is ignored', () => {
