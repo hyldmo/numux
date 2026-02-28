@@ -13,6 +13,7 @@ const DIM = '\x1b[90m'
 export interface PrefixDisplayOptions {
 	logWriter?: LogWriter
 	killOthers?: boolean
+	killOthersOnFail?: boolean
 	timestamps?: boolean
 }
 
@@ -24,6 +25,7 @@ export class PrefixDisplay {
 	private buffers = new Map<string, string>()
 	private logWriter?: LogWriter
 	private killOthers: boolean
+	private killOthersOnFail: boolean
 	private timestamps: boolean
 	private stopping = false
 	private startTime = 0
@@ -32,6 +34,7 @@ export class PrefixDisplay {
 		this.manager = manager
 		this.logWriter = options.logWriter
 		this.killOthers = options.killOthers ?? false
+		this.killOthersOnFail = options.killOthersOnFail ?? false
 		this.timestamps = options.timestamps ?? false
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
@@ -79,7 +82,8 @@ export class PrefixDisplay {
 		} else if (event.type === 'exit') {
 			// Flush remaining buffer
 			this.flushBuffer(event.name)
-			if (this.killOthers) {
+			const exitCode = this.manager.getState(event.name)?.exitCode ?? null
+			if (this.killOthers || (this.killOthersOnFail && exitCode !== 0)) {
 				this.killAllAndExit(event.name)
 			} else {
 				this.checkAllDone()

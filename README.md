@@ -1,6 +1,8 @@
 # numux
 
-Terminal multiplexer with dependency orchestration. Run multiple processes in a tabbed TUI with a dependency graph controlling startup order.
+Terminal multiplexer with dependency orchestration. Run multiple processes in a tabbed TUI with a dependency graph controlling startup order, readiness detection, and output capture between processes.
+
+Works with zero configuration — pass commands as arguments, run a script across monorepo workspaces with `-w`, or match multiple scripts with glob patterns like `'dev:*'`. For advanced setups, define a typed config with conditional processes, file watching with auto-restart, error detection, log persistence, and output capture — e.g. extract a port from one process's stdout and pass it to another process's command or env.
 
 Inspired by `sst dev` and `concurrently`
 
@@ -164,7 +166,8 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `-p, --prefix` | Prefixed output mode (no TUI, for CI/scripts) |
 | `--only <a,b,...>` | Only run these processes (+ their dependencies) |
 | `--exclude <a,b,...>` | Exclude these processes |
-| `--kill-others` | Kill all processes when any exits |
+| `--kill-others` | Kill all processes when any exits (regardless of exit code) |
+| `--kill-others-on-fail` | Kill all processes when any exits with a non-zero exit code |
 | `--max-restarts <n>` | Max auto-restarts for crashed processes |
 | `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |

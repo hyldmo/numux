@@ -248,6 +248,7 @@ async function main() {
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
 			killOthers: parsed.killOthers || config.killOthers,
+			killOthersOnFail: parsed.killOthersOnFail || config.killOthersOnFail,
 			timestamps: parsed.timestamps || config.timestamps
 		})
 		await display.start()
