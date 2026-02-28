@@ -237,7 +237,7 @@ async function main() {
 	const manager = new ProcessManager(config)
 
 	const logDir = parsed.logDir ?? config.logDir
-	const logWriter = logDir ? new LogWriter(logDir) : LogWriter.createTemp()
+	const logWriter = logDir ? LogWriter.createPersistent(logDir) : LogWriter.createTemp()
 
 	printWarnings(warnings)
 

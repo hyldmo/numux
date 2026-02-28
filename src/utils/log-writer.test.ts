@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ProcessEvent } from '../types'
@@ -170,5 +170,119 @@ describe('LogWriter', () => {
 
 		// Directory still exists (only files closed, dir not removed)
 		expect(existsSync(dir)).toBe(true)
+	})
+
+	test('isTemporary returns true for temp writers', () => {
+		const writer = LogWriter.createTemp()
+		expect(writer.isTemporary).toBe(true)
+		writer.cleanup()
+	})
+
+	test('isTemporary returns false for user-specified directory', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.isTemporary).toBe(false)
+		writer.close()
+	})
+
+	test('getDirectory returns the log directory path', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.getDirectory()).toBe(dir)
+		writer.close()
+	})
+
+	test('getProcessNames returns names of processes with output', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.getProcessNames()).toEqual([])
+
+		writer.handleEvent(outputEvent('api', 'hello'))
+		writer.handleEvent(outputEvent('web', 'world'))
+
+		const names = writer.getProcessNames()
+		expect(names).toContain('api')
+		expect(names).toContain('web')
+		expect(names.length).toBe(2)
+		writer.close()
+	})
+
+	test('searchAll finds matches across multiple processes', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello world\n'))
+		writer.handleEvent(outputEvent('api', 'foo bar\n'))
+		writer.handleEvent(outputEvent('web', 'hello again\n'))
+		writer.handleEvent(outputEvent('web', 'baz\n'))
+
+		const matches = await writer.searchAll('hello')
+		expect(matches.length).toBe(2)
+
+		const apiMatches = matches.filter(m => m.process === 'api')
+		const webMatches = matches.filter(m => m.process === 'web')
+		expect(apiMatches.length).toBe(1)
+		expect(webMatches.length).toBe(1)
+		expect(apiMatches[0]).toEqual({ process: 'api', line: 0, start: 0, end: 5 })
+		expect(webMatches[0]).toEqual({ process: 'web', line: 0, start: 0, end: 5 })
+		writer.close()
+	})
+
+	test('searchAll returns empty for empty query', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello\n'))
+		const matches = await writer.searchAll('')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('searchAll returns empty when no processes have output', async () => {
+		const writer = new LogWriter(dir)
+		const matches = await writer.searchAll('hello')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('searchAll is case-insensitive', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'Hello World\n'))
+		writer.handleEvent(outputEvent('web', 'HELLO again\n'))
+
+		const matches = await writer.searchAll('hello')
+		expect(matches.length).toBe(2)
+		writer.close()
+	})
+
+	test('createPersistent creates timestamped subdirectory', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+
+		expect(writer.isTemporary).toBe(false)
+		expect(writer.getDirectory()).toContain(baseDir)
+		expect(writer.getDirectory()).not.toBe(baseDir)
+
+		// Session dir exists
+		expect(existsSync(writer.getDirectory())).toBe(true)
+
+		writer.close()
+	})
+
+	test('createPersistent creates latest symlink', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+
+		const latestLink = join(baseDir, 'latest')
+		expect(existsSync(latestLink)).toBe(true)
+		expect(lstatSync(latestLink).isSymbolicLink()).toBe(true)
+		expect(readlinkSync(latestLink)).toBe(writer.getDirectory())
+
+		writer.close()
+	})
+
+	test('createPersistent does not clean up on cleanup', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+		writer.handleEvent(outputEvent('api', 'test'))
+		const sessionDir = writer.getDirectory()
+
+		writer.cleanup()
+
+		// Session directory should still exist
+		expect(existsSync(sessionDir)).toBe(true)
 	})
 })

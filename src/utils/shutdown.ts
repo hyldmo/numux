@@ -11,6 +11,9 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 		}
 		shuttingDown = true
 		app.shutdown().finally(() => {
+			if (logWriter && !logWriter.isTemporary) {
+				process.stderr.write(`Logs saved to: ${logWriter.getDirectory()}\n`)
+			}
 			logWriter?.cleanup()
 			process.exit(app.hasFailures() ? 1 : 0)
 		})

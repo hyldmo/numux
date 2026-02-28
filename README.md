@@ -167,7 +167,7 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |
 | `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |
-| `--log-dir <path>` | Write per-process output to `<path>/<name>.log` |
+| `--log-dir <path>` | Persist logs to timestamped subdirs (`<path>/<timestamp>/<name>.log`) with a `latest` symlink. Path is printed on exit |
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |
@@ -346,6 +346,23 @@ Unmatched references are left as-is (the shell will expand `$db` as empty + `.po
 ## Keybindings
 
 Keybindings are shown in the status bar at the bottom of the app. Panes are readonly by default — keyboard input is not forwarded to processes. Set `interactive: true` on processes that need stdin (REPLs, shells, etc.).
+
+| Key | Action |
+|-----|--------|
+| `←`/`→` or `1`-`9` | Switch tabs |
+| `F` | Search current pane |
+| `Tab` (in search) | Toggle between single-pane and all-process search |
+| `Enter`/`Shift+Enter` | Next/previous match |
+| `Esc` | Exit search |
+| `R` | Restart current process |
+| `Shift+R` | Restart all processes |
+| `S` | Stop/start current process |
+| `Y` | Copy all output |
+| `L` | Clear pane |
+| `G`/`Shift+G` | Scroll to top/bottom |
+| `PageUp`/`PageDown` | Scroll by page |
+| `Ctrl+Click` | Open link |
+| `Ctrl+C` | Quit |
 
 ## Tab icons
 

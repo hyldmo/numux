@@ -59,13 +59,21 @@ export function resolveOptionColors(
 	statuses: Map<string, ProcessStatus>,
 	processColors: Map<string, string>,
 	inputWaiting: Set<string>,
-	erroredProcesses: Set<string>
+	erroredProcesses: Set<string>,
+	searchMatchProcesses?: Set<string>
 ): Array<{ iconHex: string; nameHex: string | null }> {
 	return names.map(name => {
 		const status = statuses.get(name)!
 		const waiting = inputWaiting.has(name)
 		const errored = erroredProcesses.has(name)
-		const statusHex = waiting ? '#ffaa00' : errored ? '#ff5555' : STATUS_ICON_HEX[status]
+		const hasSearchMatch = searchMatchProcesses?.has(name)
+		const statusHex = hasSearchMatch
+			? '#b58900'
+			: waiting
+				? '#ffaa00'
+				: errored
+					? '#ff5555'
+					: STATUS_ICON_HEX[status]
 		const processHex = processColors.get(name)
 		return {
 			iconHex: statusHex ?? processHex ?? '#888888',
@@ -176,6 +184,7 @@ export class TabBar {
 	private processColors: Map<string, string>
 	private inputWaiting = new Set<string>()
 	private erroredProcesses = new Set<string>()
+	private searchMatchCounts = new Map<string, number>()
 
 	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
 		this.originalNames = names
@@ -239,6 +248,18 @@ export class TabBar {
 		this.refreshOptions()
 	}
 
+	/** Set per-process search match counts (highlights tabs with matches). */
+	setSearchMatches(counts: Map<string, number>): void {
+		this.searchMatchCounts = counts
+		this.refreshOptions()
+	}
+
+	/** Clear all search match indicators from tabs. */
+	clearSearchMatches(): void {
+		this.searchMatchCounts.clear()
+		this.refreshOptions()
+	}
+
 	/** Get the process name at the given display index */
 	getNameAtIndex(index: number): string {
 		return this.names[index]
@@ -271,18 +292,24 @@ export class TabBar {
 	}
 
 	private getDescription(name: string): string {
+		const matchCount = this.searchMatchCounts.get(name)
+		if (matchCount != null && matchCount > 0) {
+			return `${matchCount} match${matchCount === 1 ? '' : 'es'}`
+		}
 		if (this.inputWaiting.has(name)) return 'awaiting input'
 		if (this.erroredProcesses.has(name)) return 'error detected'
 		return this.baseDescriptions.get(name) ?? 'pending'
 	}
 
 	private updateOptionColors(): void {
+		const searchProcesses = this.searchMatchCounts.size > 0 ? new Set(this.searchMatchCounts.keys()) : undefined
 		const resolved = resolveOptionColors(
 			this.names,
 			this.statuses,
 			this.processColors,
 			this.inputWaiting,
-			this.erroredProcesses
+			this.erroredProcesses,
+			searchProcesses
 		)
 		const colors = resolved.map(c => ({
 			icon: parseColor(c.iconHex),
