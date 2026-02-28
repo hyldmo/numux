@@ -18,13 +18,8 @@ export interface NumuxProcessConfig<K extends string = string> {
 	/** Regex matched against stdout to signal readiness. Use `RegExp` to capture groups for `$dep.group` expansion */
 	readyPattern?: string | RegExp
 	/**
-	 * Set to `false` for one-shot processes
-	 * @default true
-	 */
-	persistent?: boolean
-	/**
-	 * Limit auto-restart attempts
-	 * @default Infinity
+	 * Limit auto-restart attempts (only restarts on non-zero exit)
+	 * @default 0
 	 */
 	maxRestarts?: number
 	/** Milliseconds to wait for readyPattern before failing */
@@ -75,18 +70,12 @@ export interface NumuxConfig<K extends string = string> {
 	 */
 	showCommand?: boolean
 	/**
-	 * Global restart limit, inherited by all processes
-	 * @default Infinity
+	 * Global restart limit, inherited by all processes (only restarts on non-zero exit)
+	 * @default 0
 	 */
 	maxRestarts?: number
 	/** Global ready timeout (ms), inherited by all processes */
 	readyTimeout?: number
-	/**
-	 * Set to `false` to make all processes non-persistent (one-shot) by default.
-	 * Individual processes can still override with their own `persistent` value.
-	 * @default true
-	 */
-	persistent?: boolean
 	/**
 	 * Global stop signal, inherited by all processes
 	 * @default 'SIGTERM'

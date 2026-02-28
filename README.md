@@ -40,7 +40,6 @@ export default defineConfig({
     migrate: {
       command: 'bun run migrate',
       dependsOn: ['db'],
-      persistent: false,
     },
     api: {
       command: 'bun run dev:api',
@@ -53,7 +52,6 @@ export default defineConfig({
     confirm: {
       command: 'sh -c "printf \'Deploy to staging? [y/n] \' && read answer && echo $answer"',
       interactive: true,
-      persistent: false,
     },
   },
 })
@@ -199,8 +197,7 @@ Top-level options apply to all processes (process-level settings override):
 | `env` | `Record<string, string>` | Environment variables merged into all processes (process `env` overrides per key) |
 | `envFile` | `string \| string[] \| false` | `.env` file(s) for all processes (process `envFile` replaces if set; `false` disables) |
 | `showCommand` | `boolean` | Print the command being run as the first line of output (default: `true`) |
-| `persistent` | `boolean` | Set to `false` to make all processes one-shot by default (default: `true`) |
-| `maxRestarts` | `number` | Restart limit for all processes (default: `Infinity`) |
+| `maxRestarts` | `number` | Restart limit for all processes (default: `0`) |
 | `readyTimeout` | `number` | Ready timeout in ms for all processes |
 | `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Stop signal for all processes (default: `'SIGTERM'`) |
 | `errorMatcher` | `boolean \| string` | Error detection for all processes (`true` = ANSI red, string = regex) |
@@ -232,8 +229,7 @@ Each process accepts:
 | `dependsOn` | `string[]` | — | Processes that must be ready first |
 | `readyPattern` | `string \| RegExp` | — | Regex matched against stdout to signal readiness. Use `RegExp` to capture groups (see below) |
 | `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
-| `persistent` | `boolean` | `true` | `false` for one-shot commands (exit 0 = ready) |
-| `maxRestarts` | `number` | `Infinity` | Max auto-restart attempts before giving up |
+| `maxRestarts` | `number` | `0` | Max auto-restart attempts on non-zero exit (0 = no restarts) |
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
 | `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
 | `platform` | `string \| string[]` | — | OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; dependents still start |
@@ -301,7 +297,6 @@ export default defineConfig({
   processes: {
     seed: {
       command: 'bun run seed',
-      persistent: false,
       condition: 'SEED_DB',    // only runs when SEED_DB is set and truthy
     },
     storybook: {
@@ -319,11 +314,10 @@ Falsy values: unset, empty string, `"0"`, `"false"`, `"no"`, `"off"` (case-insen
 Each process starts as soon as its declared `dependsOn` dependencies are ready — it does not wait for unrelated processes. If a process fails, its dependents are skipped.
 
 A process becomes **ready** when:
-- **persistent + readyPattern** — the pattern matches in stdout
-- **persistent + no readyPattern** — immediately after spawn
-- **non-persistent** — exits with code 0
+- **Has `readyPattern`** — the pattern matches in stdout (long-running server)
+- **No `readyPattern`** — exits with code 0 (one-shot task)
 
-Persistent processes that crash are auto-restarted with exponential backoff (1s–30s). Backoff resets after 10s of uptime.
+Processes that crash (non-zero exit) can be auto-restarted by setting `maxRestarts` (default: `0`). Restarts use exponential backoff (1s–30s), which resets after 10s of uptime.
 
 ### Dependency output capture
 

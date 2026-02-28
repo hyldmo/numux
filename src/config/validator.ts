@@ -3,7 +3,7 @@ import { type Color, isValidColor } from '../utils/color'
 
 export type ValidationWarning = { process: string; message: string }
 
-export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): ResolvedNumuxConfig {
+export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): ResolvedNumuxConfig {
 	if (!raw || typeof raw !== 'object') {
 		throw new Error('Config must be an object')
 	}
@@ -28,7 +28,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		typeof config.maxRestarts === 'number' && config.maxRestarts >= 0 ? config.maxRestarts : undefined
 	const globalReadyTimeout =
 		typeof config.readyTimeout === 'number' && config.readyTimeout > 0 ? config.readyTimeout : undefined
-	const globalPersistent = typeof config.persistent === 'boolean' ? config.persistent : undefined
 	const globalStopSignal = validateStopSignal(config.stopSignal)
 	const globalErrorMatcher = validateErrorMatcher('(global)', config.errorMatcher)
 	const globalWatch = validateStringOrStringArray(config.watch)
@@ -106,7 +105,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
-		const persistent = typeof p.persistent === 'boolean' ? p.persistent : (globalPersistent ?? true)
 		const readyPattern =
 			p.readyPattern instanceof RegExp
 				? p.readyPattern
@@ -122,14 +120,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 					cause: err
 				})
 			}
-		}
-
-		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
-		if (readyPattern && !persistent) {
-			warnings?.push({
-				process: name,
-				message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)'
-			})
 		}
 
 		// Validate env values are strings
@@ -163,8 +153,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			envFile: processEnvFile ?? globalEnvFile,
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern,
-			persistent,
-			maxRestarts: processMaxRestarts ?? globalMaxRestarts,
+			maxRestarts: processMaxRestarts ?? globalMaxRestarts ?? 0,
 			readyTimeout: processReadyTimeout ?? globalReadyTimeout,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,

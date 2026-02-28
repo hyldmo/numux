@@ -69,8 +69,8 @@ export class PrefixDisplay {
 		const rows = process.stdout.rows || 24
 		await this.manager.startAll(cols, rows)
 
-		// After all processes started, check if any are non-persistent
-		// If all non-persistent processes have exited, we're done
+		// After all processes started, check if any one-shot processes
+		// have already exited — if all are done, we're finished
 		this.checkAllDone()
 	}
 

@@ -41,7 +41,7 @@ describe('PrefixDisplay (integration)', () => {
 		const config = writeConfig(
 			'simple.json',
 			JSON.stringify({
-				processes: { hello: { command: "echo 'hello world'", persistent: false } }
+				processes: { hello: { command: "echo 'hello world'" } }
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config)
@@ -55,8 +55,8 @@ describe('PrefixDisplay (integration)', () => {
 			'multi.json',
 			JSON.stringify({
 				processes: {
-					aaa: { command: "echo 'from aaa'", persistent: false },
-					bbb: { command: "echo 'from bbb'", persistent: false }
+					aaa: { command: "echo 'from aaa'" },
+					bbb: { command: "echo 'from bbb'" }
 				}
 			})
 		)
@@ -72,7 +72,7 @@ describe('PrefixDisplay (integration)', () => {
 		const config = writeConfig(
 			'fail.json',
 			JSON.stringify({
-				processes: { bad: { command: "sh -c 'exit 1'", persistent: false } }
+				processes: { bad: { command: "sh -c 'exit 1'" } }
 			})
 		)
 		const { exitCode } = await runPrefix(config)
@@ -84,8 +84,8 @@ describe('PrefixDisplay (integration)', () => {
 			'padding.json',
 			JSON.stringify({
 				processes: {
-					a: { command: "echo 'short'", persistent: false },
-					longname: { command: "echo 'long'", persistent: false }
+					a: { command: "echo 'short'" },
+					longname: { command: "echo 'long'" }
 				}
 			})
 		)
@@ -101,8 +101,8 @@ describe('PrefixDisplay (integration)', () => {
 			'deps.json',
 			JSON.stringify({
 				processes: {
-					first: { command: "echo 'step1'", persistent: false },
-					second: { command: "echo 'step2'", persistent: false, dependsOn: ['first'] }
+					first: { command: "echo 'step1'" },
+					second: { command: "echo 'step2'", dependsOn: ['first'] }
 				}
 			})
 		)
@@ -122,7 +122,7 @@ describe('PrefixDisplay (integration)', () => {
 			'kill-others.json',
 			JSON.stringify({
 				processes: {
-					quick: { command: "echo 'done'", persistent: false },
+					quick: { command: "echo 'done'" },
 					slow: { command: 'sleep 60' }
 				}
 			})
@@ -137,7 +137,7 @@ describe('PrefixDisplay (integration)', () => {
 			'kill-others-fail.json',
 			JSON.stringify({
 				processes: {
-					bad: { command: "sh -c 'exit 42'", persistent: false },
+					bad: { command: "sh -c 'exit 42'" },
 					slow: { command: 'sleep 60' }
 				}
 			})
@@ -150,7 +150,7 @@ describe('PrefixDisplay (integration)', () => {
 		const config = writeConfig(
 			'timestamps.json',
 			JSON.stringify({
-				processes: { ts: { command: "echo 'hello'", persistent: false } }
+				processes: { ts: { command: "echo 'hello'" } }
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config, ['--timestamps'])
@@ -165,8 +165,8 @@ describe('PrefixDisplay (integration)', () => {
 			'summary.json',
 			JSON.stringify({
 				processes: {
-					ok: { command: 'true', persistent: false },
-					fail: { command: "sh -c 'exit 2'", persistent: false }
+					ok: { command: 'true' },
+					fail: { command: "sh -c 'exit 2'" }
 				}
 			})
 		)
@@ -182,7 +182,7 @@ describe('PrefixDisplay (integration)', () => {
 			'no-color.json',
 			JSON.stringify({
 				processes: {
-					ansi: { command: "printf '\\033[32mgreen\\033[0m plain'", persistent: false }
+					ansi: { command: "printf '\\033[32mgreen\\033[0m plain'" }
 				}
 			})
 		)
@@ -197,8 +197,8 @@ describe('PrefixDisplay (integration)', () => {
 			'skip.json',
 			JSON.stringify({
 				processes: {
-					dep: { command: "sh -c 'exit 1'", persistent: false },
-					child: { command: "echo 'should not run'", persistent: false, dependsOn: ['dep'] }
+					dep: { command: "sh -c 'exit 1'" },
+					child: { command: "echo 'should not run'", dependsOn: ['dep'] }
 				}
 			})
 		)

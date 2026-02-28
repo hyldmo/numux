@@ -314,20 +314,20 @@ describe('parseArgs', () => {
 describe('buildConfigFromArgs', () => {
 	test('named processes become config entries', () => {
 		const config = buildConfigFromArgs([], [{ name: 'api', command: 'bun run dev' }])
-		expect(config.processes.api).toEqual({ command: 'bun run dev', persistent: true })
+		expect(config.processes.api).toEqual({ command: 'bun run dev' })
 	})
 
 	test('positional commands get names from first word', () => {
 		const config = buildConfigFromArgs(['npm start', 'bun run dev'], [])
-		expect(config.processes.npm).toEqual({ command: 'npm start', persistent: true })
-		expect(config.processes.bun).toEqual({ command: 'bun run dev', persistent: true })
+		expect(config.processes.npm).toEqual({ command: 'npm start' })
+		expect(config.processes.bun).toEqual({ command: 'bun run dev' })
 	})
 
 	test('duplicate command names get index suffix', () => {
 		const config = buildConfigFromArgs(['echo hello', 'echo world'], [])
 		expect(Object.keys(config.processes)).toHaveLength(2)
-		expect(config.processes.echo).toEqual({ command: 'echo hello', persistent: true })
-		expect(config.processes['echo-1']).toEqual({ command: 'echo world', persistent: true })
+		expect(config.processes.echo).toEqual({ command: 'echo hello' })
+		expect(config.processes['echo-1']).toEqual({ command: 'echo world' })
 	})
 
 	test('path-based commands use basename', () => {
@@ -349,7 +349,7 @@ describe('buildConfigFromArgs', () => {
 const CHAIN_CONFIG: ResolvedNumuxConfig = {
 	processes: {
 		db: { command: 'echo db' },
-		migrate: { command: 'echo migrate', persistent: false, dependsOn: ['db'] },
+		migrate: { command: 'echo migrate', dependsOn: ['db'] },
 		api: { command: 'echo api', dependsOn: ['migrate'] },
 		web: { command: 'echo web', dependsOn: ['api'] }
 	}

@@ -39,7 +39,6 @@ export function createReadinessChecker(config: ResolvedProcessConfig) {
 			? config.readyPattern
 			: new RegExp(config.readyPattern)
 		: null
-	const persistent = config.persistent !== false
 	let outputBuffer = ''
 	let _captures: Record<string, string> | null = null
 
@@ -49,7 +48,7 @@ export function createReadinessChecker(config: ResolvedProcessConfig) {
 		 * should now be considered ready.
 		 */
 		feedOutput(data: string): boolean {
-			if (!(persistent && pattern)) return false
+			if (!pattern) return false
 			outputBuffer += data
 			if (outputBuffer.length > BUFFER_CAP) {
 				outputBuffer = outputBuffer.slice(-BUFFER_CAP)
@@ -70,19 +69,11 @@ export function createReadinessChecker(config: ResolvedProcessConfig) {
 		},
 
 		/**
-		 * Returns true if the process is immediately ready on spawn
-		 * (persistent with no readyPattern).
-		 */
-		get isImmediatelyReady(): boolean {
-			return persistent && !pattern
-		},
-
-		/**
 		 * Returns true if readiness depends on exit code
-		 * (non-persistent processes).
+		 * (processes without readyPattern).
 		 */
 		get dependsOnExit(): boolean {
-			return !persistent
+			return !pattern
 		}
 	}
 }
