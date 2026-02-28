@@ -2,6 +2,8 @@
 
 Terminal multiplexer with dependency orchestration. Run multiple processes in a tabbed TUI with a dependency graph controlling startup order.
 
+Inspired by `sst dev` and `concurrently`
+
 ## Install
 
 Requires [Bun](https://bun.sh) >= 1.0.
