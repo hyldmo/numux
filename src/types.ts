@@ -110,10 +110,15 @@ export interface NumuxConfig<K extends string = string> {
 	/** Add timestamps to prefixed output lines (only applies when `prefix` is true) */
 	timestamps?: boolean
 	/**
-	 * Kill all processes when any one exits
+	 * Kill all processes when any one exits (regardless of exit code)
 	 * @default false
 	 */
 	killOthers?: boolean
+	/**
+	 * Kill all processes when any one exits with a non-zero exit code
+	 * @default false
+	 */
+	killOthersOnFail?: boolean
 	/**
 	 * Disable file watching even if processes have watch patterns
 	 * @default false
@@ -137,6 +142,7 @@ export interface ResolvedNumuxConfig {
 	prefix?: boolean
 	timestamps?: boolean
 	killOthers?: boolean
+	killOthersOnFail?: boolean
 	noWatch?: boolean
 	logDir?: string
 	processes: Record<string, ResolvedProcessConfig>

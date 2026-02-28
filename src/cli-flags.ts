@@ -139,7 +139,13 @@ export const FLAGS: FlagDef[] = [
 		type: 'boolean',
 		long: '--kill-others',
 		key: 'killOthers',
-		description: 'Kill all processes when any exits'
+		description: 'Kill all processes when any exits (regardless of exit code)'
+	},
+	{
+		type: 'boolean',
+		long: '--kill-others-on-fail',
+		key: 'killOthersOnFail',
+		description: 'Kill all processes when any exits with non-zero code'
 	},
 	{
 		type: 'boolean',

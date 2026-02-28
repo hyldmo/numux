@@ -46,6 +46,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 	const prefix = config.prefix === true ? true : undefined
 	const timestamps = config.timestamps === true ? true : undefined
 	const killOthers = config.killOthers === true ? true : undefined
+	const killOthersOnFail = config.killOthersOnFail === true ? true : undefined
 	const noWatch = config.noWatch === true ? true : undefined
 	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
 
@@ -187,6 +188,7 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		...(prefix ? { prefix } : {}),
 		...(timestamps ? { timestamps } : {}),
 		...(killOthers ? { killOthers } : {}),
+		...(killOthersOnFail ? { killOthersOnFail } : {}),
 		...(noWatch ? { noWatch } : {}),
 		...(logDir ? { logDir } : {}),
 		processes: validated

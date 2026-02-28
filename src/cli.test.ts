@@ -59,6 +59,14 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).killOthers).toBe(false)
 	})
 
+	test('--kill-others-on-fail sets killOthersOnFail flag', () => {
+		expect(parseArgs(argv('--kill-others-on-fail')).killOthersOnFail).toBe(true)
+	})
+
+	test('killOthersOnFail is false by default', () => {
+		expect(parseArgs(argv()).killOthersOnFail).toBe(false)
+	})
+
 	test('-t sets timestamps flag', () => {
 		expect(parseArgs(argv('-t')).timestamps).toBe(true)
 	})
