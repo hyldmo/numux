@@ -248,11 +248,12 @@ export class ProcessManager {
 			this.fileWatcher.watch(name, patterns, cwd, changedFile => {
 				const state = this.states.get(name)
 				if (!state) return
-				// Don't restart processes that are stopped/finished, pending, stopping, or skipped
+				// Don't restart processes that are stopped, pending, stopping, or skipped
+				// Note: 'finished' is intentionally allowed so one-shot processes
+				// (e.g. codegen) are re-run when watched files change.
 				if (
 					state.status === 'pending' ||
 					state.status === 'stopped' ||
-					state.status === 'finished' ||
 					state.status === 'stopping' ||
 					state.status === 'skipped'
 				)
