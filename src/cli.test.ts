@@ -248,17 +248,17 @@ describe('parseArgs', () => {
 	})
 
 	test('exec parses process name and command', () => {
-		const result = parseArgs(argv('exec', 'api', 'npx', 'prisma', 'migrate'))
+		const result = parseArgs(argv('exec', 'api', 'bunx', 'prisma', 'migrate'))
 		expect(result.exec).toBe(true)
 		expect(result.execName).toBe('api')
-		expect(result.execCommand).toBe('npx prisma migrate')
+		expect(result.execCommand).toBe('bunx prisma migrate')
 	})
 
 	test('exec supports -- separator', () => {
-		const result = parseArgs(argv('exec', 'api', '--', 'npx', 'prisma', 'migrate', '--force'))
+		const result = parseArgs(argv('exec', 'api', '--', 'bunx', 'prisma', 'migrate', '--force'))
 		expect(result.exec).toBe(true)
 		expect(result.execName).toBe('api')
-		expect(result.execCommand).toBe('npx prisma migrate --force')
+		expect(result.execCommand).toBe('bunx prisma migrate --force')
 	})
 
 	test('exec requires a process name', () => {
