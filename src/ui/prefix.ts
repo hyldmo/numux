@@ -95,7 +95,7 @@ export class PrefixDisplay {
 		const decoder = this.decoders.get(name) ?? new TextDecoder()
 		const text = decoder.decode(data, { stream: true })
 		const buffer = (this.buffers.get(name) ?? '') + text
-		const lines = buffer.split(/\r?\n/)
+		const lines = buffer.split(/\r\n|\n|\r/)
 
 		// Keep the last element (incomplete line) in the buffer
 		this.buffers.set(name, lines.pop() ?? '')
