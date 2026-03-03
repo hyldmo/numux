@@ -95,13 +95,27 @@ export class PrefixDisplay {
 		const decoder = this.decoders.get(name) ?? new TextDecoder()
 		const text = decoder.decode(data, { stream: true })
 		const buffer = (this.buffers.get(name) ?? '') + text
-		const lines = buffer.split(/\r\n|\n|\r/)
 
-		// Keep the last element (incomplete line) in the buffer
-		this.buffers.set(name, lines.pop() ?? '')
+		// Split on real line endings (\r\n or \n)
+		const lines = buffer.split(/\r?\n/)
 
+		// Last element is the incomplete line — buffer it.
+		// Collapse bare \r to prevent unbounded growth from spinner output.
+		// A trailing \r is kept since it may be the start of a \r\n split across chunks.
+		let tail = lines.pop() ?? ''
+		if (tail.includes('\r')) {
+			const keepTrailingCr = tail.endsWith('\r')
+			const base = keepTrailingCr ? tail.slice(0, -1) : tail
+			const lastCr = base.lastIndexOf('\r')
+			tail = (lastCr === -1 ? base : base.slice(lastCr + 1)) + (keepTrailingCr ? '\r' : '')
+		}
+		this.buffers.set(name, tail)
+
+		// Bare \r within a completed line means "overwrite from start of line".
+		// Keep only the content after the last bare \r.
 		for (const line of lines) {
-			this.printLine(name, line)
+			const lastCr = line.lastIndexOf('\r')
+			this.printLine(name, lastCr === -1 ? line : line.slice(lastCr + 1))
 		}
 	}
 
@@ -131,7 +145,13 @@ export class PrefixDisplay {
 	private flushBuffer(name: string): void {
 		const remaining = this.buffers.get(name) ?? ''
 		if (remaining.length > 0) {
-			this.printLine(name, remaining)
+			// Strip trailing \r (cursor return with no overwrite), then collapse bare \r
+			const stripped = remaining.endsWith('\r') ? remaining.slice(0, -1) : remaining
+			const lastCr = stripped.lastIndexOf('\r')
+			const visible = lastCr === -1 ? stripped : stripped.slice(lastCr + 1)
+			if (visible.length > 0) {
+				this.printLine(name, visible)
+			}
 			this.buffers.set(name, '')
 		}
 	}

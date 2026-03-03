@@ -177,7 +177,7 @@ describe('PrefixDisplay (integration)', () => {
 		expect(summaryLines.length).toBeGreaterThan(0)
 	}, 10000)
 
-	test('bare carriage return splits into separate prefixed lines', async () => {
+	test('bare carriage return collapses overwritten content', async () => {
 		const config = writeConfig(
 			'cr.json',
 			JSON.stringify({
@@ -185,8 +185,10 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
-		// Bare \r should be treated as a line separator, not left inside a line
 		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		// Bare \r simulates overwrite — only 'second' should appear, not 'first'
+		expect(contentLines.some(l => l.includes('second'))).toBe(true)
+		expect(contentLines.some(l => l.includes('first'))).toBe(false)
 		for (const line of contentLines) {
 			expect(line).not.toContain('\r')
 		}
