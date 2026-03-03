@@ -177,6 +177,22 @@ describe('PrefixDisplay (integration)', () => {
 		expect(summaryLines.length).toBeGreaterThan(0)
 	}, 10000)
 
+	test('bare carriage return splits into separate prefixed lines', async () => {
+		const config = writeConfig(
+			'cr.json',
+			JSON.stringify({
+				processes: { cr: { command: "printf 'first\\rsecond\\n'" } }
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		// Bare \r should be treated as a line separator, not left inside a line
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		for (const line of contentLines) {
+			expect(line).not.toContain('\r')
+		}
+		expect(exitCode).toBe(0)
+	}, 10000)
+
 	test('strips ANSI from process output when NO_COLOR is set', async () => {
 		const config = writeConfig(
 			'no-color.json',
