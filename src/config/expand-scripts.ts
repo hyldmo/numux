@@ -100,7 +100,8 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 		}
 
 		const glob = new Bun.Glob(globPattern)
-		const matches = scriptNames.filter(s => glob.match(s))
+		const colonDepth = (globPattern.match(/:/g) || []).length
+		const matches = scriptNames.filter(s => glob.match(s) && (s.match(/:/g) || []).length === colonDepth)
 
 		if (matches.length === 0) {
 			throw new Error(

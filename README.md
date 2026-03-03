@@ -135,6 +135,8 @@ numux 'dev:*'             # all scripts matching dev:*
 numux 'npm:*:dev'         # explicit npm: prefix (same behavior)
 ```
 
+`*` does not match across `:` separators (like `/` in file paths), so `format:*` matches `format:store` but not `format:check:store`. Use `format:*:*` to match two levels deep.
+
 Extra arguments after the pattern are forwarded to each matched command:
 
 ```sh
