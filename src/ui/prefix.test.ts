@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { stripCursorSequences } from './prefix'
 
 const INDEX = join(import.meta.dir, '../index.ts')
 let tmpDir: string
@@ -288,4 +289,89 @@ describe('PrefixDisplay (integration)', () => {
 		expect(stdout).not.toContain('should not run')
 		expect(exitCode).toBe(1)
 	}, 10000)
+
+	test('cursor-up sequences are stripped to preserve prefix', async () => {
+		// Use bun -e to emit real escape bytes — avoids printf portability issues
+		const config = writeConfig(
+			'cursor-up.json',
+			JSON.stringify({
+				processes: {
+					fmt: {
+						command: `bun -e "process.stdout.write('header\\n\\x1b[1A\\x1b[2Kfile.md 35ms\\n')"`
+					}
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[fmt]') && !l.includes('$'))
+		// Every content line must have the [fmt] prefix
+		expect(contentLines.some(l => l.includes('header'))).toBe(true)
+		expect(contentLines.some(l => l.includes('file.md 35ms'))).toBe(true)
+		// Cursor sequences must be stripped
+		expect(stdout).not.toContain('\x1b[1A')
+		expect(stdout).not.toContain('\x1b[2K')
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('SGR color sequences are preserved', async () => {
+		const config = writeConfig(
+			'sgr-preserved.json',
+			JSON.stringify({
+				processes: {
+					clr: {
+						command: `bun -e "process.stdout.write('\\x1b[32mgreen\\x1b[0m\\n')"`
+					}
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config)
+		// SGR (color) sequences should pass through
+		expect(stdout).toContain('\x1b[32m')
+		expect(stdout).toContain('green')
+		expect(exitCode).toBe(0)
+	}, 10000)
+})
+
+describe('stripCursorSequences', () => {
+	test('strips cursor-up', () => {
+		expect(stripCursorSequences('before\x1b[1Aafter')).toBe('beforeafter')
+	})
+
+	test('strips cursor-down', () => {
+		expect(stripCursorSequences('before\x1b[2Bafter')).toBe('beforeafter')
+	})
+
+	test('strips erase-line', () => {
+		expect(stripCursorSequences('\x1b[2Kcontent')).toBe('content')
+	})
+
+	test('strips erase-display', () => {
+		expect(stripCursorSequences('\x1b[2Jcontent')).toBe('content')
+	})
+
+	test('strips cursor-position', () => {
+		expect(stripCursorSequences('\x1b[5;10Hcontent')).toBe('content')
+	})
+
+	test('strips scroll-up and scroll-down', () => {
+		expect(stripCursorSequences('\x1b[3S\x1b[3Tcontent')).toBe('content')
+	})
+
+	test('preserves SGR (color) sequences', () => {
+		expect(stripCursorSequences('\x1b[32mgreen\x1b[0m')).toBe('\x1b[32mgreen\x1b[0m')
+	})
+
+	test('strips mixed cursor sequences while preserving colors', () => {
+		const input = '\x1b[32m\x1b[1Agreen\x1b[2K\x1b[0m'
+		expect(stripCursorSequences(input)).toBe('\x1b[32mgreen\x1b[0m')
+	})
+
+	test('returns plain text unchanged', () => {
+		expect(stripCursorSequences('hello world')).toBe('hello world')
+	})
+
+	test('strips sequences without explicit count', () => {
+		// \x1b[A is same as \x1b[1A (move up 1)
+		expect(stripCursorSequences('before\x1b[Aafter')).toBe('beforeafter')
+	})
 })
