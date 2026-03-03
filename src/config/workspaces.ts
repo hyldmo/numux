@@ -65,8 +65,7 @@ export function resolveWorkspaceProcesses(script: string, cwd: string): Record<s
 
 		processes[name] = {
 			command: `${pm} run ${script}`,
-			cwd: dir,
-			persistent: true
+			cwd: dir
 		}
 	}
 

@@ -115,7 +115,7 @@ export function buildConfigFromArgs(
 
 	for (const { name, command } of named) {
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command, persistent: true, ...(color ? { color } : {}) }
+		processes[name] = { command, ...(color ? { color } : {}) }
 	}
 
 	for (let i = 0; i < commands.length; i++) {
@@ -126,7 +126,7 @@ export function buildConfigFromArgs(
 			name = `${name}-${i}`
 		}
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command: cmd, persistent: true, ...(color ? { color } : {}) }
+		processes[name] = { command: cmd, ...(color ? { color } : {}) }
 	}
 
 	return { processes }

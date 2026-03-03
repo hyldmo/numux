@@ -56,7 +56,6 @@ describe('resolveWorkspaceProcesses', () => {
 		const result = resolveWorkspaceProcesses('dev', dir)
 		expect(Object.keys(result).sort()).toEqual(['api', 'web'])
 		expect(result.web.command).toBe('npm run dev')
-		expect(result.web.persistent).toBe(true)
 		expect(result.web.cwd).toBe(join(dir, 'packages/web'))
 	})
 
