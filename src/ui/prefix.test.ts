@@ -177,7 +177,7 @@ describe('PrefixDisplay (integration)', () => {
 		expect(summaryLines.length).toBeGreaterThan(0)
 	}, 10000)
 
-	test('bare carriage return splits into separate prefixed lines', async () => {
+	test('bare carriage return collapses overwritten content', async () => {
 		const config = writeConfig(
 			'cr.json',
 			JSON.stringify({
@@ -185,11 +185,74 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
-		// Bare \r should be treated as a line separator, not left inside a line
 		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		// Bare \r simulates overwrite — only 'second' should appear, not 'first'
+		expect(contentLines.some(l => l.includes('second'))).toBe(true)
+		expect(contentLines.some(l => l.includes('first'))).toBe(false)
 		for (const line of contentLines) {
 			expect(line).not.toContain('\r')
 		}
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('multiple carriage returns keep only final overwrite', async () => {
+		const config = writeConfig(
+			'cr-multi.json',
+			JSON.stringify({
+				processes: { cr: { command: "printf 'frame1\\rframe2\\rframe3\\n'" } }
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		expect(contentLines.some(l => l.includes('frame3'))).toBe(true)
+		expect(contentLines.some(l => l.includes('frame1'))).toBe(false)
+		expect(contentLines.some(l => l.includes('frame2'))).toBe(false)
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('CRLF line endings are not affected by carriage return collapsing', async () => {
+		const config = writeConfig(
+			'crlf.json',
+			JSON.stringify({
+				processes: { cr: { command: "printf 'line1\\r\\nline2\\r\\n'" } }
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		// Both lines should appear — \r\n is a normal line ending, not an overwrite
+		expect(contentLines.some(l => l.includes('line1'))).toBe(true)
+		expect(contentLines.some(l => l.includes('line2'))).toBe(true)
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('trailing carriage return without newline is flushed on exit', async () => {
+		const config = writeConfig(
+			'cr-flush.json',
+			JSON.stringify({
+				processes: { cr: { command: "printf 'buffered\\rvisible'" } }
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		// 'visible' overwrites 'buffered', then flush on exit should emit 'visible'
+		expect(contentLines.some(l => l.includes('visible'))).toBe(true)
+		expect(contentLines.some(l => l.includes('buffered'))).toBe(false)
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('normal lines mixed with carriage return lines', async () => {
+		const config = writeConfig(
+			'cr-mixed.json',
+			JSON.stringify({
+				processes: { cr: { command: "printf 'normal1\\nold\\rnew\\nnormal2\\n'" } }
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cr]') && !l.includes('$'))
+		expect(contentLines.some(l => l.includes('normal1'))).toBe(true)
+		expect(contentLines.some(l => l.includes('new'))).toBe(true)
+		expect(contentLines.some(l => l.includes('normal2'))).toBe(true)
+		expect(contentLines.some(l => l.includes('old'))).toBe(false)
 		expect(exitCode).toBe(0)
 	}, 10000)
 
