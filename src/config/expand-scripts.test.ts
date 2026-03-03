@@ -433,6 +433,53 @@ describe('expandScriptPatterns', () => {
 		expect(Object.keys(result.processes)).toEqual(['dev', 'build'])
 	})
 
+	test('* does not match across colon separators', () => {
+		const dir = setupDir('colon-depth', {
+			'package.json': pkgJson({
+				'format:store': 'prettier --write .',
+				'format:odoo': 'yarn workspace odoo format',
+				'format:check': 'numux format:check:*',
+				'format:check:store': 'prettier --check .',
+				'format:check:odoo': 'yarn workspace odoo format:check'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'format:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Should match format:store, format:odoo, format:check (1 colon each)
+		// Should NOT match format:check:store, format:check:odoo (2 colons)
+		expect(names.sort()).toEqual(['check', 'odoo', 'store'])
+	})
+
+	test('* does not match across colon separators with npm: prefix', () => {
+		const dir = setupDir('colon-depth-npm', {
+			'package.json': pkgJson({
+				'format:store': 'prettier --write .',
+				'format:check:store': 'prettier --check .'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:format:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		expect(names).toEqual(['store'])
+	})
+
+	test('multi-level wildcard *:* matches two-colon scripts only', () => {
+		const dir = setupDir('colon-depth-multi', {
+			'package.json': pkgJson({
+				'format': 'numux format:*',
+				'format:store': 'prettier --write .',
+				'format:odoo': 'yarn workspace odoo format',
+				'format:check:store': 'prettier --check .',
+				'format:check:odoo': 'yarn workspace odoo format:check',
+				'format:lint:deep:store': 'some deep script'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'format:*:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Should match format:check:store, format:check:odoo (2 colons)
+		// Should NOT match format:store (1 colon) or format:lint:deep:store (3 colons)
+		expect(names.sort()).toEqual(['check:odoo', 'check:store'])
+	})
+
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
 		// Simulates: numux '*:dev' — should only match scripts containing ":dev"
 		const dir = setupDir('cli-bare-glob', {
