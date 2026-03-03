@@ -96,18 +96,18 @@ export class PrefixDisplay {
 		const text = decoder.decode(data, { stream: true })
 		const buffer = (this.buffers.get(name) ?? '') + text
 
-		// Split on real line endings (\r\n or \n)
-		const lines = buffer.split(/\r?\n/)
+		// Split on line endings. \r*\n handles \n, \r\n, and PTY-doubled \r\r\n.
+		const lines = buffer.split(/\r*\n/)
 
 		// Last element is the incomplete line — buffer it.
 		// Collapse bare \r to prevent unbounded growth from spinner output.
-		// A trailing \r is kept since it may be the start of a \r\n split across chunks.
+		// Trailing \r(s) are preserved since they may precede a \n in the next chunk.
 		let tail = lines.pop() ?? ''
 		if (tail.includes('\r')) {
-			const keepTrailingCr = tail.endsWith('\r')
-			const base = keepTrailingCr ? tail.slice(0, -1) : tail
+			const trailingCrs = tail.match(/\r+$/)?.[0] ?? ''
+			const base = tail.slice(0, tail.length - trailingCrs.length)
 			const lastCr = base.lastIndexOf('\r')
-			tail = (lastCr === -1 ? base : base.slice(lastCr + 1)) + (keepTrailingCr ? '\r' : '')
+			tail = (lastCr === -1 ? base : base.slice(lastCr + 1)) + trailingCrs
 		}
 		this.buffers.set(name, tail)
 
