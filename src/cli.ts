@@ -13,6 +13,7 @@ export interface ParsedArgs {
 	execCommand?: string
 	completions?: string
 	prefix: boolean
+	tmux: boolean
 	killOthers: boolean
 	killOthersOnFail: boolean
 	timestamps: boolean
@@ -52,6 +53,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		validate: false,
 		exec: false,
 		prefix: false,
+		tmux: false,
 		killOthers: false,
 		killOthersOnFail: false,
 		timestamps: false,

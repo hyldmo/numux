@@ -14,6 +14,7 @@ import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
+import { TmuxDisplay } from './ui/tmux'
 import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
@@ -232,15 +233,26 @@ async function main() {
 		}
 	}
 
-	const manager = new ProcessManager(config)
-
 	const logDir = parsed.logDir ?? config.logDir
 	const logWriter = logDir ? LogWriter.createPersistent(logDir) : LogWriter.createTemp()
 
 	printWarnings(warnings)
 
 	const usePrefix = parsed.prefix || config.prefix
-	if (usePrefix) {
+	const useTmux = parsed.tmux
+
+	if (useTmux) {
+		const display = new TmuxDisplay(config, {
+			logWriter,
+			killOthers: parsed.killOthers || config.killOthers,
+			killOthersOnFail: parsed.killOthersOnFail || config.killOthersOnFail
+		})
+		const manager = new ProcessManager(config, display.createRunnerFactory())
+		display.setManager(manager)
+		setupShutdownHandlers(display, logWriter)
+		await display.start()
+	} else if (usePrefix) {
+		const manager = new ProcessManager(config)
 		// Default to no restarts in prefix mode (CI/scripts)
 		for (const proc of Object.values(config.processes)) {
 			proc.maxRestarts ??= 0
@@ -253,6 +265,7 @@ async function main() {
 		})
 		await display.start()
 	} else {
+		const manager = new ProcessManager(config)
 		manager.on(logWriter.handleEvent)
 		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)

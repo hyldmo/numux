@@ -3,7 +3,7 @@ import { resolveDependencyTiers } from '../config/resolver'
 import type { ProcessEvent, ProcessState, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { log } from '../utils/logger'
 import { FileWatcher } from '../utils/watcher'
-import { ProcessRunner } from './runner'
+import { ProcessRunner, type Runner, type RunnerEventHandler, type RunnerFactory } from './runner'
 
 type EventListener = (event: ProcessEvent) => void
 
@@ -13,7 +13,7 @@ const BACKOFF_RESET_MS = 10_000
 
 export class ProcessManager {
 	private config: ResolvedNumuxConfig
-	private runners = new Map<string, ProcessRunner>()
+	private runners = new Map<string, Runner>()
 	private states = new Map<string, ProcessState>()
 	private tiers: string[][]
 	private listeners: EventListener[] = []
@@ -26,9 +26,11 @@ export class ProcessManager {
 	private pendingReadyResolvers = new Map<string, () => void>()
 	private readyCaptures = new Map<string, Record<string, string>>()
 	private fileWatcher?: FileWatcher
+	private runnerFactory: RunnerFactory
 
-	constructor(config: ResolvedNumuxConfig) {
+	constructor(config: ResolvedNumuxConfig, runnerFactory?: RunnerFactory) {
 		this.config = config
+		this.runnerFactory = runnerFactory ?? ((name, cfg, handler) => new ProcessRunner(name, cfg, handler))
 		this.tiers = resolveDependencyTiers(config)
 		log(`Resolved ${this.tiers.length} dependency tiers:`, this.tiers)
 
@@ -160,7 +162,7 @@ export class ProcessManager {
 
 	private createRunner(name: string, onInitialReady?: () => void): void {
 		let readyResolved = !onInitialReady
-		const runner = new ProcessRunner(name, this.config.processes[name], {
+		const handler: RunnerEventHandler = {
 			onStatus: status => this.updateStatus(name, status),
 			onOutput: data => this.emit({ type: 'output', name, data }),
 			onExit: code => {
@@ -183,7 +185,8 @@ export class ProcessManager {
 				}
 			},
 			onError: () => this.emit({ type: 'error', name })
-		})
+		}
+		const runner = this.runnerFactory(name, this.config.processes[name], handler)
 		this.runners.set(name, runner)
 	}
 
