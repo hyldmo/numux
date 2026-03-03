@@ -8,10 +8,19 @@ export interface SearchMatch {
 	end: number
 }
 
+// Cap the native terminal buffer to prevent unbounded growth. getJson()
+// serializes the entire buffer on each render — a huge buffer freezes the
+// event loop. Full output is always available in log files, so resetting
+// only loses in-terminal scrollback.
+const MAX_SCROLLBACK_LINES = 50_000
+// Fallback byte cap for hidden panes where lineCount isn't updated
+const MAX_BUFFER_BYTES = 10 * 1024 * 1024
+
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
 	readonly terminal: GhosttyTerminalRenderable
 	private decoder = new TextDecoder()
+	private bytesFed = 0
 
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
@@ -73,6 +82,11 @@ export class Pane {
 	}
 
 	feed(data: Uint8Array): void {
+		this.bytesFed += data.length
+		if (this.terminal.lineCount > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
+			this.terminal.reset()
+			this.bytesFed = 0
+		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
 	}
@@ -164,6 +178,7 @@ export class Pane {
 
 	clear(): void {
 		this.terminal.reset()
+		this.bytesFed = 0
 	}
 
 	destroy(): void {
