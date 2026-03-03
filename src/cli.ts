@@ -104,6 +104,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	return result
 }
 
+const RUNNERS = new Set(['npm', 'npx', 'yarn', 'pnpm', 'bun', 'bunx'])
+
+/** Derive a short process name from a command string. For package runners, uses the last arg (the script name). */
+export function deriveProcessName(cmd: string): string {
+	const parts = cmd.split(/\s+/)
+	const first = parts[0].split('/').pop()!
+	if (parts.length > 1 && RUNNERS.has(first)) {
+		return parts[parts.length - 1]
+	}
+	return first
+}
+
 export function buildConfigFromArgs(
 	commands: string[],
 	named: Array<{ name: string; command: string }>,
@@ -120,8 +132,7 @@ export function buildConfigFromArgs(
 
 	for (let i = 0; i < commands.length; i++) {
 		const cmd = commands[i]
-		// Derive name from command: first word, deduplicated
-		let name = cmd.split(/\s+/)[0].split('/').pop()!
+		let name = deriveProcessName(cmd)
 		if (processes[name]) {
 			name = `${name}-${i}`
 		}

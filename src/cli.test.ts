@@ -317,10 +317,17 @@ describe('buildConfigFromArgs', () => {
 		expect(config.processes.api).toEqual({ command: 'bun run dev' })
 	})
 
-	test('positional commands get names from first word', () => {
-		const config = buildConfigFromArgs(['npm start', 'bun run dev'], [])
-		expect(config.processes.npm).toEqual({ command: 'npm start' })
-		expect(config.processes.bun).toEqual({ command: 'bun run dev' })
+	test('positional commands use last arg as name when first word is a package runner', () => {
+		const config = buildConfigFromArgs(['npm start', 'bun run dev', 'yarn format:check'], [])
+		expect(config.processes.start).toEqual({ command: 'npm start' })
+		expect(config.processes.dev).toEqual({ command: 'bun run dev' })
+		expect(config.processes['format:check']).toEqual({ command: 'yarn format:check' })
+	})
+
+	test('positional commands use first word for non-runner commands', () => {
+		const config = buildConfigFromArgs(['echo hello', '/usr/bin/node server.js'], [])
+		expect(config.processes.echo).toEqual({ command: 'echo hello' })
+		expect(config.processes.node).toEqual({ command: '/usr/bin/node server.js' })
 	})
 
 	test('duplicate command names get index suffix', () => {

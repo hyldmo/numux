@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildConfigFromArgs, filterConfig, parseArgs } from './cli'
+import { buildConfigFromArgs, deriveProcessName, filterConfig, parseArgs } from './cli'
 import { generateHelp } from './cli-flags'
 import { generateCompletions } from './completions'
 import { expandScriptPatterns } from './config/expand-scripts'
@@ -164,7 +164,7 @@ async function main() {
 			}
 			for (let i = 0; i < otherCommands.length; i++) {
 				const cmd = otherCommands[i]
-				let name = cmd.split(/\s+/)[0].split('/').pop()!
+				let name = deriveProcessName(cmd)
 				if (processes[name]) name = `${name}-${i}`
 				processes[name] = cmd
 			}
