@@ -44,9 +44,13 @@ src/
 - `readyPattern` accepts `string` (simple match) or `RegExp` (match + capture groups). RegExp captures are expanded into dependent `command` and `env` values via `$dep.group` syntax (e.g. `$odoo.url`)
 - `platform` restricts a process to specific OS(es) (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; their dependents still start with the dependency stripped (unlike `condition` which cascades)
 
+## Commits
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) format: `type(scope): subject`. Enforced by commitlint via a git hook (`.githooks/commit-msg`) and in CI.
+
 ## CI
 
-Runs on push to main and PRs: typecheck, lint, test.
+Runs on PRs: commitlint, typecheck, lint, test.
 
 ## Hooks
 
