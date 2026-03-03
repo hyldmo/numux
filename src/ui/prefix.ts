@@ -145,8 +145,8 @@ export class PrefixDisplay {
 	private flushBuffer(name: string): void {
 		const remaining = this.buffers.get(name) ?? ''
 		if (remaining.length > 0) {
-			// Strip trailing \r (cursor return with no overwrite), then collapse bare \r
-			const stripped = remaining.endsWith('\r') ? remaining.slice(0, -1) : remaining
+			// Strip all trailing \r(s), then collapse bare \r (overwrite semantics)
+			const stripped = remaining.replace(/\r+$/, '')
 			const lastCr = stripped.lastIndexOf('\r')
 			const visible = lastCr === -1 ? stripped : stripped.slice(lastCr + 1)
 			if (visible.length > 0) {
