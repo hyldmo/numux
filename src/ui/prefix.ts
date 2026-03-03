@@ -6,6 +6,20 @@ import type { LogWriter } from '../utils/log-writer'
 const RESET = ANSI_RESET
 const DIM = '\x1b[90m'
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences requires \x1b
+const CURSOR_SEQ_RE = /\x1b\[[\d;]*[ABCDEFGHJKLMSTdf]/g
+
+/**
+ * Strip CSI sequences that move the cursor or erase content.
+ * Keeps SGR sequences (\x1b[...m) for colors/styles.
+ *
+ * Stripped: cursor movement (A/B/C/D/E/F/G/H/d/f), erasure (J/K),
+ * scrolling (S/T), line insert/delete (L/M).
+ */
+export function stripCursorSequences(text: string): string {
+	return text.replace(CURSOR_SEQ_RE, '')
+}
+
 /**
  * Concurrently-style prefixed output mode for CI and headless environments.
  * Prints all process output interleaved with colored [name] prefixes.
@@ -93,7 +107,12 @@ export class PrefixDisplay {
 
 	private handleOutput(name: string, data: Uint8Array): void {
 		const decoder = this.decoders.get(name) ?? new TextDecoder()
-		const text = decoder.decode(data, { stream: true })
+		const raw = decoder.decode(data, { stream: true })
+		// Strip ANSI sequences that move the cursor or erase content.
+		// PTY processes emit these for interactive progress displays, but in
+		// prefix mode they would visually destroy the [name] prefix.
+		// Preserves SGR (color/style) sequences (\x1b[...m).
+		const text = stripCursorSequences(raw)
 		const buffer = (this.buffers.get(name) ?? '') + text
 
 		// Split on line endings. \r*\n handles \n, \r\n, and PTY-doubled \r\r\n.
