@@ -99,7 +99,7 @@ export class ProcessRunner {
 			this.handler.onOutput(encoder.encode(msg))
 		}
 
-		this.handler.onStatus(this.config.readyPattern ? 'running' : 'starting')
+		this.handler.onStatus('running')
 
 		this.startReadyTimeout(gen)
 
