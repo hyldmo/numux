@@ -71,8 +71,7 @@ describe('ProcessRunner — process with readyPattern', () => {
 			check()
 		})
 
-		expect(handler.statuses).toContain('running')
-		expect(handler.statuses).toContain('ready')
+		expect(handler.statuses).toEqual(['starting', 'running', 'ready'])
 		expect(handler.readyCount).toBe(1)
 
 		await runner.stop()
@@ -86,18 +85,18 @@ describe('ProcessRunner — process with readyPattern', () => {
 		await waitForExit(handler)
 
 		expect(handler.exits[0]).toBe(1)
-		expect(handler.statuses).toContain('failed')
+		expect(handler.statuses).toEqual(['starting', 'running', 'failed'])
 	}, 5000)
 
 	test('reports finished status on clean exit', async () => {
 		const handler = createHandler()
-		const runner = new ProcessRunner('ok', { command: 'true' }, handler)
+		const runner = new ProcessRunner('ok', { command: 'true', readyPattern: 'hello' }, handler)
 
 		runner.start(80, 24)
 		await waitForExit(handler)
 
 		expect(handler.exits[0]).toBe(0)
-		expect(handler.statuses).toContain('finished')
+		expect(handler.statuses).toEqual(['starting', 'running', 'finished'])
 	}, 5000)
 })
 
@@ -111,9 +110,7 @@ describe('ProcessRunner — process without readyPattern (one-shot)', () => {
 
 		expect(runner.isReady).toBe(true)
 		expect(handler.readyCount).toBe(1)
-		expect(handler.statuses).toContain('starting')
-		expect(handler.statuses).toContain('ready')
-		expect(handler.statuses).toContain('finished')
+		expect(handler.statuses).toEqual(['starting', 'running', 'ready', 'finished'])
 	}, 5000)
 
 	test('does not become ready on non-zero exit', async () => {
@@ -125,7 +122,20 @@ describe('ProcessRunner — process without readyPattern (one-shot)', () => {
 
 		expect(runner.isReady).toBe(false)
 		expect(handler.readyCount).toBe(0)
-		expect(handler.statuses).toContain('failed')
+		expect(handler.statuses).toEqual(['starting', 'running', 'failed'])
+	}, 5000)
+
+	test('transitions to running (not starting) while process is alive', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('srv', { command: 'sleep 60' }, handler)
+
+		runner.start(80, 24)
+		// Give the process a moment to spawn
+		await new Promise(r => setTimeout(r, 100))
+
+		expect(handler.statuses).toEqual(['starting', 'running'])
+
+		await runner.stop()
 	}, 5000)
 })
 
@@ -307,9 +317,8 @@ describe('ProcessRunner — restart', () => {
 			check()
 		})
 
-		// Should have gone through stopping → starting → running → ready again
-		expect(handler.statuses).toContain('stopping')
-		expect(handler.statuses.filter(s => s === 'ready').length).toBeGreaterThanOrEqual(2)
+		// Verify exact status sequence across the full restart cycle
+		expect(handler.statuses).toEqual(['starting', 'running', 'ready', 'stopping', 'starting', 'running', 'ready'])
 		expect(runner.isReady).toBe(true)
 
 		await runner.stop()
@@ -375,7 +384,135 @@ describe('ProcessRunner — stop', () => {
 
 		await runner.stop()
 
-		expect(handler.statuses).toContain('stopping')
-		expect(handler.statuses).toContain('stopped')
+		expect(handler.statuses).toEqual(['starting', 'running', 'ready', 'stopping', 'stopped'])
+	}, 5000)
+})
+
+describe('ProcessRunner — showCommand', () => {
+	test('shows command prefix by default', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('echo', { command: 'echo hello' }, handler)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).toContain('$ echo hello')
+	}, 5000)
+
+	test('suppresses command prefix when showCommand is false', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('echo', { command: 'echo hello', showCommand: false }, handler)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).not.toContain('$ echo hello')
+	}, 5000)
+})
+
+describe('ProcessRunner — exit code hints', () => {
+	test('shows permission denied hint on exit code 126', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('bad', { command: "sh -c 'exit 126'" }, handler)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		expect(handler.exits[0]).toBe(126)
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).toContain('permission denied')
+	}, 5000)
+})
+
+describe('ProcessRunner — concurrent restart', () => {
+	test('second restart while already restarting is a no-op', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('srv', { command: "echo 'ready' && sleep 60", readyPattern: 'ready' }, handler)
+
+		runner.start(80, 24)
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
+
+		// Fire two restarts concurrently — second should be ignored
+		const p1 = runner.restart(80, 24)
+		const p2 = runner.restart(80, 24)
+		await Promise.all([p1, p2])
+
+		// Should only see one stopping→starting cycle, not two
+		const stoppingCount = handler.statuses.filter(s => s === 'stopping').length
+		expect(stoppingCount).toBe(1)
+
+		await runner.stop()
+	}, 10000)
+})
+
+describe('ProcessRunner — commandOverride', () => {
+	test('commandOverride persists across restart', async () => {
+		const handler = createHandler()
+		const runner = new ProcessRunner('srv', { command: 'echo original', readyPattern: 'override' }, handler)
+
+		// Start with an override
+		runner.start(80, 24, "echo 'override' && sleep 60")
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (runner.isReady) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
+		expect(runner.isReady).toBe(true)
+
+		// Restart without passing override again — it should persist
+		await runner.restart(80, 24)
+		await new Promise<void>((resolve, reject) => {
+			const start = Date.now()
+			const check = () => {
+				if (handler.statuses.filter(s => s === 'ready').length >= 2) return resolve()
+				if (Date.now() - start > 3000) return reject(new Error('Timed out'))
+				setTimeout(check, 10)
+			}
+			check()
+		})
+
+		// If the original command ran instead, readyPattern 'override' wouldn't match
+		expect(handler.statuses.filter(s => s === 'ready').length).toBe(2)
+
+		await runner.stop()
+	}, 10000)
+})
+
+describe('ProcessRunner — errorMatcher', () => {
+	test('fires onError when error output is detected', async () => {
+		const handler = createHandler()
+		let errorCount = 0
+		handler.onError = () => {
+			errorCount++
+		}
+		const runner = new ProcessRunner(
+			'srv',
+			{
+				command: "echo 'something went wrong' && sleep 10",
+				errorMatcher: 'went wrong'
+			},
+			handler
+		)
+
+		runner.start(80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		expect(errorCount).toBeGreaterThan(0)
+
+		await runner.stop()
 	}, 5000)
 })
