@@ -171,7 +171,7 @@ Template properties (color, env, dependsOn, etc.) are inherited by all matched p
 | `--max-restarts <n>` | Max auto-restarts for crashed processes |
 | `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
 | `--no-watch` | Disable file watching even if config has `watch` patterns |
-| `-t, --timestamps` | Add `[HH:MM:SS]` timestamps to prefixed output |
+| `-t, --timestamps` | Add `HH:MM:SS` timestamps (prefix mode: inline, TUI mode: side gutter). Toggle in TUI with `T` |
 | `--log-dir <path>` | Persist logs to timestamped subdirs (`<path>/<timestamp>/<name>.log`) with a `latest` symlink. Path is printed on exit |
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |
