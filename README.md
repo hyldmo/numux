@@ -128,11 +128,12 @@ numux -n api="bun dev:api" -n web="bun dev:web"
 
 ### Script patterns
 
-Run multiple package.json scripts matching a glob pattern:
+Run package.json scripts by name — any colon-containing name is automatically recognized as a script reference:
 
 ```sh
-numux 'dev:*'             # all scripts matching dev:*
-numux 'npm:*:dev'         # explicit npm: prefix (same behavior)
+numux 'lint:eslint --fix'  # runs: yarn run lint:eslint --fix
+numux 'dev:*'              # all scripts matching dev:*
+numux 'npm:*:dev'          # explicit npm: prefix (same behavior)
 ```
 
 `*` does not match across `:` separators (like `/` in file paths), so `format:*` matches `format:store` but not `format:check:store`. Use `format:*:*` to match two levels deep.
