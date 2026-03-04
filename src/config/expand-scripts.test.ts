@@ -572,6 +572,38 @@ describe('expandScriptPatterns', () => {
 		expect(expandScriptPatterns(config)).toBe(config)
 	})
 
+	test('^  suffix excludes scripts that have children', () => {
+		const dir = setupDir('leaf-only', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'lint:ts': 'tsc --noEmit',
+				'lint:style': 'numux lint:style:*',
+				'lint:style:css': 'stylelint **/*.css',
+				'lint:style:scss': 'stylelint **/*.scss'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:*^': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// lint:style has children — excluded by ^
+		expect(names.sort()).toEqual(['eslint', 'ts'])
+	})
+
+	test('^ without suffix includes parent scripts', () => {
+		const dir = setupDir('no-leaf-only', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'lint:ts': 'tsc --noEmit',
+				'lint:style': 'numux lint:style:*',
+				'lint:style:css': 'stylelint **/*.css',
+				'lint:style:scss': 'stylelint **/*.scss'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Without ^, lint:style is included
+		expect(names.sort()).toEqual(['eslint', 'style', 'ts'])
+	})
+
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
 		// Simulates: numux '*:dev' — should only match scripts containing ":dev"
 		const dir = setupDir('cli-bare-glob', {
