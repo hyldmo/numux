@@ -29,6 +29,17 @@ function isGlobPattern(name: string): boolean {
 	return /[*?[]/.test(name)
 }
 
+/** Check whether a config entry should be treated as a package.json script reference.
+ *  Colon-containing names (like `lint:eslint`) are script references unless
+ *  the value is a string (explicit command) or an object with a `command` field. */
+function isScriptReference(name: string, value: unknown): boolean {
+	if (name.startsWith('npm:') || isGlobPattern(name)) return true
+	if (!name.includes(':')) return false
+	if (typeof value === 'string') return false
+	if (value && typeof value === 'object' && 'command' in value) return false
+	return true
+}
+
 /** Derive a short display name by stripping the literal prefix & suffix of the
  *  glob pattern from the matched script name.
  *  e.g. pattern "dev:*" + script "dev:web" → "web"
@@ -62,8 +73,8 @@ function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
 
 export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxConfig {
 	const entries = Object.entries(config.processes)
-	const hasWildcard = entries.some(([name]) => name.startsWith('npm:') || isGlobPattern(name))
-	if (!hasWildcard) return config
+	const hasScriptRef = entries.some(([name, value]) => isScriptReference(name, value))
+	if (!hasScriptRef) return config
 
 	const dir = config.cwd ?? cwd ?? process.cwd()
 	const pkgPath = resolve(dir, 'package.json')
@@ -84,7 +95,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 	const expanded: Record<string, NumuxProcessConfig | string> = {}
 
 	for (const [name, value] of entries) {
-		if (!(name.startsWith('npm:') || isGlobPattern(name))) {
+		if (!isScriptReference(name, value)) {
 			expanded[name] = value as NumuxProcessConfig | string
 			continue
 		}
