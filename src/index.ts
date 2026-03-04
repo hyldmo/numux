@@ -150,7 +150,8 @@ async function main() {
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0 || parsed.workspace) {
-		const isScriptPattern = (c: string) => c.startsWith('npm:') || /[*?[]/.test(c)
+		const isScriptPattern = (c: string) =>
+			c.startsWith('npm:') || /[*?[]/.test(c) || c.split(/\s+/)[0].includes(':')
 		const hasNpmPatterns = parsed.commands.some(isScriptPattern)
 		if (hasNpmPatterns) {
 			// Expand npm:/glob patterns into named processes, pass remaining commands as-is

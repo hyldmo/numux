@@ -480,6 +480,98 @@ describe('expandScriptPatterns', () => {
 		expect(names.sort()).toEqual(['check:odoo', 'check:store'])
 	})
 
+	test('exact colon name expands as script reference', () => {
+		const dir = setupDir('colon-exact', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .', 'lint:ts': 'tsc --noEmit' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:eslint': {} } }, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint')
+	})
+
+	test('exact colon name with extra args', () => {
+		const dir = setupDir('colon-exact-args', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:eslint --fix': {} } }, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint --fix')
+	})
+
+	test('exact colon name inherits template properties', () => {
+		const dir = setupDir('colon-exact-template', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const result = expandScriptPatterns(
+			{ processes: { 'lint:eslint': { env: { FIX: '1' }, color: '#ff0000' } } },
+			dir
+		)
+		expect(proc(result, 'lint:eslint').env).toEqual({ FIX: '1' })
+		expect(proc(result, 'lint:eslint').color).toBe('#ff0000')
+	})
+
+	test('exact colon name with string value is NOT expanded', () => {
+		const dir = setupDir('colon-exact-string', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const config: NumuxConfig = { processes: { 'lint:eslint': 'custom-command' } }
+		const result = expandScriptPatterns(config, dir)
+		expect(result.processes['lint:eslint']).toBe('custom-command')
+	})
+
+	test('exact colon name with explicit command is NOT expanded', () => {
+		const dir = setupDir('colon-exact-cmd', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const config: NumuxConfig = {
+			processes: { 'lint:eslint': { command: 'custom-command' } }
+		}
+		const result = expandScriptPatterns(config, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('custom-command')
+	})
+
+	test('exact colon name not in scripts throws', () => {
+		const dir = setupDir('colon-exact-missing', {
+			'package.json': pkgJson({ dev: 'next dev', build: 'tsc' })
+		})
+		expect(() => expandScriptPatterns({ processes: { 'lint:eslint': {} } }, dir)).toThrow(
+			/no scripts matched.*Available scripts/
+		)
+	})
+
+	test('exact colon name mixed with regular and glob processes', () => {
+		const dir = setupDir('colon-exact-mixed', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'dev:web': 'next dev',
+				'dev:api': 'bun api'
+			})
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					db: 'docker compose up',
+					'lint:eslint': {},
+					'dev:*': {}
+				}
+			},
+			dir
+		)
+		expect(result.processes.db).toBe('docker compose up')
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint')
+		expect(proc(result, 'web').command).toBe('npm run dev:web')
+		expect(proc(result, 'api').command).toBe('npm run dev:api')
+	})
+
+	test('only string-value colon names do not trigger package.json read', () => {
+		// No package.json needed — all colon names have string values
+		const config: NumuxConfig = {
+			processes: {
+				'docker:compose': 'docker compose up',
+				web: 'echo hi'
+			}
+		}
+		expect(expandScriptPatterns(config)).toBe(config)
+	})
+
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
 		// Simulates: numux '*:dev' — should only match scripts containing ":dev"
 		const dir = setupDir('cli-bare-glob', {
