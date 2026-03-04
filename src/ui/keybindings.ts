@@ -13,6 +13,7 @@ export const SHORTCUTS = {
 	restart: { key: 'r', label: 'R', description: 'restart' },
 	stopStart: { key: 's', label: 'S', description: 'stop/start' },
 	clear: { key: 'l', label: 'L', description: 'clear' },
+	timestamps: { key: 't', label: 'T', description: 'timestamps' },
 	scrollToTop: { key: 'g', label: 'G', description: 'top' },
 	scrollToBottom: { key: 'g', label: 'Shift+G', description: 'bottom', shift: true }
 } as const satisfies Record<string, Shortcut>
@@ -26,6 +27,7 @@ const STATUS_HINTS: [label: string, description: string][] = [
 	[SHORTCUTS.search.label, SHORTCUTS.search.description],
 	[SHORTCUTS.copy.label, SHORTCUTS.copy.description],
 	[SHORTCUTS.clear.label, SHORTCUTS.clear.description],
+	[SHORTCUTS.timestamps.label, SHORTCUTS.timestamps.description],
 	['Ctrl+Click', 'open link'],
 	['Ctrl+C', 'quit']
 ]

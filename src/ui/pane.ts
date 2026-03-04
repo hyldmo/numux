@@ -1,4 +1,10 @@
-import { type CliRenderer, ScrollBoxRenderable, type Selection } from '@opentui/core'
+import {
+	type CliRenderer,
+	LineNumberRenderable,
+	type LineSign,
+	ScrollBoxRenderable,
+	type Selection
+} from '@opentui/core'
 import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
@@ -16,17 +22,34 @@ const MAX_SCROLLBACK_LINES = 50_000
 // Fallback byte cap for hidden panes where lineCount isn't updated
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024
 
+function formatTimestamp(epochMs: number): string {
+	const d = new Date(epochMs)
+	const h = d.getHours().toString().padStart(2, '0')
+	const m = d.getMinutes().toString().padStart(2, '0')
+	const s = d.getSeconds().toString().padStart(2, '0')
+	return `${h}:${m}:${s}`
+}
+
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
 	readonly terminal: GhosttyTerminalRenderable
 	private decoder = new TextDecoder()
 	private bytesFed = 0
 
+	// Timestamp gutter
+	private renderer: CliRenderer
+	private timestampGutter: LineNumberRenderable | null = null
+	private _timestampsEnabled = false
+	/** Epoch ms when each logical line was first created */
+	lineTimestamps: number[] = []
+	private lineCounter = 0
+
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
 	private _onLinkClick: ((link: DetectedLink) => void) | null = null
 
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
+		this.renderer = renderer
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
 			flexGrow: 1,
@@ -86,9 +109,27 @@ export class Pane {
 		if (this.terminal.lineCount > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
 			this.terminal.reset()
 			this.bytesFed = 0
+			this.lineTimestamps = []
+			this.lineCounter = 0
+		}
+		const now = Date.now()
+		// Record timestamp for first line if we haven't yet
+		if (this.lineCounter === 0) {
+			this.lineTimestamps.push(now)
+			this.lineCounter = 1
+		}
+		// Count newlines in the incoming data
+		for (let i = 0; i < data.length; i++) {
+			if (data[i] === 0x0a) {
+				this.lineTimestamps.push(now)
+				this.lineCounter++
+			}
 		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
+		if (this._timestampsEnabled) {
+			this.updateTimestampSigns()
+		}
 	}
 
 	resize(cols: number, rows: number): void {
@@ -179,6 +220,58 @@ export class Pane {
 	clear(): void {
 		this.terminal.reset()
 		this.bytesFed = 0
+		this.lineTimestamps = []
+		this.lineCounter = 0
+		if (this._timestampsEnabled) {
+			this.timestampGutter?.clearAllLineSigns()
+		}
+	}
+
+	setTimestamps(enabled: boolean): void {
+		if (this._timestampsEnabled === enabled) return
+		this._timestampsEnabled = enabled
+
+		if (enabled) {
+			// Wrap terminal in LineNumberRenderable for gutter + scroll sync
+			this.scrollBox.remove(this.terminal.id)
+			this.timestampGutter = new LineNumberRenderable(this.renderer, {
+				id: `ts-${this.terminal.id}`,
+				target: this.terminal,
+				showLineNumbers: false,
+				minWidth: 9,
+				paddingRight: 0,
+				fg: '#666666'
+			})
+			this.scrollBox.add(this.timestampGutter)
+			this.updateTimestampSigns()
+		} else {
+			// Unwrap: detach terminal from gutter, add directly to scrollBox
+			if (this.timestampGutter) {
+				this.timestampGutter.clearTarget()
+				this.scrollBox.remove(this.timestampGutter.id)
+				this.timestampGutter = null
+			}
+			this.scrollBox.add(this.terminal)
+		}
+	}
+
+	get timestampsEnabled(): boolean {
+		return this._timestampsEnabled
+	}
+
+	private updateTimestampSigns(): void {
+		if (!this.timestampGutter) return
+		const signs = new Map<number, LineSign>()
+		let prevFormatted = ''
+		for (let i = 0; i < this.lineTimestamps.length; i++) {
+			const formatted = formatTimestamp(this.lineTimestamps[i])
+			// Only show timestamp when it changes from the previous line
+			if (formatted !== prevFormatted) {
+				signs.set(i, { before: formatted })
+				prevFormatted = formatted
+			}
+		}
+		this.timestampGutter.setLineSigns(signs)
 	}
 
 	destroy(): void {
