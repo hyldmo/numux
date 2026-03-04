@@ -110,13 +110,20 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			)
 		}
 
-		const glob = new Bun.Glob(globPattern)
-		const colonDepth = (globPattern.match(/:/g) || []).length
-		const matches = scriptNames.filter(s => glob.match(s) && (s.match(/:/g) || []).length === colonDepth)
+		const leafOnly = globPattern.endsWith('^')
+		const effectivePattern = leafOnly ? globPattern.slice(0, -1) : globPattern
+		const glob = new Bun.Glob(effectivePattern)
+		const colonDepth = (effectivePattern.match(/:/g) || []).length
+		const matches = scriptNames.filter(
+			s =>
+				glob.match(s) &&
+				(s.match(/:/g) || []).length === colonDepth &&
+				!(leafOnly && scriptNames.some(other => other.startsWith(`${s}:`)))
+		)
 
 		if (matches.length === 0) {
 			throw new Error(
-				`"${name}": no scripts matched pattern "${globPattern}". Available scripts: ${scriptNames.join(', ')}`
+				`"${name}": no scripts matched pattern "${effectivePattern}". Available scripts: ${scriptNames.join(', ')}`
 			)
 		}
 
@@ -125,7 +132,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 
 		for (let i = 0; i < matches.length; i++) {
 			const scriptName = matches[i]
-			const displayName = deriveShortName(globPattern, scriptName)
+			const displayName = deriveShortName(effectivePattern, scriptName)
 
 			if (expanded[displayName]) {
 				throw new Error(`"${name}": expanded script "${scriptName}" collides with an existing process name`)

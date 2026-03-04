@@ -138,6 +138,8 @@ numux 'npm:*:dev'          # explicit npm: prefix (same behavior)
 
 `*` does not match across `:` separators (like `/` in file paths), so `format:*` matches `format:store` but not `format:check:store`. Use `format:*:*` to match two levels deep.
 
+Append `^` to skip scripts that act as group runners — scripts that have sub-scripts beneath them. For example, if `format:check` runs `numux 'format:check:*'` internally, then `format:*^` excludes it (because `format:check:store` and `format:check:odoo` exist as sub-scripts), avoiding duplicate runs.
+
 Extra arguments after the pattern are forwarded to each matched command:
 
 ```sh
