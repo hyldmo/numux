@@ -313,6 +313,27 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(0)
 	}, 10000)
 
+	test('CHA col-1 sequence triggers overwrite instead of concatenation', async () => {
+		// Progress displays often use \x1b[2K\x1b[G (erase-line + CHA col-1)
+		// to overwrite the current line. CHA col-1 must become \r so the
+		// overwrite logic keeps only the final content.
+		const config = writeConfig(
+			'cha-overwrite.json',
+			JSON.stringify({
+				processes: {
+					cha: {
+						command: `bun -e "process.stdout.write('file.ts\\x1b[2K\\x1b[1Gfile.ts 0ms (cached)\\n')"`
+					}
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const contentLines = stdout.split('\n').filter(l => l.startsWith('[cha]') && !l.includes('$'))
+		// Should show only the final overwrite, not concatenated filenames
+		expect(contentLines.some(l => l === '[cha] file.ts 0ms (cached)')).toBe(true)
+		expect(exitCode).toBe(0)
+	}, 10000)
+
 	test('SGR color sequences are preserved', async () => {
 		const config = writeConfig(
 			'sgr-preserved.json',
@@ -373,5 +394,23 @@ describe('stripCursorSequences', () => {
 	test('strips sequences without explicit count', () => {
 		// \x1b[A is same as \x1b[1A (move up 1)
 		expect(stripCursorSequences('before\x1b[Aafter')).toBe('beforeafter')
+	})
+
+	test('replaces CHA col-1 (\\x1b[G) with \\r', () => {
+		expect(stripCursorSequences('file.ts\x1b[Gfile.ts 0ms')).toBe('file.ts\rfile.ts 0ms')
+	})
+
+	test('replaces CHA col-1 (\\x1b[1G) with \\r', () => {
+		expect(stripCursorSequences('file.ts\x1b[1Gfile.ts 0ms')).toBe('file.ts\rfile.ts 0ms')
+	})
+
+	test('strips CHA with other columns', () => {
+		// \x1b[5G (go to column 5) is not col-1, so strip it
+		expect(stripCursorSequences('before\x1b[5Gafter')).toBe('beforeafter')
+	})
+
+	test('replaces CHA col-1 combined with erase-line', () => {
+		// Common progress pattern: erase line + move to col 1
+		expect(stripCursorSequences('file.ts\x1b[2K\x1b[1Gfile.ts 0ms')).toBe('file.ts\rfile.ts 0ms')
 	})
 })
