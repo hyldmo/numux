@@ -7,17 +7,22 @@ const RESET = ANSI_RESET
 const DIM = '\x1b[90m'
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences requires \x1b
+const CHA_COL1_RE = /\x1b\[1?G/g
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences requires \x1b
 const CURSOR_SEQ_RE = /\x1b\[[\d;]*[ABCDEFGHJKLMSTdf]/g
 
 /**
  * Strip CSI sequences that move the cursor or erase content.
  * Keeps SGR sequences (\x1b[...m) for colors/styles.
  *
- * Stripped: cursor movement (A/B/C/D/E/F/G/H/d/f), erasure (J/K),
- * scrolling (S/T), line insert/delete (L/M).
+ * CHA col-1 (\x1b[G / \x1b[1G) is replaced with \r so the existing
+ * carriage-return overwrite logic applies. All other cursor movement
+ * (A/B/C/D/E/F/H/d/f), erasure (J/K), scrolling (S/T), and
+ * line insert/delete (L/M) are stripped.
  */
 export function stripCursorSequences(text: string): string {
-	return text.replace(CURSOR_SEQ_RE, '')
+	return text.replace(CHA_COL1_RE, '\r').replace(CURSOR_SEQ_RE, '')
 }
 
 /**
