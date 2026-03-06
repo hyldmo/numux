@@ -24,6 +24,7 @@ export class StatusBar {
 			bg: '#1a1a1a',
 			paddingX: 1
 		})
+		this.renderable.selectable = false
 	}
 
 	setSearchMode(

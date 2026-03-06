@@ -60,8 +60,15 @@ export class Pane {
 					this._onCopy?.(text)
 				} else {
 					// Click without drag — clear the empty selection to prevent
-					// visual block artifacts from the text buffer's highlight
-					queueMicrotask(() => renderer.clearSelection())
+					// visual block artifacts from the text buffer's highlight.
+					// Guard: if a new selection started before the microtask
+					// fires, don't wipe it out.
+					const stale = renderer.getSelection()
+					queueMicrotask(() => {
+						if (renderer.getSelection() === stale) {
+							renderer.clearSelection()
+						}
+					})
 				}
 			}
 			return result
