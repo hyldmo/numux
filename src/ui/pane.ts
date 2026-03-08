@@ -1,5 +1,12 @@
-import { type CliRenderer, ScrollBoxRenderable, type Selection } from '@opentui/core'
+import {
+	type CliRenderer,
+	LineNumberRenderable,
+	type LineSign,
+	ScrollBoxRenderable,
+	type Selection
+} from '@opentui/core'
 import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import { DEFAULT_TIMESTAMP_FORMAT, formatTimestamp } from '../utils/timestamp'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
 export interface SearchMatch {
@@ -22,11 +29,20 @@ export class Pane {
 	private decoder = new TextDecoder()
 	private bytesFed = 0
 
+	// Timestamp gutter
+	private renderer: CliRenderer
+	private timestampGutter: LineNumberRenderable | null = null
+	private _timestampFormat: string | null = null
+	/** Epoch ms when each logical line was first created */
+	lineTimestamps: number[] = []
+	private lineCounter = 0
+
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
 	private _onLinkClick: ((link: DetectedLink) => void) | null = null
 
 	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
+		this.renderer = renderer
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
 			flexGrow: 1,
@@ -93,9 +109,27 @@ export class Pane {
 		if (this.terminal.lineCount > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
 			this.terminal.reset()
 			this.bytesFed = 0
+			this.lineTimestamps = []
+			this.lineCounter = 0
+		}
+		const now = Date.now()
+		// Record timestamp for first line if we haven't yet
+		if (this.lineCounter === 0) {
+			this.lineTimestamps.push(now)
+			this.lineCounter = 1
+		}
+		// Count newlines in the incoming data
+		for (let i = 0; i < data.length; i++) {
+			if (data[i] === 0x0a) {
+				this.lineTimestamps.push(now)
+				this.lineCounter++
+			}
 		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
+		if (this._timestampFormat) {
+			this.updateTimestampSigns()
+		}
 	}
 
 	resize(cols: number, rows: number): void {
@@ -186,6 +220,68 @@ export class Pane {
 	clear(): void {
 		this.terminal.reset()
 		this.bytesFed = 0
+		this.lineTimestamps = []
+		this.lineCounter = 0
+		if (this._timestampFormat) {
+			this.timestampGutter?.clearAllLineSigns()
+		}
+	}
+
+	/** Enable or disable the timestamp gutter. Pass `true` for default format, a string for custom format, or `false` to disable. */
+	setTimestamps(value: boolean | string): void {
+		const newFormat = !value ? null : typeof value === 'string' ? value : DEFAULT_TIMESTAMP_FORMAT
+		const wasEnabled = this._timestampFormat !== null
+		const isEnabled = newFormat !== null
+
+		if (wasEnabled === isEnabled && this._timestampFormat === newFormat) return
+		this._timestampFormat = newFormat
+
+		if (isEnabled && !wasEnabled) {
+			// Wrap terminal in LineNumberRenderable for gutter + scroll sync
+			this.scrollBox.remove(this.terminal.id)
+			const gutterWidth = (newFormat?.length ?? 8) + 1
+			this.timestampGutter = new LineNumberRenderable(this.renderer, {
+				id: `ts-${this.terminal.id}`,
+				target: this.terminal,
+				showLineNumbers: false,
+				minWidth: gutterWidth,
+				paddingRight: 0,
+				fg: '#666666'
+			})
+			this.scrollBox.add(this.timestampGutter)
+			this.updateTimestampSigns()
+		} else if (!isEnabled && wasEnabled) {
+			// Unwrap: detach terminal from gutter, add directly to scrollBox
+			if (this.timestampGutter) {
+				this.timestampGutter.clearTarget()
+				this.scrollBox.remove(this.timestampGutter.id)
+				this.timestampGutter = null
+			}
+			this.scrollBox.add(this.terminal)
+		} else if (isEnabled) {
+			// Format changed while enabled — update signs
+			this.updateTimestampSigns()
+		}
+	}
+
+	get timestampsEnabled(): boolean {
+		return this._timestampFormat !== null
+	}
+
+	private updateTimestampSigns(): void {
+		if (!(this.timestampGutter && this._timestampFormat)) return
+		const fmt = this._timestampFormat
+		const signs = new Map<number, LineSign>()
+		let prevFormatted = ''
+		for (let i = 0; i < this.lineTimestamps.length; i++) {
+			const formatted = formatTimestamp(new Date(this.lineTimestamps[i]), fmt)
+			// Only show timestamp when it changes from the previous line
+			if (formatted !== prevFormatted) {
+				signs.set(i, { before: formatted })
+				prevFormatted = formatted
+			}
+		}
+		this.timestampGutter.setLineSigns(signs)
 	}
 
 	destroy(): void {

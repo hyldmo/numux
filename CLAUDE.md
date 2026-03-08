@@ -37,6 +37,7 @@ src/
 - Panes are **readonly by default** — keyboard input is not forwarded to processes
 - Arrow keys (Up/Down) navigate between tabs, PageUp/PageDown scroll by page, Home/End to top/bottom
 - Mouse drag selects text and auto-copies to clipboard (OSC 52); `Y` key also copies selection
+- `T` toggles an `HH:MM:SS` timestamp gutter in TUI mode; also enabled via `timestamps: true` config or `--timestamps` flag. Accepts a format string (e.g. `timestamps: "HH:mm:ss.SSS"`) with tokens: `YYYY`, `MM`, `DD`, `HH`, `hh`, `mm`, `ss`, `SSS`, `A`
 - Keybinding hints are shown in the status bar; config lives in `src/ui/keybindings.ts`
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor

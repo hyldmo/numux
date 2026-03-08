@@ -96,8 +96,8 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default false
 	 */
 	prefix?: boolean
-	/** Add timestamps to prefixed output lines (only applies when `prefix` is true) */
-	timestamps?: boolean
+	/** Add timestamps to output lines. `true` uses default `HH:mm:ss` format, or pass a format string (e.g. `"HH:mm:ss.SSS"`) */
+	timestamps?: boolean | string
 	/**
 	 * Kill all processes when any one exits (regardless of exit code)
 	 * @default false
@@ -129,7 +129,7 @@ export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'depends
 export interface ResolvedNumuxConfig {
 	sort?: SortOrder
 	prefix?: boolean
-	timestamps?: boolean
+	timestamps?: boolean | string
 	killOthers?: boolean
 	killOthersOnFail?: boolean
 	noWatch?: boolean

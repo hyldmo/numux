@@ -21,7 +21,18 @@ interface ValueFlag {
 	parse?: (raw: string, flag: string) => unknown
 }
 
-export type FlagDef = BooleanFlag | ValueFlag
+/** Flag that acts as boolean when used alone, or accepts a value: --flag or --flag <value> */
+interface OptionalValueFlag {
+	type: 'optional-value'
+	long: string
+	short?: string
+	key: keyof ParsedArgs
+	description: string
+	valueName: string
+	completionHint?: 'file' | 'directory' | 'none'
+}
+
+export type FlagDef = BooleanFlag | ValueFlag | OptionalValueFlag
 
 export interface SubcommandDef {
 	name: string
@@ -167,11 +178,13 @@ export const FLAGS: FlagDef[] = [
 		description: 'Disable file watching even if config has watch patterns'
 	},
 	{
-		type: 'boolean',
+		type: 'optional-value',
 		long: '--timestamps',
 		short: '-t',
 		key: 'timestamps',
-		description: 'Add timestamps to prefixed output lines'
+		description: 'Add timestamps to output (default HH:mm:ss, or pass a format string)',
+		valueName: '<format>',
+		completionHint: 'none'
 	},
 	{
 		type: 'value',
@@ -274,6 +287,7 @@ export function generateHelp(): string {
 		if (f.short) parts.push(`${f.short},`)
 		parts.push(f.long)
 		if (f.type === 'value') parts.push(f.valueName)
+		if (f.type === 'optional-value') parts.push(`[${f.valueName}]`)
 		const left = `  ${parts.join(' ')}`
 		lines.push(`${left.padEnd(29)}${f.description}`)
 	}

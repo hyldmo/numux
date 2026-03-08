@@ -75,6 +75,20 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv('--timestamps')).timestamps).toBe(true)
 	})
 
+	test('--timestamps accepts a format string', () => {
+		expect(parseArgs(argv('--timestamps', 'HH:mm:ss.SSS')).timestamps).toBe('HH:mm:ss.SSS')
+	})
+
+	test('-t accepts a format string', () => {
+		expect(parseArgs(argv('-t', 'hh:mm A')).timestamps).toBe('hh:mm A')
+	})
+
+	test('--timestamps without value before another flag defaults to true', () => {
+		const parsed = parseArgs(argv('--timestamps', '--prefix'))
+		expect(parsed.timestamps).toBe(true)
+		expect(parsed.prefix).toBe(true)
+	})
+
 	test('timestamps is false by default', () => {
 		expect(parseArgs(argv()).timestamps).toBe(false)
 	})
