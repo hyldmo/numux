@@ -6,6 +6,7 @@ import {
 	type Selection
 } from '@opentui/core'
 import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import { DEFAULT_TIMESTAMP_FORMAT, formatTimestamp } from '../utils/timestamp'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
 export interface SearchMatch {
@@ -22,14 +23,6 @@ const MAX_SCROLLBACK_LINES = 50_000
 // Fallback byte cap for hidden panes where lineCount isn't updated
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024
 
-function formatTimestamp(epochMs: number): string {
-	const d = new Date(epochMs)
-	const h = d.getHours().toString().padStart(2, '0')
-	const m = d.getMinutes().toString().padStart(2, '0')
-	const s = d.getSeconds().toString().padStart(2, '0')
-	return `${h}:${m}:${s}`
-}
-
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
 	readonly terminal: GhosttyTerminalRenderable
@@ -39,7 +32,7 @@ export class Pane {
 	// Timestamp gutter
 	private renderer: CliRenderer
 	private timestampGutter: LineNumberRenderable | null = null
-	private _timestampsEnabled = false
+	private _timestampFormat: string | null = null
 	/** Epoch ms when each logical line was first created */
 	lineTimestamps: number[] = []
 	private lineCounter = 0
@@ -127,7 +120,7 @@ export class Pane {
 		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
-		if (this._timestampsEnabled) {
+		if (this._timestampFormat) {
 			this.updateTimestampSigns()
 		}
 	}
@@ -222,29 +215,35 @@ export class Pane {
 		this.bytesFed = 0
 		this.lineTimestamps = []
 		this.lineCounter = 0
-		if (this._timestampsEnabled) {
+		if (this._timestampFormat) {
 			this.timestampGutter?.clearAllLineSigns()
 		}
 	}
 
-	setTimestamps(enabled: boolean): void {
-		if (this._timestampsEnabled === enabled) return
-		this._timestampsEnabled = enabled
+	/** Enable or disable the timestamp gutter. Pass `true` for default format, a string for custom format, or `false` to disable. */
+	setTimestamps(value: boolean | string): void {
+		const newFormat = !value ? null : typeof value === 'string' ? value : DEFAULT_TIMESTAMP_FORMAT
+		const wasEnabled = this._timestampFormat !== null
+		const isEnabled = newFormat !== null
 
-		if (enabled) {
+		if (wasEnabled === isEnabled && this._timestampFormat === newFormat) return
+		this._timestampFormat = newFormat
+
+		if (isEnabled && !wasEnabled) {
 			// Wrap terminal in LineNumberRenderable for gutter + scroll sync
 			this.scrollBox.remove(this.terminal.id)
+			const gutterWidth = (newFormat?.length ?? 8) + 1
 			this.timestampGutter = new LineNumberRenderable(this.renderer, {
 				id: `ts-${this.terminal.id}`,
 				target: this.terminal,
 				showLineNumbers: false,
-				minWidth: 9,
+				minWidth: gutterWidth,
 				paddingRight: 0,
 				fg: '#666666'
 			})
 			this.scrollBox.add(this.timestampGutter)
 			this.updateTimestampSigns()
-		} else {
+		} else if (!isEnabled && wasEnabled) {
 			// Unwrap: detach terminal from gutter, add directly to scrollBox
 			if (this.timestampGutter) {
 				this.timestampGutter.clearTarget()
@@ -252,19 +251,23 @@ export class Pane {
 				this.timestampGutter = null
 			}
 			this.scrollBox.add(this.terminal)
+		} else if (isEnabled) {
+			// Format changed while enabled — update signs
+			this.updateTimestampSigns()
 		}
 	}
 
 	get timestampsEnabled(): boolean {
-		return this._timestampsEnabled
+		return this._timestampFormat !== null
 	}
 
 	private updateTimestampSigns(): void {
-		if (!this.timestampGutter) return
+		if (!(this.timestampGutter && this._timestampFormat)) return
+		const fmt = this._timestampFormat
 		const signs = new Map<number, LineSign>()
 		let prevFormatted = ''
 		for (let i = 0; i < this.lineTimestamps.length; i++) {
-			const formatted = formatTimestamp(this.lineTimestamps[i])
+			const formatted = formatTimestamp(new Date(this.lineTimestamps[i]), fmt)
 			// Only show timestamp when it changes from the previous line
 			if (formatted !== prevFormatted) {
 				signs.set(i, { before: formatted })

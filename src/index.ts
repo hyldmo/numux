@@ -239,16 +239,18 @@ async function main() {
 
 	printWarnings(warnings)
 
+	const timestamps = parsed.timestamps || config.timestamps
 	const usePrefix = parsed.prefix || config.prefix
 	if (usePrefix) {
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
 			killOthers: parsed.killOthers || config.killOthers,
 			killOthersOnFail: parsed.killOthersOnFail || config.killOthersOnFail,
-			timestamps: parsed.timestamps || config.timestamps
+			timestamps
 		})
 		await display.start()
 	} else {
+		if (timestamps) config.timestamps = timestamps
 		manager.on(logWriter.handleEvent)
 		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)

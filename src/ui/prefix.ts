@@ -2,6 +2,7 @@ import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { ANSI_RESET, buildProcessColorMap, STATUS_ANSI, stripAnsi } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
+import { formatTimestamp, resolveTimestampFormat } from '../utils/timestamp'
 
 const RESET = ANSI_RESET
 const DIM = '\x1b[90m'
@@ -28,7 +29,7 @@ export interface PrefixDisplayOptions {
 	logWriter?: LogWriter
 	killOthers?: boolean
 	killOthersOnFail?: boolean
-	timestamps?: boolean
+	timestamps?: boolean | string
 }
 
 export class PrefixDisplay {
@@ -40,7 +41,7 @@ export class PrefixDisplay {
 	private logWriter?: LogWriter
 	private killOthers: boolean
 	private killOthersOnFail: boolean
-	private timestamps: boolean
+	private timestampFormat: string | null
 	private stopping = false
 	private startTime = 0
 
@@ -49,7 +50,7 @@ export class PrefixDisplay {
 		this.logWriter = options.logWriter
 		this.killOthers = options.killOthers ?? false
 		this.killOthersOnFail = options.killOthersOnFail ?? false
-		this.timestamps = options.timestamps ?? false
+		this.timestampFormat = resolveTimestampFormat(options.timestamps)
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.colors = buildProcessColorMap(names, config)
@@ -142,17 +143,10 @@ export class PrefixDisplay {
 		// Status messages are not printed in prefix mode — only process output
 	}
 
-	private formatTimestamp(): string {
-		const now = new Date()
-		const h = String(now.getHours()).padStart(2, '0')
-		const m = String(now.getMinutes()).padStart(2, '0')
-		const s = String(now.getSeconds()).padStart(2, '0')
-		return `${h}:${m}:${s}`
-	}
-
 	private printLine(name: string, line: string): void {
-		const ts = this.timestamps ? `${DIM}[${this.formatTimestamp()}]${RESET} ` : ''
-		const tsPlain = this.timestamps ? `[${this.formatTimestamp()}] ` : ''
+		const fmt = this.timestampFormat
+		const ts = fmt ? `${DIM}[${formatTimestamp(new Date(), fmt)}]${RESET} ` : ''
+		const tsPlain = fmt ? `[${formatTimestamp(new Date(), fmt)}] ` : ''
 		if (this.noColor) {
 			process.stdout.write(`${tsPlain}[${name}] ${stripAnsi(line)}\n`)
 		} else {

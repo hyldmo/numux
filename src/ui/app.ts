@@ -110,7 +110,7 @@ export class App {
 			const interactive = this.config.processes[name].interactive === true
 			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
 			if (this.config.timestamps) {
-				pane.setTimestamps(true)
+				pane.setTimestamps(this.config.timestamps)
 			}
 			pane.onCopy(text => {
 				this.copyToClipboard(text)
@@ -252,11 +252,13 @@ export class App {
 				}
 
 				if (name === SHORTCUTS.timestamps.key) {
-					// Toggle timestamps on all panes
+					// Toggle timestamps on all panes (use config format or default)
 					const firstPane = this.panes.values().next().value
-					const newState = firstPane ? !firstPane.timestampsEnabled : true
-					for (const pane of this.panes.values()) {
-						pane.setTimestamps(newState)
+					if (firstPane?.timestampsEnabled) {
+						for (const pane of this.panes.values()) pane.setTimestamps(false)
+					} else {
+						const fmt: boolean | string = this.config.timestamps ?? true
+						for (const pane of this.panes.values()) pane.setTimestamps(fmt)
 					}
 					return
 				}

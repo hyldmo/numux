@@ -4,11 +4,11 @@ import { Pane } from './pane'
 
 const encoder = new TextEncoder()
 
-async function createPane(opts?: { timestamps?: boolean }) {
+async function createPane(opts?: { timestamps?: boolean | string }) {
 	const { renderer } = await createTestRenderer({ width: 80, height: 24 })
 	const pane = new Pane(renderer, 'test', 80, 24)
 	if (opts?.timestamps) {
-		pane.setTimestamps(true)
+		pane.setTimestamps(opts.timestamps)
 	}
 	return pane
 }
@@ -64,10 +64,18 @@ describe('Pane timestamp tracking', () => {
 })
 
 describe('Pane timestamp toggle', () => {
-	test('setTimestamps enables and disables', async () => {
+	test('setTimestamps enables and disables with boolean', async () => {
 		const pane = await createPane()
 		expect(pane.timestampsEnabled).toBe(false)
 		pane.setTimestamps(true)
+		expect(pane.timestampsEnabled).toBe(true)
+		pane.setTimestamps(false)
+		expect(pane.timestampsEnabled).toBe(false)
+	})
+
+	test('setTimestamps accepts a format string', async () => {
+		const pane = await createPane()
+		pane.setTimestamps('HH:mm:ss.SSS')
 		expect(pane.timestampsEnabled).toBe(true)
 		pane.setTimestamps(false)
 		expect(pane.timestampsEnabled).toBe(false)
@@ -88,5 +96,10 @@ describe('Pane timestamp toggle', () => {
 		expect(pane.timestampsEnabled).toBe(true)
 		pane.feed(encoder.encode('hello\nworld\n'))
 		expect(pane.lineTimestamps.length).toBe(3)
+	})
+
+	test('timestamps can be enabled with format from constructor flow', async () => {
+		const pane = await createPane({ timestamps: 'HH:mm:ss.SSS' })
+		expect(pane.timestampsEnabled).toBe(true)
 	})
 })

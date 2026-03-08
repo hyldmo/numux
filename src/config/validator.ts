@@ -43,7 +43,8 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 
 	const sort = validateSort(config.sort)
 	const prefix = config.prefix === true ? true : undefined
-	const timestamps = config.timestamps === true ? true : undefined
+	const timestamps =
+		config.timestamps === true ? true : typeof config.timestamps === 'string' ? config.timestamps : undefined
 	const killOthers = config.killOthers === true ? true : undefined
 	const killOthersOnFail = config.killOthersOnFail === true ? true : undefined
 	const noWatch = config.noWatch === true ? true : undefined

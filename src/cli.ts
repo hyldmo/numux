@@ -15,7 +15,7 @@ export interface ParsedArgs {
 	prefix: boolean
 	killOthers: boolean
 	killOthersOnFail: boolean
-	timestamps: boolean
+	timestamps: boolean | string
 	noWatch: boolean
 	maxRestarts?: number
 	autoColors: boolean
@@ -72,6 +72,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		if (flag) {
 			if (flag.type === 'boolean') {
 				;(result as any)[flag.key] = true
+			} else if (flag.type === 'optional-value') {
+				// Peek at next arg — consume as value if it exists and doesn't look like a flag
+				const next = args[i + 1]
+				if (next !== undefined && !next.startsWith('-')) {
+					;(result as any)[flag.key] = next
+					i++
+				} else {
+					;(result as any)[flag.key] = true
+				}
 			} else {
 				const next = args[++i]
 				if (next === undefined) {
