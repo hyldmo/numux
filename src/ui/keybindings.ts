@@ -15,7 +15,8 @@ export const SHORTCUTS = {
 	clear: { key: 'l', label: 'L', description: 'clear' },
 	timestamps: { key: 't', label: 'T', description: 'timestamps' },
 	scrollToTop: { key: 'g', label: 'G', description: 'top' },
-	scrollToBottom: { key: 'g', label: 'Shift+G', description: 'bottom', shift: true }
+	scrollToBottom: { key: 'g', label: 'Shift+G', description: 'bottom', shift: true },
+	openLogs: { key: 'o', label: 'O', description: 'open logs' }
 } as const satisfies Record<string, Shortcut>
 
 /** Hints shown in the status bar (subset + navigation keys) */
@@ -28,6 +29,7 @@ const STATUS_HINTS: [label: string, description: string][] = [
 	[SHORTCUTS.copy.label, SHORTCUTS.copy.description],
 	[SHORTCUTS.clear.label, SHORTCUTS.clear.description],
 	[SHORTCUTS.timestamps.label, SHORTCUTS.timestamps.description],
+	[SHORTCUTS.openLogs.label, SHORTCUTS.openLogs.description],
 	['Ctrl+Click', 'open link'],
 	['Ctrl+C', 'quit']
 ]
