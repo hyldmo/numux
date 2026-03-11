@@ -395,6 +395,35 @@ describe('expandScriptPatterns', () => {
 		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
 	})
 
+	test('npm:studio:dev shorthand expands to npm run studio:dev', () => {
+		const dir = setupDir('studio-dev', {
+			'package.json': pkgJson({ 'studio:dev': 'prisma studio' })
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:studio:dev': { color: '#5A67D8' } } }, dir)
+		expect(proc(result, 'studio:dev').command).toBe('npm run studio:dev')
+		expect(proc(result, 'studio:dev').color).toBe('#5A67D8')
+	})
+
+	test('command value npm:script shorthand expands to pm run script', () => {
+		const dir = setupDir('cmd-shorthand', {
+			'package.json': pkgJson({ 'studio:dev': 'prisma studio' })
+		})
+		const result = expandScriptPatterns(
+			{ processes: { prisma: { command: 'npm:studio:dev', color: '#5A67D8' } } },
+			dir
+		)
+		expect(proc(result, 'prisma').command).toBe('npm run studio:dev')
+		expect(proc(result, 'prisma').color).toBe('#5A67D8')
+	})
+
+	test('command value npm:script with extra args', () => {
+		const dir = setupDir('cmd-shorthand-args', {
+			'package.json': pkgJson({ lint: 'eslint' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: { command: 'npm:lint --fix' } } }, dir)
+		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
+	})
+
 	test('prefix glob strips common prefix from process names', () => {
 		// numux 'dev:*' should produce tab names "web", "api", "db" not "dev:web", etc.
 		const dir = setupDir('prefix-strip', {
