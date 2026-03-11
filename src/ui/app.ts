@@ -263,6 +263,11 @@ export class App {
 					return
 				}
 
+				if (name === SHORTCUTS.openLogs.key) {
+					this.openLogDirectory()
+					return
+				}
+
 				// 1-9: jump to tab (uses display order from tab bar)
 				const num = Number.parseInt(name, 10)
 				if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
@@ -393,6 +398,18 @@ export class App {
 			} catch {
 				// Native clipboard tool not available, OSC 52 is the fallback
 			}
+		}
+	}
+
+	/** Open the log directory in the system file manager. */
+	private openLogDirectory(): void {
+		const dir = this.logWriter.getDirectory()
+		const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
+		try {
+			Bun.spawn([cmd, dir], { stdout: 'ignore', stderr: 'ignore' })
+			this.statusBar.showTemporaryMessage(`Opening ${dir}`)
+		} catch {
+			this.statusBar.showTemporaryMessage('Could not open log directory')
 		}
 	}
 
