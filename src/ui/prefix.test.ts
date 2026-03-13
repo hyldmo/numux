@@ -353,6 +353,106 @@ describe('PrefixDisplay (integration)', () => {
 	}, 10000)
 })
 
+describe('Summary formatting', () => {
+	test('summary aligns status and exit codes into columns', async () => {
+		const config = writeConfig(
+			'summary-align.json',
+			JSON.stringify({
+				processes: {
+					ok: { command: 'true' },
+					fail: { command: "sh -c 'exit 2'" }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		// Summary lines start with two spaces and are not process output (no [brackets])
+		const summaryLines = stdout.split('\n').filter(l => /^\s{2}\S/.test(l) && !l.startsWith('['))
+
+		const okLine = summaryLines.find(l => /\bok\b/.test(l))
+		const failLine = summaryLines.find(l => /\bfail\b/.test(l))
+		expect(okLine).toBeDefined()
+		expect(failLine).toBeDefined()
+
+		// "finished" and "failed" are different lengths — padding should align exit codes
+		const okExitIdx = okLine!.indexOf('(exit')
+		const failExitIdx = failLine!.indexOf('(exit')
+		expect(okExitIdx).toBe(failExitIdx)
+	}, 10000)
+
+	test('summary shows per-process duration', async () => {
+		const config = writeConfig(
+			'summary-duration.json',
+			JSON.stringify({
+				processes: {
+					fast: { command: 'true' }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		// Summary line for the process should contain a duration (e.g. "42ms" or "1.2s")
+		const lines = stdout.split('\n')
+		const summaryLine = lines.find(l => l.includes('fast') && l.includes('finished'))
+		expect(summaryLine).toBeDefined()
+		expect(summaryLine).toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('summary shows duration for failed processes', async () => {
+		const config = writeConfig(
+			'summary-duration-fail.json',
+			JSON.stringify({
+				processes: {
+					bad: { command: "sh -c 'exit 1'" }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const summaryLine = lines.find(l => l.includes('bad') && l.includes('failed'))
+		expect(summaryLine).toBeDefined()
+		expect(summaryLine).toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('skipped processes have no duration', async () => {
+		const config = writeConfig(
+			'summary-skipped.json',
+			JSON.stringify({
+				processes: {
+					dep: { command: "sh -c 'exit 1'" },
+					child: { command: 'true', dependsOn: ['dep'] }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const skippedLine = lines.find(l => l.includes('child') && l.includes('skipped'))
+		expect(skippedLine).toBeDefined()
+		// Skipped processes never started, so no duration should appear
+		expect(skippedLine).not.toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('summary names are padded to equal width', async () => {
+		const config = writeConfig(
+			'summary-namepad.json',
+			JSON.stringify({
+				processes: {
+					a: { command: 'true' },
+					longname: { command: 'true' }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const aLine = lines.find(l => /^\s+a\s/.test(l) && l.includes('finished'))
+		const longLine = lines.find(l => l.includes('longname') && l.includes('finished'))
+		expect(aLine).toBeDefined()
+		expect(longLine).toBeDefined()
+		// Status text should start at the same column
+		const aStatusIdx = aLine!.indexOf('finished')
+		const longStatusIdx = longLine!.indexOf('finished')
+		expect(aStatusIdx).toBe(longStatusIdx)
+	}, 10000)
+})
+
 describe('stripCursorSequences', () => {
 	test('strips cursor-up', () => {
 		expect(stripCursorSequences('before\x1b[1Aafter')).toBe('beforeafter')
