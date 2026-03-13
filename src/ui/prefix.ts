@@ -49,6 +49,7 @@ export class PrefixDisplay {
 	private timestampFormat: string | null
 	private stopping = false
 	private startTime = 0
+	private processTimes = new Map<string, { start: number; end?: number }>()
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, options: PrefixDisplayOptions = {}) {
 		this.manager = manager
@@ -144,8 +145,15 @@ export class PrefixDisplay {
 		}
 	}
 
-	private handleStatus(_name: string, _status: ProcessStatus): void {
-		// Status messages are not printed in prefix mode — only process output
+	private handleStatus(name: string, status: ProcessStatus): void {
+		if (status === 'running' || status === 'starting') {
+			if (!this.processTimes.has(name)) {
+				this.processTimes.set(name, { start: Date.now() })
+			}
+		} else if (status === 'finished' || status === 'failed' || status === 'stopped') {
+			const t = this.processTimes.get(name)
+			if (t && !t.end) t.end = Date.now()
+		}
 	}
 
 	private printLine(name: string, line: string): void {
@@ -203,8 +211,7 @@ export class PrefixDisplay {
 		})
 	}
 
-	private formatElapsed(): string {
-		const ms = Date.now() - this.startTime
+	private formatDuration(ms: number): string {
 		if (ms < 1000) return `${ms}ms`
 		const s = ms / 1000
 		if (s < 60) return `${s.toFixed(1)}s`
@@ -213,19 +220,29 @@ export class PrefixDisplay {
 		return `${m}m ${rem.toFixed(0)}s`
 	}
 
+	private formatElapsed(): string {
+		return this.formatDuration(Date.now() - this.startTime)
+	}
+
 	private printSummary(): void {
 		const states = this.manager.getAllStates()
 		const namePad = Math.max(...states.map(s => s.name.length))
+		const statusPad = Math.max(...states.map(s => s.status.length))
 		process.stdout.write('\n')
 		for (const s of states) {
 			const name = s.name.padEnd(namePad)
-			const exitStr = s.exitCode !== null ? `exit ${s.exitCode}` : ''
+			const exitStr = s.exitCode !== null ? `(exit ${s.exitCode})` : ''
+			const t = this.processTimes.get(s.name)
+			const duration = t ? this.formatDuration((t.end ?? Date.now()) - t.start) : ''
 			if (this.noColor) {
-				process.stdout.write(`  ${name}  ${s.status}${exitStr ? `  (${exitStr})` : ''}\n`)
+				const status = s.status.padEnd(statusPad)
+				process.stdout.write(`  ${name}  ${status}  ${exitStr.padEnd(9)}  ${duration}\n`)
 			} else {
 				const ansi = STATUS_ANSI[s.status] ?? ''
-				const statusText = ansi ? `${ansi}${s.status}${RESET}` : s.status
-				process.stdout.write(`  ${name}  ${statusText}${exitStr ? `  ${DIM}(${exitStr})${RESET}` : ''}\n`)
+				const statusPlain = s.status.padEnd(statusPad)
+				const statusText = ansi ? `${ansi}${statusPlain}${RESET}` : statusPlain
+				const exitPart = exitStr ? `${DIM}${exitStr.padEnd(9)}${RESET}` : ' '.repeat(9)
+				process.stdout.write(`  ${name}  ${statusText}  ${exitPart}  ${DIM}${duration}${RESET}\n`)
 			}
 		}
 		const elapsed = this.formatElapsed()
