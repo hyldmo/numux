@@ -344,7 +344,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		runner.restart(cols, rows, command, env)
@@ -400,7 +400,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		this.runners.get(name)?.restart(cols, rows, command, env)

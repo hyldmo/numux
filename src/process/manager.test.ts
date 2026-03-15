@@ -321,8 +321,51 @@ describe('ProcessManager — restartAll', () => {
 		mgr.restartAll(80, 24)
 		// Wait for restarts to complete
 		await new Promise(r => setTimeout(r, 1000))
-		expect(mgr.getState('a')?.restartCount).toBe(1)
-		expect(mgr.getState('b')?.restartCount).toBe(1)
+		expect(mgr.getState('a')?.restartCount).toBe(0)
+		expect(mgr.getState('b')?.restartCount).toBe(0)
+		await mgr.stopAll()
+	}, 10000)
+})
+
+describe('ProcessManager — manual restart resets restartCount', () => {
+	test('restart() resets auto-restart count to 0', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for at least one auto-restart (1s backoff)
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('crasher')?.restartCount).toBeGreaterThan(0)
+
+		// Manual restart should reset the counter
+		mgr.restart('crasher', 80, 24)
+		expect(mgr.getState('crasher')?.restartCount).toBe(0)
+
+		await mgr.stopAll()
+	}, 10000)
+
+	test('start() resets restartCount on stopped process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for auto-restarts to accumulate
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('server')?.restartCount).toBeGreaterThan(0)
+
+		await mgr.stop('server')
+		// start() should reset the counter
+		mgr.start('server', 80, 24)
+		expect(mgr.getState('server')?.restartCount).toBe(0)
+
 		await mgr.stopAll()
 	}, 10000)
 })
