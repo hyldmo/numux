@@ -88,7 +88,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 		return typeof c === 'string' && c.startsWith('npm:')
 	})
 	const hasCommandlessEntry = entries.some(([, v]) => {
-		if (v == null) return true
+		if (v == null || v === true) return true
 		if (typeof v === 'object' && !('command' in v)) return true
 		return false
 	})
@@ -108,6 +108,11 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 
 	for (const [name, value] of entries) {
 		if (!isScriptReference(name, value)) {
+			// true/null shorthand: resolve from scripts or pass through for validator to catch
+			if (value === true || value == null) {
+				expanded[name] = scriptNames.includes(name) ? expandScriptCommand(name, pm) : (value as any)
+				continue
+			}
 			let proc = value as NumuxProcessConfig | string
 			const c = cmd(proc)
 			if (typeof c === 'string' && c.startsWith('npm:')) {
@@ -115,8 +120,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 				proc = typeof proc === 'string' ? expandedCmd : { ...proc, command: expandedCmd }
 			} else if (!c && scriptNames.includes(name)) {
 				// Auto-resolve: process name matches a package.json script
-				const expandedCmd = expandScriptCommand(name, pm)
-				proc = proc == null ? expandedCmd : { ...(proc as NumuxProcessConfig), command: expandedCmd }
+				proc = { ...(proc as NumuxProcessConfig), command: expandScriptCommand(name, pm) }
 			}
 			expanded[name] = proc
 			continue

@@ -59,7 +59,7 @@ export default defineConfig({
 
 The `defineConfig()` helper is optional — it provides type checking for your config.
 
-Processes can be a string (shorthand for `{ command: "..." }`), an empty object (auto-resolves to a matching `package.json` script), or a full config object.
+Processes can be a string (shorthand for `{ command: "..." }`), `true` or `{}` (auto-resolves to a matching `package.json` script), or a full config object.
 
 Then run:
 
@@ -164,7 +164,7 @@ When a process has no command and its name matches a `package.json` script, the 
 ```ts
 export default defineConfig({
   processes: {
-    lint: {},                         // → bun run lint
+    lint: true,                       // → bun run lint
     typecheck: { dependsOn: ['db'] }, // → bun run typecheck (with dependency)
     db: 'docker compose up postgres', // explicit command, not resolved
   },

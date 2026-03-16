@@ -120,7 +120,7 @@ export interface NumuxConfig<K extends string = string> {
 	noWatch?: boolean
 	/** Directory to write per-process log files */
 	logDir?: string
-	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
+	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string | true>
 }
 
 export type SortOrder = 'config' | 'alphabetical' | 'topological'

@@ -363,6 +363,15 @@ describe('expandScriptPatterns', () => {
 		expect(proc(result, 'dev').env).toEqual({ PORT: '3000' })
 	})
 
+	test('true value auto-resolves when name matches a script', () => {
+		const dir = setupDir('auto-resolve-true', {
+			'package.json': pkgJson({ lint: 'eslint .', dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: true as any, dev: true as any } }, dir)
+		expect(result.processes.lint).toBe('npm run lint')
+		expect(result.processes.dev).toBe('npm run dev')
+	})
+
 	test('commandless entry not matching a script passes through unchanged', () => {
 		const dir = setupDir('auto-resolve-miss', {
 			'package.json': pkgJson({ dev: 'next dev' })
