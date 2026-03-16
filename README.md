@@ -244,6 +244,32 @@ Each process accepts:
 | `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
 | `errorMatcher` | `boolean \| string` | — | `true` detects ANSI red output, string = regex pattern — shows error indicator on tab |
 | `showCommand` | `boolean` | `true` | Print the command being run as the first line of output |
+| `workspaces` | `boolean \| string \| string[]` | — | Run command in monorepo workspaces (see below) |
+
+### Workspace expansion
+
+Use `workspaces` on a process to expand it into per-workspace processes. Reads the `workspaces` field from your root `package.json`.
+
+```ts
+export default defineConfig({
+  processes: {
+    // All workspaces — filters by script availability for PM run commands
+    lint: { command: 'npm run lint', workspaces: true },
+
+    // Specific workspace by package name
+    validate: { command: 'npm run validate', workspaces: '@repo/image-worker' },
+
+    // Multiple specific workspaces
+    dev: { command: 'npm run dev', workspaces: ['@repo/api', '@repo/web'] },
+  },
+})
+```
+
+Each entry expands into `{name}:{wsName}` processes (e.g. `lint:api`, `lint:web`) with `cwd` set to the workspace directory. All other config (env, dependsOn, color, etc.) is inherited from the template.
+
+When `workspaces: true` is used with a PM run command (`npm run lint`), only workspaces that have the matching script are included. Raw commands (`eslint .`) run in all workspaces.
+
+String values resolve by package name first (with or without scope), then fall back to relative path. Cannot be combined with `cwd`.
 
 ### File watching
 
