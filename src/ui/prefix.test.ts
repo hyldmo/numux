@@ -27,10 +27,12 @@ async function runPrefix(
 	extraArgs: string[] = [],
 	envOverrides: Record<string, string> = {}
 ): Promise<{ stdout: string; exitCode: number }> {
+	const env: Record<string, string | undefined> = { ...process.env, FORCE_COLOR: '0', ...envOverrides }
+	if (!('NO_COLOR' in envOverrides)) delete env.NO_COLOR
 	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '--config', configPath], {
 		stdout: 'pipe',
 		stderr: 'pipe',
-		env: { ...process.env, FORCE_COLOR: '0', ...envOverrides }
+		env
 	})
 	const stdout = await new Response(proc.stdout).text()
 	const exitCode = await proc.exited

@@ -338,6 +338,11 @@ describe('buildConfigFromArgs', () => {
 		expect(config.processes['format:check']).toEqual({ command: 'yarn format:check' })
 	})
 
+	test('npm run script:name derives process name from script', () => {
+		const config = buildConfigFromArgs(['npm run studio:dev'], [])
+		expect(config.processes['studio:dev']).toEqual({ command: 'npm run studio:dev' })
+	})
+
 	test('positional commands use first word for non-runner commands', () => {
 		const config = buildConfigFromArgs(['echo hello', '/usr/bin/node server.js'], [])
 		expect(config.processes.echo).toEqual({ command: 'echo hello' })

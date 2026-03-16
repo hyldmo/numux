@@ -71,33 +71,50 @@ function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
 	return { glob: raw.slice(0, i), extraArgs: raw.slice(i) }
 }
 
+function expandScriptCommand(raw: string, pm: PackageManager): string {
+	const { glob: script, extraArgs } = splitPatternArgs(raw)
+	if (extraArgs) {
+		return `${pm} run ${script} --${extraArgs}`
+	}
+	return `${pm} run ${script}`
+}
+
 export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxConfig {
 	const entries = Object.entries(config.processes)
+	const cmd = (v: unknown) => (typeof v === 'string' ? v : (v as { command?: string })?.command)
 	const hasScriptRef = entries.some(([name, value]) => isScriptReference(name, value))
-	if (!hasScriptRef) return config
+	const hasNpmCommand = entries.some(([, v]) => {
+		const c = cmd(v)
+		return typeof c === 'string' && c.startsWith('npm:')
+	})
+	if (!(hasScriptRef || hasNpmCommand)) return config
 
 	const dir = config.cwd ?? cwd ?? process.cwd()
 	const pkgPath = resolve(dir, 'package.json')
-
-	if (!existsSync(pkgPath)) {
+	if (!existsSync(pkgPath) && hasScriptRef) {
 		throw new Error(`Wildcard patterns require a package.json (looked in ${dir})`)
 	}
-
-	const pkgJson = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
+	const pkgJson = existsSync(pkgPath) ? (JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>) : {}
 	const scripts = pkgJson.scripts as Record<string, string> | undefined
-	if (!scripts || typeof scripts !== 'object') {
-		throw new Error('package.json has no "scripts" field')
-	}
-
-	const scriptNames = Object.keys(scripts)
+	const scriptNames = scripts && typeof scripts === 'object' ? Object.keys(scripts) : []
 	const pm = detectPackageManager(pkgJson, dir)
 
 	const expanded: Record<string, NumuxProcessConfig | string> = {}
 
 	for (const [name, value] of entries) {
 		if (!isScriptReference(name, value)) {
-			expanded[name] = value as NumuxProcessConfig | string
+			let proc = value as NumuxProcessConfig | string
+			const c = cmd(proc)
+			if (typeof c === 'string' && c.startsWith('npm:')) {
+				const expandedCmd = expandScriptCommand(c.slice(4), pm)
+				proc = typeof proc === 'string' ? expandedCmd : { ...proc, command: expandedCmd }
+			}
+			expanded[name] = proc
 			continue
+		}
+
+		if (!scripts || typeof scripts !== 'object') {
+			throw new Error('package.json has no "scripts" field')
 		}
 
 		const rawPattern = name.startsWith('npm:') ? name.slice(4) : name
@@ -143,7 +160,7 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			const { color: _color, ...rest } = template
 			expanded[displayName] = {
 				...rest,
-				command: `${pm} run ${scriptName}${extraArgs}`,
+				command: expandScriptCommand(`${scriptName}${extraArgs}`, pm),
 				...(color ? { color } : {})
 			} as NumuxProcessConfig
 		}
