@@ -376,7 +376,7 @@ describe('expandWorkspaces', () => {
 					dev: { command: 'npm run dev', workspaces: 'nonexistent' }
 				})
 			)
-		).toThrow('workspace "nonexistent" not found. Available: web, api')
+		).toThrow('workspace "nonexistent" not found. Available: api, web')
 	})
 
 	test('workspaces + cwd conflict throws', () => {

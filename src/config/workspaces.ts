@@ -49,7 +49,7 @@ export function discoverWorkspaces(cwd: string): WorkspaceInfo[] {
 		}
 	}
 
-	return workspaces
+	return workspaces.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Find a workspace by package name (full or scope-stripped) or relative path */
