@@ -87,7 +87,12 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 		const c = cmd(v)
 		return typeof c === 'string' && c.startsWith('npm:')
 	})
-	if (!(hasScriptRef || hasNpmCommand)) return config
+	const hasCommandlessEntry = entries.some(([, v]) => {
+		if (v == null) return true
+		if (typeof v === 'object' && !('command' in v)) return true
+		return false
+	})
+	if (!(hasScriptRef || hasNpmCommand || hasCommandlessEntry)) return config
 
 	const dir = config.cwd ?? cwd ?? process.cwd()
 	const pkgPath = resolve(dir, 'package.json')
@@ -108,6 +113,10 @@ export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxCo
 			if (typeof c === 'string' && c.startsWith('npm:')) {
 				const expandedCmd = expandScriptCommand(c.slice(4), pm)
 				proc = typeof proc === 'string' ? expandedCmd : { ...proc, command: expandedCmd }
+			} else if (!c && scriptNames.includes(name)) {
+				// Auto-resolve: process name matches a package.json script
+				const expandedCmd = expandScriptCommand(name, pm)
+				proc = proc == null ? expandedCmd : { ...(proc as NumuxProcessConfig), command: expandedCmd }
 			}
 			expanded[name] = proc
 			continue
