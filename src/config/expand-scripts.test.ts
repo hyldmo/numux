@@ -366,8 +366,8 @@ describe('expandScriptPatterns', () => {
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix': {} } }, dir)
 		expect(Object.keys(result.processes).sort()).toEqual(['js', 'ts'])
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
-		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts -- --fix')
 	})
 
 	test('npm: prefix with extra args', () => {
@@ -375,8 +375,8 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint:* --fix': {} } }, dir)
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
-		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts -- --fix')
 	})
 
 	test('multiple extra args forwarded', () => {
@@ -384,7 +384,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix --quiet': {} } }, dir)
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix --quiet')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix --quiet')
 	})
 
 	test('npm: exact script name with extra args', () => {
@@ -392,7 +392,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ lint: 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
-		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
+		expect(proc(result, 'lint').command).toBe('npm run lint -- --fix')
 	})
 
 	test('npm:studio:dev shorthand expands to npm run studio:dev', () => {
@@ -421,7 +421,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ lint: 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { lint: { command: 'npm:lint --fix' } } }, dir)
-		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
+		expect(proc(result, 'lint').command).toBe('npm run lint -- --fix')
 	})
 
 	test('prefix glob strips common prefix from process names', () => {
@@ -522,7 +522,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:eslint --fix': {} } }, dir)
-		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint --fix')
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint -- --fix')
 	})
 
 	test('exact colon name inherits template properties', () => {

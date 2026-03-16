@@ -73,7 +73,10 @@ function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
 
 function expandScriptCommand(raw: string, pm: PackageManager): string {
 	const { glob: script, extraArgs } = splitPatternArgs(raw)
-	return `${pm} run ${script}${extraArgs}`
+	if (extraArgs) {
+		return `${pm} run ${script} --${extraArgs}`
+	}
+	return `${pm} run ${script}`
 }
 
 export function expandScriptPatterns(config: NumuxConfig, cwd?: string): NumuxConfig {
