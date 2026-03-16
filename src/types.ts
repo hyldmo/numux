@@ -47,6 +47,11 @@ export interface NumuxProcessConfig<K extends string = string> {
 	/** `true` = detect ANSI red output, string = regex pattern */
 	errorMatcher?: boolean | string
 	/**
+	 * Run command in monorepo workspaces.
+	 * `true` = all workspaces, string = specific workspace by name/path, string[] = multiple workspaces
+	 */
+	workspaces?: boolean | string | string[]
+	/**
 	 * Print the command being run as the first line of output
 	 * @default true
 	 */
@@ -121,7 +126,7 @@ export interface NumuxConfig<K extends string = string> {
 export type SortOrder = 'config' | 'alphabetical' | 'topological'
 
 /** Process config after validation — dependsOn is always normalized to an array */
-export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn'> {
+export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn' | 'workspaces'> {
 	dependsOn?: string[]
 }
 
