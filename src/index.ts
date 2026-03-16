@@ -9,7 +9,7 @@ import { loadConfig } from './config/loader'
 import { filterByPlatform } from './config/platform'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
-import { resolveWorkspaceProcesses } from './config/workspaces'
+import { expandWorkspaces, resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
@@ -76,7 +76,7 @@ async function main() {
 	}
 
 	if (parsed.validate) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const warnings: ValidationWarning[] = []
 		let config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
@@ -116,7 +116,7 @@ async function main() {
 	}
 
 	if (parsed.exec) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const config = validateConfig(raw)
 		const proc = config.processes[parsed.execName!]
 		if (!proc) {
@@ -194,7 +194,7 @@ async function main() {
 			}
 		}
 	} else {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
 	}
