@@ -353,11 +353,38 @@ describe('expandScriptPatterns', () => {
 		)
 	})
 
-	test('non-glob names without command are not expanded', () => {
-		// Names like "web" that don't contain glob chars should NOT be treated as patterns
-		const config: NumuxConfig = { processes: { web: { env: { FOO: 'bar' } } } }
-		// This should passthrough, not try to expand
-		expect(expandScriptPatterns(config)).toBe(config)
+	test('commandless entry auto-resolves when name matches a script', () => {
+		const dir = setupDir('auto-resolve', {
+			'package.json': pkgJson({ lint: 'eslint .', dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: {}, dev: { env: { PORT: '3000' } } } }, dir)
+		expect(proc(result, 'lint').command).toBe('npm run lint')
+		expect(proc(result, 'dev').command).toBe('npm run dev')
+		expect(proc(result, 'dev').env).toEqual({ PORT: '3000' })
+	})
+
+	test('true value auto-resolves when name matches a script', () => {
+		const dir = setupDir('auto-resolve-true', {
+			'package.json': pkgJson({ lint: 'eslint .', dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: true as any, dev: true as any } }, dir)
+		expect(result.processes.lint).toBe('npm run lint')
+		expect(result.processes.dev).toBe('npm run dev')
+	})
+
+	test('commandless entry not matching a script passes through unchanged', () => {
+		const dir = setupDir('auto-resolve-miss', {
+			'package.json': pkgJson({ dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { web: { env: { FOO: 'bar' } } } }, dir)
+		// Not a script match — passes through as-is (validator will catch missing command)
+		expect(proc(result, 'web').command).toBeUndefined()
+	})
+
+	test('no package.json — commandless entries pass through', () => {
+		const dir = setupDir('auto-resolve-no-pkg', {})
+		const result = expandScriptPatterns({ processes: { web: {} } }, dir)
+		expect(proc(result, 'web').command).toBeUndefined()
 	})
 
 	test('extra args are forwarded to expanded commands', () => {

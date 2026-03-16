@@ -80,8 +80,8 @@ export function expandWorkspaces(config: NumuxConfig): NumuxConfig {
 	let discoveredWorkspaces: WorkspaceInfo[] | null = null
 
 	for (const [name, entry] of Object.entries(config.processes)) {
-		// Pass through string shorthand and non-workspace entries
-		if (typeof entry === 'string' || !entry.workspaces) {
+		// Pass through string shorthand, true shorthand, and non-workspace entries
+		if (typeof entry === 'string' || entry === true || !entry.workspaces) {
 			newProcesses[name] = entry
 			continue
 		}

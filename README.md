@@ -59,7 +59,7 @@ export default defineConfig({
 
 The `defineConfig()` helper is optional — it provides type checking for your config.
 
-Processes can be a string (shorthand for `{ command: "..." }`) or a full config object.
+Processes can be a string (shorthand for `{ command: "..." }`), `true` or `{}` (auto-resolves to a matching `package.json` script), or a full config object.
 
 Then run:
 
@@ -158,6 +158,18 @@ export default defineConfig({
 ```
 
 Template properties (color, env, dependsOn, etc.) are inherited by all matched processes. Colors given as an array are distributed round-robin.
+
+When a process has no command and its name matches a `package.json` script, the command is auto-resolved:
+
+```ts
+export default defineConfig({
+  processes: {
+    lint: true,                       // → bun run lint
+    typecheck: { dependsOn: ['db'] }, // → bun run typecheck (with dependency)
+    db: 'docker compose up postgres', // explicit command, not resolved
+  },
+})
+```
 
 ### Options
 
