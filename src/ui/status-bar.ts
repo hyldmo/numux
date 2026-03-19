@@ -19,7 +19,7 @@ export class StatusBar {
 		this.renderable = new TextRenderable(renderer, {
 			id: 'status-bar',
 			width: '100%',
-			height: 1,
+			wrapMode: 'word',
 			content: this.buildContent(),
 			bg: '#1a1a1a',
 			paddingX: 1
