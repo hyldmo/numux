@@ -18,6 +18,7 @@ import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
+import { defaultLogDir } from './utils/project-name'
 import { setupShutdownHandlers } from './utils/shutdown'
 
 const HELP = generateHelp()
@@ -235,8 +236,8 @@ async function main() {
 
 	const manager = new ProcessManager(config)
 
-	const logDir = parsed.logDir ?? config.logDir
-	const logWriter = logDir ? LogWriter.createPersistent(logDir) : LogWriter.createTemp()
+	const logDir = parsed.logDir ?? config.logDir ?? defaultLogDir(process.cwd())
+	const logWriter = LogWriter.createPersistent(logDir)
 
 	printWarnings(warnings)
 
