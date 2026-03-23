@@ -76,6 +76,33 @@ async function main() {
 		process.exit(0)
 	}
 
+	if (parsed.logs) {
+		const logDir = parsed.logDir ?? (await resolveLogDir(parsed.configPath))
+		const latestDir = resolve(logDir, 'latest')
+		const target = existsSync(latestDir) ? latestDir : logDir
+
+		if (parsed.logsProcess) {
+			const logFile = resolve(target, `${parsed.logsProcess}.log`)
+			if (!existsSync(logFile)) {
+				const { readdirSync } = await import('node:fs')
+				const files = readdirSync(target)
+					.filter(f => f.endsWith('.log'))
+					.map(f => f.replace(/\.log$/, ''))
+				const available = files.length > 0 ? `Available: ${files.join(', ')}` : 'No log files found'
+				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
+				process.exit(1)
+			}
+			const child = Bun.spawn(['cat', logFile], {
+				stdout: 'inherit',
+				stderr: 'inherit'
+			})
+			process.exit(await child.exited)
+		}
+
+		console.info(target)
+		process.exit(0)
+	}
+
 	if (parsed.validate) {
 		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const warnings: ValidationWarning[] = []
@@ -264,6 +291,18 @@ function printWarnings(warnings: ValidationWarning[]): void {
 	for (const w of warnings) {
 		console.warn(`Warning: process "${w.process}": ${w.message}`)
 	}
+}
+
+async function resolveLogDir(configPath?: string): Promise<string> {
+	try {
+		const raw = await loadConfig(configPath)
+		if (typeof raw.logDir === 'string' && raw.logDir.trim()) {
+			return resolve(raw.logDir.trim())
+		}
+	} catch {
+		// Config may not exist — fall through to default
+	}
+	return defaultLogDir(process.cwd())
 }
 
 main().catch(err => {

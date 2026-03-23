@@ -73,6 +73,7 @@ numux
 numux init                         # Create a starter numux.config.ts
 numux validate                     # Validate config and show process dependency graph
 numux exec <name> [--] <command>   # Run a command in a process's environment
+numux logs [name]                  # Open log directory or view a process log
 numux completions <shell>          # Generate shell completions (bash, zsh, fish)
 ```
 
@@ -83,6 +84,13 @@ numux completions <shell>          # Generate shell completions (bash, zsh, fish
 ```sh
 numux exec api -- npx prisma migrate
 numux exec web npm run build
+```
+
+`logs` prints the log directory path, or a specific process's log contents:
+
+```sh
+numux logs           # Print log directory path
+numux logs api       # Print the api process log
 ```
 
 Set up completions for your shell:

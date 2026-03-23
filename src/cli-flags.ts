@@ -250,6 +250,20 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 		}
 	},
 	{
+		name: 'logs',
+		description: 'Open the log directory or a specific process log',
+		usage: 'logs [name]',
+		parse: (args, i, result) => {
+			result.logs = true
+			const next = args[i + 1]
+			if (next !== undefined && !next.startsWith('-')) {
+				result.logsProcess = next
+				i++
+			}
+			return i
+		}
+	},
+	{
 		name: 'completions',
 		description: 'Generate shell completions (bash, zsh, fish)',
 		usage: 'completions <shell>',
