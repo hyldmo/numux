@@ -49,6 +49,24 @@ describe('validateConfig', () => {
 		expect(() => validateConfig({ processes: {} })).toThrow('at least one process')
 	})
 
+	test('passes through optional: true', () => {
+		const config = validateConfig({
+			processes: {
+				studio: { command: 'prisma studio', optional: true }
+			}
+		})
+		expect(config.processes.studio.optional).toBe(true)
+	})
+
+	test('ignores non-boolean optional values', () => {
+		const config = validateConfig({
+			processes: {
+				studio: { command: 'prisma studio', optional: 'yes' }
+			}
+		})
+		expect(config.processes.studio.optional).toBeUndefined()
+	})
+
 	test('throws on missing command', () => {
 		expect(() => validateConfig({ processes: { web: {} } })).toThrow('non-empty "command" string')
 	})

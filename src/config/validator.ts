@@ -149,6 +149,7 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 
 		validated[name] = {
 			command: p.command,
+			...(p.optional === true ? { optional: true } : {}),
 			cwd: processCwd ?? globalCwd,
 			env: globalEnv || processEnv ? { ...globalEnv, ...processEnv } : undefined,
 			envFile: processEnvFile ?? globalEnvFile,
