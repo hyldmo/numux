@@ -256,6 +256,7 @@ Each process accepts:
 | `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
 | `maxRestarts` | `number` | `0` | Max auto-restart attempts on non-zero exit (0 = no restarts) |
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
+| `optional` | `boolean` | `false` | Process is visible as a tab but not started automatically. Use Alt+S to start manually |
 | `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
 | `platform` | `string \| string[]` | — | OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; dependents still start |
 | `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
@@ -359,6 +360,24 @@ export default defineConfig({
 ```
 
 Falsy values: unset, empty string, `"0"`, `"false"`, `"no"`, `"off"` (case-insensitive). If a conditional process is skipped, its dependents are also skipped.
+
+### Optional processes
+
+Use `optional` for tools you want visible in tabs but not auto-started (e.g. Prisma Studio, debug servers):
+
+```ts
+export default defineConfig({
+  processes: {
+    app: { command: 'bun run dev' },
+    studio: {
+      command: 'bunx prisma studio',
+      optional: true,  // shows as stopped tab, start with Alt+S
+    },
+  },
+})
+```
+
+Unlike `condition`, optional processes don't cascade — their dependents still start normally.
 
 ### Dependency orchestration
 
