@@ -99,11 +99,7 @@ async function main() {
 			process.exit(await child.exited)
 		}
 
-		if (process.platform === 'darwin') {
-			Bun.spawn(['open', target])
-		} else {
-			console.info(target)
-		}
+		console.info(target)
 		process.exit(0)
 	}
 
