@@ -1,5 +1,5 @@
 diff --git a/dist/terminal-buffer.js b/dist/terminal-buffer.js
-index 818145199154a290083de72f87a69ecbc2acd167..5dac6238d07492af38da5412382472d8d670e1d1 100644
+index 197ecab7df10ed4b19473af370bb551635ddbe6e..26cea6765fb25dbf0af364c30e764c827f2c8fe9 100644
 --- a/dist/terminal-buffer.js
 +++ b/dist/terminal-buffer.js
 @@ -442,7 +442,9 @@ export class GhosttyTerminalRenderable extends TextBufferRenderable {
@@ -22,19 +22,32 @@ index 818145199154a290083de72f87a69ecbc2acd167..5dac6238d07492af38da5412382472d8
          // If we have line start info, use it; otherwise fall back to simple calculation
          let lineYOffset = clampedLine;
          if (lineStarts && lineStarts.length > clampedLine) {
+@@ -477,5 +479,12 @@ export class GhosttyTerminalRenderable extends TextBufferRenderable {
+         return this.y + lineYOffset;
+     }
+ }
++const EMPTY_LINE_INFO = { lineStarts: [], lineStartCols: [], lineWidthColsMax: 0, lineSources: [] };
++Object.defineProperty(GhosttyTerminalRenderable.prototype, 'lineInfo', {
++    get() {
++        return this.textBufferView.logicalLineInfo ?? EMPTY_LINE_INFO;
++    },
++    configurable: true,
++});
+ /** @deprecated Use GhosttyTerminalRenderable instead */
+ export const TerminalBufferRenderable = GhosttyTerminalRenderable;
 diff --git a/src/terminal-buffer.ts b/src/terminal-buffer.ts
-index 818145199154a290083de72f87a69ecbc2acd167..5dac6238d07492af38da5412382472d8d670e1d1 100644
+index 818145199154a290083de72f87a69ecbc2acd167..74d376238fb1c2702e6b070b20cdbb6cc26bb67f 100644
 --- a/src/terminal-buffer.ts
 +++ b/src/terminal-buffer.ts
 @@ -585,7 +585,9 @@ export class GhosttyTerminalRenderable extends TextBufferRenderable {
-
+       
        // Update line count based on actual rendered lines
        const lineInfo = this.textBufferView.logicalLineInfo
 -      this._lineCount = lineInfo.lineStarts.length
 +      if (lineInfo) {
 +        this._lineCount = lineInfo.lineStarts.length
 +      }
-
+       
        this._ansiDirty = false
      }
 @@ -613,8 +615,8 @@ export class GhosttyTerminalRenderable extends TextBufferRenderable {
@@ -42,9 +55,23 @@ index 818145199154a290083de72f87a69ecbc2acd167..5dac6238d07492af38da5412382472d8
      // This accounts for wrapping and actual text layout
      const lineInfo = this.textBufferView.logicalLineInfo
 -    const lineStarts = lineInfo.lineStarts
--
+-    
 +    const lineStarts = lineInfo?.lineStarts
 +
      // If we have line start info, use it; otherwise fall back to simple calculation
      let lineYOffset = clampedLine
      if (lineStarts && lineStarts.length > clampedLine) {
+@@ -626,5 +628,13 @@ export class GhosttyTerminalRenderable extends TextBufferRenderable {
+   }
+ }
+ 
++const EMPTY_LINE_INFO = { lineStarts: [], lineStartCols: [], lineWidthColsMax: 0, lineSources: [] }
++Object.defineProperty(GhosttyTerminalRenderable.prototype, 'lineInfo', {
++  get() {
++    return this.textBufferView.logicalLineInfo ?? EMPTY_LINE_INFO
++  },
++  configurable: true,
++})
++
+ /** @deprecated Use GhosttyTerminalRenderable instead */
+ export const TerminalBufferRenderable = GhosttyTerminalRenderable
