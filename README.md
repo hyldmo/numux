@@ -130,7 +130,7 @@ numux -w dev -n redis="redis-server" --colors
 # Unnamed (name derived from command)
 numux "bun dev:api" "bun dev:web"
 
-# Named
+# Named process
 numux -n api="bun dev:api" -n web="bun dev:web"
 ```
 
