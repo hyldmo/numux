@@ -80,8 +80,8 @@ export class PrefixDisplay {
 			this.shutdown()
 		})
 		process.on('unhandledRejection', (reason: unknown) => {
-			const message = reason instanceof Error ? reason.message : String(reason)
-			process.stderr.write(`numux: unhandled rejection: ${message}\n`)
+			const stack = reason instanceof Error ? reason.stack : String(reason)
+			process.stderr.write(`numux: unhandled rejection: ${stack}\n`)
 			this.shutdown()
 		})
 

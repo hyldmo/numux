@@ -31,10 +31,10 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	})
 
 	process.on('unhandledRejection', (reason: unknown) => {
-		const message = reason instanceof Error ? reason.message : String(reason)
-		log('Unhandled rejection:', message)
+		const stack = reason instanceof Error ? reason.stack : String(reason)
+		log('Unhandled rejection:', stack)
 		app.shutdown().finally(() => {
-			process.stderr.write(`numux: unhandled rejection: ${message}\n`)
+			process.stderr.write(`numux: unhandled rejection: ${stack}\n`)
 			logWriter?.cleanup()
 			process.exit(1)
 		})
