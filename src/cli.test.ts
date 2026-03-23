@@ -261,6 +261,25 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).autoColors).toBe(false)
 	})
 
+	test('logs sets logs flag', () => {
+		const result = parseArgs(argv('logs'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBeUndefined()
+	})
+
+	test('logs with process name', () => {
+		const result = parseArgs(argv('logs', 'api'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBe('api')
+	})
+
+	test('logs with --log-dir flag', () => {
+		const result = parseArgs(argv('--log-dir', './my-logs', 'logs', 'web'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBe('web')
+		expect(result.logDir).toBe('./my-logs')
+	})
+
 	test('exec parses process name and command', () => {
 		const result = parseArgs(argv('exec', 'api', 'bunx', 'prisma', 'migrate'))
 		expect(result.exec).toBe(true)

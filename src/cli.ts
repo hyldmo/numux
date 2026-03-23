@@ -11,6 +11,8 @@ export interface ParsedArgs {
 	exec: boolean
 	execName?: string
 	execCommand?: string
+	logs: boolean
+	logsProcess?: string
 	completions?: string
 	prefix: boolean
 	killOthers: boolean
@@ -51,6 +53,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		init: false,
 		validate: false,
 		exec: false,
+		logs: false,
 		prefix: false,
 		killOthers: false,
 		killOthersOnFail: false,
