@@ -741,6 +741,58 @@ describe('ProcessManager — delay', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — optional', () => {
+	test('optional process starts as stopped', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process can be manually started', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'true', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+
+		mgr.start('studio', 80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		const status = mgr.getState('studio')?.status
+		expect(status === 'finished' || status === 'ready').toBe(true)
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process does not block dependents', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true },
+				child: { command: 'true', dependsOn: ['studio'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		// child should have started and finished — not blocked by optional dep
+		const childStatus = mgr.getState('child')?.status
+		expect(childStatus).not.toBe('pending')
+		expect(childStatus).not.toBe('skipped')
+		await mgr.stopAll()
+	}, 5000)
+})
+
 describe('ProcessManager — condition', () => {
 	test('skips process when condition env var is unset', async () => {
 		delete process.env.NUMUX_TEST_CONDITION

@@ -43,6 +43,7 @@ src/
 - Non-interactive panes hide the terminal cursor
 - Set `errorMatcher: true` to detect ANSI red output, or a regex string to match custom patterns — shows a red indicator on the tab while the process keeps running
 - `readyPattern` accepts `string` (simple match) or `RegExp` (match + capture groups). RegExp captures are expanded into dependent `command` and `env` values via `$dep.group` syntax (e.g. `$odoo.url`)
+- `optional: true` makes a process visible as a tab but not auto-started (starts in `stopped` state). Alt+S starts it manually. Unlike `condition`, optional does not cascade to dependents
 - `platform` restricts a process to specific OS(es) (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; their dependents still start with the dependency stripped (unlike `condition` which cascades)
 
 ## Commits

@@ -44,6 +44,8 @@ export interface NumuxProcessConfig<K extends string = string> {
 	 * @default false
 	 */
 	interactive?: boolean
+	/** Process is visible but not started automatically. Use Alt+S to start manually */
+	optional?: boolean
 	/** `true` = detect ANSI red output, string = regex pattern */
 	errorMatcher?: boolean | string
 	/**

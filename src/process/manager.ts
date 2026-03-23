@@ -93,6 +93,14 @@ export class ProcessManager {
 			const proc = this.config.processes[name]
 			const resolve = readyResolvers.get(name)!
 
+			// Optional processes start as stopped — resolve immediately so dependents aren't blocked
+			if (proc.optional) {
+				this.updateStatus(name, 'stopped')
+				this.createRunner(name)
+				resolve()
+				return
+			}
+
 			// Wait for declared dependencies only
 			const deps = proc.dependsOn ?? []
 			if (deps.length > 0) {
