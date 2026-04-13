@@ -69,6 +69,7 @@ numux
 
 ### Subcommands
 
+<!-- generated:subcommands -->
 ```sh
 numux init                         # Create a starter numux.config.ts
 numux validate                     # Validate config and show process dependency graph
@@ -76,6 +77,7 @@ numux exec <name> [--] <command>   # Run a command in a process's environment
 numux logs [name]                  # Open log directory or view a process log
 numux completions <shell>          # Generate shell completions (bash, zsh, fish)
 ```
+<!-- /generated:subcommands -->
 
 `validate` respects `--only`/`--exclude` filters and shows processes grouped by dependency tiers.
 
@@ -181,6 +183,7 @@ export default defineConfig({
 
 ### Options
 
+<!-- generated:options -->
 | Flag | Description |
 |------|-------------|
 | `-w, --workspace <script>` | Run a script across all workspaces |
@@ -199,6 +202,7 @@ export default defineConfig({
 | `--debug` | Log to `.numux/debug.log` |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |
+<!-- /generated:options -->
 
 ### Prefix mode
 
@@ -216,6 +220,7 @@ Auto-exits when all processes finish. Exit code 1 if any process failed.
 
 Top-level options apply to all processes (process-level settings override):
 
+<!-- generated:config-global -->
 | Field | Type | Description |
 |-------|------|-------------|
 | `cwd` | `string` | Working directory for all processes (process `cwd` overrides) |
@@ -228,6 +233,7 @@ Top-level options apply to all processes (process-level settings override):
 | `errorMatcher` | `boolean \| string` | Error detection for all processes (`true` = ANSI red, string = regex) |
 | `watch` | `string \| string[]` | Watch patterns for all processes (process `watch` replaces if set) |
 | `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order (default: `'config'` — definition order) |
+<!-- /generated:config-global -->
 
 ```ts
 export default defineConfig({
@@ -245,6 +251,7 @@ export default defineConfig({
 
 Each process accepts:
 
+<!-- generated:config-process -->
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `command` | `string` | *required* | Shell command to run. Supports `$dep.group` references from dependency capture groups |
@@ -266,6 +273,7 @@ Each process accepts:
 | `errorMatcher` | `boolean \| string` | — | `true` detects ANSI red output, string = regex pattern — shows error indicator on tab |
 | `showCommand` | `boolean` | `true` | Print the command being run as the first line of output |
 | `workspaces` | `boolean \| string \| string[]` | — | Run command in monorepo workspaces (see below) |
+<!-- /generated:config-process -->
 
 ### Workspace expansion
 
@@ -417,6 +425,7 @@ Unmatched references are left as-is (the shell will expand `$db` as empty + `.po
 
 Keybindings are shown in the status bar at the bottom of the app. Panes are readonly by default — keyboard input is not forwarded to processes. Set `interactive: true` on processes that need stdin (REPLs, shells, etc.).
 
+<!-- generated:keybindings -->
 | Key | Action |
 |-----|--------|
 | `←`/`→` or `1`-`9` | Switch tabs |
@@ -433,9 +442,11 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 | `PageUp`/`PageDown` | Scroll by page |
 | `Ctrl+Click` | Open link |
 | `Ctrl+C` | Quit |
+<!-- /generated:keybindings -->
 
 ## Tab icons
 
+<!-- generated:tab-icons -->
 | Icon | Status |
 |------|--------|
 | ○ | Pending |
@@ -446,6 +457,7 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 | ■ | Stopped |
 | ✖ | Failed |
 | ⊘ | Skipped |
+<!-- /generated:tab-icons -->
 
 ## Dependencies
 
