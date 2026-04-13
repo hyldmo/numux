@@ -20,7 +20,7 @@ export const SHORTCUTS = {
 } as const satisfies Record<string, Shortcut>
 
 /** Hints shown in the status bar (subset + navigation keys) */
-const STATUS_HINTS: [label: string, description: string][] = [
+export const STATUS_HINTS: [label: string, description: string][] = [
 	['\u2190\u2192/1-9', 'tabs'],
 	['G/Shift+G', 'top/bottom'],
 	[SHORTCUTS.restart.label, SHORTCUTS.restart.description],

@@ -71,10 +71,10 @@ numux
 
 <!-- generated:subcommands -->
 ```sh
-numux init                         # Create a starter numux.config.ts
-numux validate                     # Validate config and show process dependency graph
-numux exec <name> [--] <command>   # Run a command in a process's environment
-numux logs [name]                  # Open log directory or view a process log
+numux init                         # Create a starter config file
+numux validate                     # Validate config and show process graph
+numux exec <name> [--] <cmd>       # Run a command in a process's environment
+numux logs [name]                  # Open the log directory or a specific process log
 numux completions <shell>          # Generate shell completions (bash, zsh, fish)
 ```
 <!-- /generated:subcommands -->
@@ -186,22 +186,25 @@ export default defineConfig({
 <!-- generated:options -->
 | Flag | Description |
 |------|-------------|
-| `-w, --workspace <script>` | Run a script across all workspaces |
-| `-c, --config <path>` | Explicit config file path |
-| `-n, --name <name=cmd>` | Add a named process (repeatable) |
-| `-p, --prefix` | Prefixed output mode (no TUI, for CI/scripts) |
-| `--only <a,b,...>` | Only run these processes (+ their dependencies) |
-| `--exclude <a,b,...>` | Exclude these processes |
+| `-s,` `--sort` `<config|alphabetical|topological>` | Tab display order |
+| `-w,` `--workspace` `<script>` | Run a package.json script across all workspaces |
+| `-n,` `--name` `<name=command>` | Add a named process |
+| `-c,` `--color` `<colors>` | Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple) |
+| `--colors` | Auto-assign colors to processes based on their name |
+| `-e,` `--env-file` `<path|false>` | Env file path, or "false" to disable env file loading |
+| `--config` `<path>` | Config file path (default: auto-detect) |
+| `-p,` `--prefix` | Prefixed output mode (no TUI, for CI/scripts) |
+| `--only` `<a,b,...>` | Only run these processes (+ their dependencies) |
+| `--exclude` `<a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits (regardless of exit code) |
-| `--kill-others-on-fail` | Kill all processes when any exits with a non-zero exit code |
-| `--max-restarts <n>` | Max auto-restarts for crashed processes |
-| `-s, --sort <mode>` | Tab display order: `config` (default), `alphabetical`, `topological` |
-| `--no-watch` | Disable file watching even if config has `watch` patterns |
-| `-t, --timestamps [format]` | Add timestamps (default `HH:mm:ss`). Works in both prefix and TUI mode. Pass a format string for custom output (e.g. `HH:mm:ss.SSS`). Toggle in TUI with `T` |
-| `--log-dir <path>` | Persist logs to timestamped subdirs (`<path>/<timestamp>/<name>.log`) with a `latest` symlink. Path is printed on exit |
-| `--debug` | Log to `.numux/debug.log` |
-| `-h, --help` | Show help |
-| `-v, --version` | Show version |
+| `--kill-others-on-fail` | Kill all processes when any exits with non-zero code |
+| `--max-restarts` `<n>` | Max auto-restarts for crashed processes |
+| `--no-watch` | Disable file watching even if config has watch patterns |
+| `-t,` `--timestamps` `[<format>]` | Add timestamps to output (default HH:mm:ss, or pass a format string) |
+| `--log-dir` `<path>` | Write per-process logs to directory |
+| `--debug` | Enable debug logging to .numux/debug.log |
+| `-h,` `--help` | Show this help |
+| `-v,` `--version` | Show version |
 <!-- /generated:options -->
 
 ### Prefix mode
@@ -223,16 +226,22 @@ Top-level options apply to all processes (process-level settings override):
 <!-- generated:config-global -->
 | Field | Type | Description |
 |-------|------|-------------|
-| `cwd` | `string` | Working directory for all processes (process `cwd` overrides) |
-| `env` | `Record<string, string>` | Environment variables merged into all processes (process `env` overrides per key) |
-| `envFile` | `string \| string[] \| false` | `.env` file(s) for all processes (process `envFile` replaces if set; `false` disables) |
-| `showCommand` | `boolean` | Print the command being run as the first line of output (default: `true`) |
-| `maxRestarts` | `number` | Restart limit for all processes (default: `0`) |
-| `readyTimeout` | `number` | Ready timeout in ms for all processes |
-| `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Stop signal for all processes (default: `'SIGTERM'`) |
-| `errorMatcher` | `boolean \| string` | Error detection for all processes (`true` = ANSI red, string = regex) |
-| `watch` | `string \| string[]` | Watch patterns for all processes (process `watch` replaces if set) |
-| `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order (default: `'config'` — definition order) |
+| `cwd` | `string` | Global working directory, inherited by all processes |
+| `env` | `Record<string, string>` | Global env vars, merged into each process (process-level overrides) |
+| `envFile` | `string \| string[] \| false` | Global .env file(s), inherited by processes without their own envFile; `false` disables |
+| `showCommand` | `boolean` | Global showCommand flag, inherited by all processes |
+| `maxRestarts` | `number` | Global restart limit, inherited by all processes (only restarts on non-zero exit) |
+| `readyTimeout` | `number` | Global ready timeout (ms), inherited by all processes |
+| `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Global stop signal, inherited by all processes |
+| `errorMatcher` | `boolean \| string` | Global error matcher, inherited by all processes. `true` = detect ANSI red output, string = regex |
+| `watch` | `string \| string[]` | Global watch patterns, inherited by processes without their own watch |
+| `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers. |
+| `prefix` | `boolean` | Use prefixed output mode instead of TUI (for CI/scripts) |
+| `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss` format, or pass a format string (e.g. `"HH:mm:ss.SSS"`) |
+| `killOthers` | `boolean` | Kill all processes when any one exits (regardless of exit code) |
+| `killOthersOnFail` | `boolean` | Kill all processes when any one exits with a non-zero exit code |
+| `noWatch` | `boolean` | Disable file watching even if processes have watch patterns |
+| `logDir` | `string` | Directory to write per-process log files |
 <!-- /generated:config-global -->
 
 ```ts
@@ -255,24 +264,24 @@ Each process accepts:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `command` | `string` | *required* | Shell command to run. Supports `$dep.group` references from dependency capture groups |
-| `cwd` | `string` | `process.cwd()` | Working directory |
-| `env` | `Record<string, string>` | — | Extra environment variables. Values support `$dep.group` references from dependency capture groups |
-| `envFile` | `string \| string[] \| false` | — | `.env` file path(s) to load (relative to `cwd`); `false` disables inherited envFile |
-| `dependsOn` | `string[]` | — | Processes that must be ready first |
-| `readyPattern` | `string \| RegExp` | — | Regex matched against stdout to signal readiness. Use `RegExp` to capture groups (see below) |
-| `readyTimeout` | `number` | — | Milliseconds to wait for `readyPattern` before failing |
-| `maxRestarts` | `number` | `0` | Max auto-restart attempts on non-zero exit (0 = no restarts) |
+| `cwd` | `string` | — | Working directory for the process |
+| `env` | `Record<string, string>` | — | Extra environment variables. Values support `$dep.group` references from dependency capture groups. |
+| `envFile` | `string \| string[] \| false` | — | .env file path(s) to load, or `false` to disable |
+| `dependsOn` | `string \| string[]` | — | Processes that must be ready before this one starts |
+| `readyPattern` | `string \| RegExp` | — | Regex matched against stdout to signal readiness. Use `RegExp` to capture groups for `$dep.group` expansion |
+| `maxRestarts` | `number` | `0` | Limit auto-restart attempts (only restarts on non-zero exit) |
+| `readyTimeout` | `number` | — | Milliseconds to wait for readyPattern before failing |
 | `delay` | `number` | — | Milliseconds to wait before starting the process |
-| `optional` | `boolean` | `false` | Process is visible as a tab but not started automatically. Use Alt+S to start manually |
-| `condition` | `string` | — | Env var name; process skipped if falsy. Prefix with `!` to negate |
-| `platform` | `string \| string[]` | — | OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; dependents still start |
-| `stopSignal` | `string` | `SIGTERM` | Signal for graceful stop (`SIGTERM`, `SIGINT`, or `SIGHUP`) |
-| `color` | `string \| string[]` | auto | Hex (e.g. `"#ff6600"`) or basic name: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple |
+| `condition` | `string` | — | Env var name (prefix with `!` to negate); process skipped if condition is falsy |
+| `platform` | `string \| string[]` | — | OS(es) this process runs on (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed, their dependents still start |
+| `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | `'SIGTERM'` | Signal for graceful stop |
+| `color` | `string \| string[]` | — | Hex color (e.g. `"#ff6600"`) or color name. Array for round-robin in script patterns |
 | `watch` | `string \| string[]` | — | Glob patterns — restart process when matching files change |
-| `interactive` | `boolean` | `false` | When `true`, keyboard input is forwarded to the process |
-| `errorMatcher` | `boolean \| string` | — | `true` detects ANSI red output, string = regex pattern — shows error indicator on tab |
+| `interactive` | `boolean` | `false` | When true, keyboard input is forwarded to the process |
+| `optional` | `boolean` | — | Process is visible but not started automatically. Use Alt+S to start manually |
+| `errorMatcher` | `boolean \| string` | — | `true` = detect ANSI red output, string = regex pattern |
+| `workspaces` | `boolean \| string \| string[]` | — | Run command in monorepo workspaces. `true` = all workspaces, string = specific workspace by name/path, string[] = multiple workspaces |
 | `showCommand` | `boolean` | `true` | Print the command being run as the first line of output |
-| `workspaces` | `boolean \| string \| string[]` | — | Run command in monorepo workspaces (see below) |
 <!-- /generated:config-process -->
 
 ### Workspace expansion
@@ -428,21 +437,27 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 <!-- generated:keybindings -->
 | Key | Action |
 |-----|--------|
-| `←`/`→` or `1`-`9` | Switch tabs |
-| `F` | Search current pane |
-| `Tab` (in search) | Toggle between single-pane and all-process search |
-| `Enter`/`Shift+Enter` | Next/previous match |
-| `Esc` | Exit search |
-| `R` | Restart current process |
-| `Shift+R` | Restart all processes |
-| `S` | Stop/start current process |
-| `Y` | Copy all output |
-| `L` | Clear pane |
-| `G`/`Shift+G` | Scroll to top/bottom |
-| `PageUp`/`PageDown` | Scroll by page |
+| `←`/`→` or `1`-`9` | Tabs |
+| `G/Shift+G` | Top/bottom |
+| `R` | Restart |
+| `S` | Stop/start |
+| `F` | Search |
+| `Y` | Copy all |
+| `L` | Clear |
+| `T` | Timestamps |
+| `O` | Open logs |
 | `Ctrl+Click` | Open link |
 | `Ctrl+C` | Quit |
 <!-- /generated:keybindings -->
+
+Search mode (after pressing `F`):
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Toggle between single-pane and all-process search |
+| `Enter`/`Shift+Enter` | Next/previous match |
+| `Esc` | Exit search |
+| `PageUp`/`PageDown` | Scroll by page |
 
 ## Tab icons
 
@@ -455,6 +470,7 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 | ● | Ready |
 | ◑ | Stopping |
 | ■ | Stopped |
+| ✓ | Finished |
 | ✖ | Failed |
 | ⊘ | Skipped |
 <!-- /generated:tab-icons -->

@@ -1,0 +1,240 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { FLAGS, SUBCOMMANDS } from '../src/cli-flags'
+import { STATUS_HINTS } from '../src/ui/keybindings'
+import { STATUS_ICONS } from '../src/ui/tabs'
+
+const ROOT = join(import.meta.dir, '..')
+
+// --- Options table ---
+
+function generateOptionsTable(): string {
+	const rows: string[] = ['| Flag | Description |', '|------|-------------|']
+	for (const f of FLAGS) {
+		const parts: string[] = []
+		if (f.short) parts.push(`\`${f.short},\``)
+		parts.push(`\`${f.long}\``)
+		if (f.type === 'value') parts.push(`\`${f.valueName}\``)
+		if (f.type === 'optional-value') parts.push(`\`[${f.valueName}]\``)
+		rows.push(`| ${parts.join(' ')} | ${f.description} |`)
+	}
+	return rows.join('\n')
+}
+
+// --- Subcommands block ---
+
+function generateSubcommandsBlock(): string {
+	const PAD = 35
+	const lines = SUBCOMMANDS.map(s => {
+		const usage = `numux ${s.usage ?? s.name}`
+		return `${usage.padEnd(PAD)}# ${s.description}`
+	})
+	return '```sh\n' + lines.join('\n') + '\n```'
+}
+
+// --- Keybindings table ---
+
+function generateKeybindingsTable(): string {
+	const rows: string[] = ['| Key | Action |', '|-----|--------|']
+	for (const [label, desc] of STATUS_HINTS) {
+		const key = label === '\u2190\u2192/1-9' ? '`\u2190`/`\u2192` or `1`-`9`' : `\`${label}\``
+		const action = desc.charAt(0).toUpperCase() + desc.slice(1)
+		rows.push(`| ${key} | ${action} |`)
+	}
+	return rows.join('\n')
+}
+
+// --- Tab icons table ---
+
+function generateTabIconsTable(): string {
+	const rows: string[] = ['| Icon | Status |', '|------|--------|']
+	for (const [status, icon] of Object.entries(STATUS_ICONS)) {
+		const label = status.charAt(0).toUpperCase() + status.slice(1)
+		rows.push(`| ${icon} | ${label} |`)
+	}
+	return rows.join('\n')
+}
+
+// --- Type parsing helpers ---
+
+interface FieldDoc {
+	name: string
+	type: string
+	defaultVal: string | null
+	description: string
+}
+
+/** Known type aliases to expand for readability */
+const TYPE_ALIASES: Record<string, string> = {
+	SortOrder: "'config' | 'alphabetical' | 'topological'",
+	Color: 'string',
+}
+
+function cleanType(raw: string): string {
+	// Strip NoInfer<X> -> X
+	let t = raw.replace(/NoInfer<([^>]+)>/g, '$1')
+	// Replace generic type parameters (K, K[]) with string equivalents
+	t = t.replace(/\bK\b\[\]/g, 'string[]').replace(/\bK\b/g, 'string')
+	// Strip trailing semicolons
+	t = t.replace(/;$/, '').trim()
+	// Expand known type aliases
+	for (const [alias, expanded] of Object.entries(TYPE_ALIASES)) {
+		if (t === alias) return expanded
+		// e.g. Color | Color[]
+		t = t.replace(new RegExp(`\\b${alias}\\b`, 'g'), expanded)
+	}
+	return t
+}
+
+function parseInterfaceFields(src: string, interfaceName: string): FieldDoc[] {
+	// Find the interface body
+	const ifaceRe = new RegExp(`interface ${interfaceName}[^{]*\\{([\\s\\S]*?)^\\}`, 'm')
+	const match = ifaceRe.exec(src)
+	if (!match) throw new Error(`Interface ${interfaceName} not found`)
+	const body = match[1]
+
+	const fields: FieldDoc[] = []
+	const lines = body.split('\n')
+
+	let jsdocLines: string[] = []
+	let inJsdoc = false
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i]
+		const trimmed = line.trim()
+
+		// Single-line JSDoc: /** text */ or /** text @default val */
+		const singleLine = /^\/\*\*\s*(.*?)\s*\*\/$/.exec(trimmed)
+		if (singleLine) {
+			jsdocLines = [singleLine[1]]
+			continue
+		}
+
+		if (trimmed === '/**') {
+			inJsdoc = true
+			jsdocLines = []
+			continue
+		}
+		if (inJsdoc) {
+			if (trimmed === '*/') {
+				inJsdoc = false
+				continue
+			}
+			jsdocLines.push(trimmed.replace(/^\*\s?/, ''))
+			continue
+		}
+
+		// Field declaration line: name?: Type or name: Type
+		const fieldRe = /^\s*(\w+)\??\s*:\s*(.+)$/
+		const fm = fieldRe.exec(line)
+		if (!fm) {
+			if (trimmed && !trimmed.startsWith('//')) jsdocLines = []
+			continue
+		}
+
+		const name = fm[1]
+		const rawType = fm[2].replace(/;$/, '').trim()
+		const type = cleanType(rawType)
+
+		// Parse jsdoc
+		let defaultVal: string | null = null
+		const descParts: string[] = []
+		for (const jl of jsdocLines) {
+			if (jl.startsWith('@default ')) {
+				defaultVal = jl.slice('@default '.length).trim()
+			} else if (jl.startsWith('@example')) {
+				// skip example lines
+			} else if (jl.startsWith('@')) {
+				// skip other tags
+			} else if (jl) {
+				descParts.push(jl)
+			}
+		}
+		const description = descParts.join(' ').trim()
+
+		fields.push({ name, type, defaultVal, description })
+		jsdocLines = []
+	}
+
+	return fields
+}
+
+// --- Process options table ---
+
+function generateProcessOptionsTable(): string {
+	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8')
+	const fields = parseInterfaceFields(src, 'NumuxProcessConfig')
+
+	const rows: string[] = [
+		'| Field | Type | Default | Description |',
+		'|-------|------|---------|-------------|',
+	]
+
+	for (const f of fields) {
+		const rawDef = f.name === 'command' ? '*required*' : (f.defaultVal ?? '\u2014')
+		// Wrap plain code values (numbers, quoted strings, booleans) in backticks
+		const def =
+			rawDef === '*required*' || rawDef === '\u2014'
+				? rawDef
+				: `\`${rawDef}\``
+		const type = f.type.replace(/\|/g, '\\|')
+		rows.push(`| \`${f.name}\` | \`${type}\` | ${def} | ${f.description} |`)
+	}
+
+	return rows.join('\n')
+}
+
+// --- Global options table ---
+
+function generateGlobalOptionsTable(): string {
+	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8')
+	const fields = parseInterfaceFields(src, 'NumuxConfig')
+
+	const rows: string[] = [
+		'| Field | Type | Description |',
+		'|-------|------|-------------|',
+	]
+
+	for (const f of fields) {
+		if (f.name === 'processes') continue
+		const type = f.type.replace(/\|/g, '\\|')
+		rows.push(`| \`${f.name}\` | \`${type}\` | ${f.description} |`)
+	}
+
+	return rows.join('\n')
+}
+
+// --- README section replacement ---
+
+function escapeRegex(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function replaceSection(readme: string, name: string, content: string): string {
+	const open = `<!-- generated:${name} -->`
+	const close = `<!-- /generated:${name} -->`
+	const re = new RegExp(`${escapeRegex(open)}\n[\\s\\S]*?\n${escapeRegex(close)}`)
+	if (!re.test(readme)) {
+		throw new Error(`Marker not found: ${name}`)
+	}
+	return readme.replace(re, `${open}\n${content}\n${close}`)
+}
+
+function updateReadme(): void {
+	const readmePath = join(ROOT, 'README.md')
+	let readme = readFileSync(readmePath, 'utf8')
+
+	readme = replaceSection(readme, 'subcommands', generateSubcommandsBlock())
+	readme = replaceSection(readme, 'options', generateOptionsTable())
+	readme = replaceSection(readme, 'config-global', generateGlobalOptionsTable())
+	readme = replaceSection(readme, 'config-process', generateProcessOptionsTable())
+	readme = replaceSection(readme, 'keybindings', generateKeybindingsTable())
+	readme = replaceSection(readme, 'tab-icons', generateTabIconsTable())
+
+	writeFileSync(readmePath, readme, 'utf8')
+	console.log('README.md updated')
+}
+
+if (import.meta.main) {
+	updateReadme()
+}
