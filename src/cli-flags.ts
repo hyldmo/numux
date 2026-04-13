@@ -1,4 +1,5 @@
 import type { ParsedArgs } from './cli'
+import { CONFIG_FILES } from './config/loader'
 
 // --- Flag types ---
 
@@ -320,7 +321,7 @@ export function generateHelp(): string {
 		lines.push(`${left.padEnd(29)}${f.description}`)
 	}
 
-	lines.push('', 'Config files (auto-detected):', '  numux.config.ts, numux.config.js')
+	lines.push('', 'Config files (auto-detected):', `  ${CONFIG_FILES.join(', ')}, or "numux" key in package.json`)
 
 	return lines.join('\n')
 }
