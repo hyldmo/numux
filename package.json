@@ -31,8 +31,9 @@
     }
   },
   "scripts": {
+    "docs": "bun scripts/generate-docs.ts",
     "build": "bun run build.ts",
-    "prepublishOnly": "bun run build",
+    "prepublishOnly": "bun run docs && bun run build",
     "dev": "cd example && bun run dev --debug",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",

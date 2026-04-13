@@ -27,4 +27,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bunx biome ci
+      - name: Check generated docs are up to date
+        run: |
+          bun run docs
+          git diff --exit-code
       - run: bun test
