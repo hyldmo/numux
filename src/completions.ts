@@ -43,7 +43,9 @@ function bashCompletions(): string {
 		}
 	}
 	caseEntries.push('    completions)\n      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )\n      return ;;')
-	caseEntries.push(`    help)\n      COMPREPLY=( $(compgen -W "${HELP_TOPIC_NAMES.join(' ')}" -- "$cur") )\n      return ;;`)
+	caseEntries.push(
+		`    help)\n      COMPREPLY=( $(compgen -W "${HELP_TOPIC_NAMES.join(' ')}" -- "$cur") )\n      return ;;`
+	)
 
 	// All flag names for compgen
 	const allFlags = FLAGS.flatMap(f => (f.short ? [f.short, f.long] : [f.long]))

@@ -2,7 +2,6 @@ import { HELP_TOPICS, TOPIC_ALIASES } from './generated/help-topics'
 
 function stripMarkdown(md: string): string {
 	return md
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional HTML comment removal
 		.replace(/<!--[\s\S]*?-->/g, '')
 		.replace(/\*\*(.+?)\*\*/g, '$1')
 		.replace(/\*(.+?)\*/g, '$1')
