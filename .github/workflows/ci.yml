@@ -26,6 +26,8 @@ jobs:
           bun-version: "1.x"
       - run: bun install --frozen-lockfile
       - run: bun run docs
+      - name: Check README is up to date with code
+        run: git diff --exit-code README.md
       - run: bun run typecheck
       - run: bunx biome ci
       - run: bun test
