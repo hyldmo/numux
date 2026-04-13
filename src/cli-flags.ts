@@ -273,6 +273,20 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 			result.completions = next
 			return i
 		}
+	},
+	{
+		name: 'help',
+		description: 'Show help for a topic',
+		usage: 'help [topic]',
+		parse: (args, i, result) => {
+			result.help = true
+			const next = args[i + 1]
+			if (next !== undefined && !next.startsWith('-')) {
+				result.helpTopic = next
+				i++
+			}
+			return i
+		}
 	}
 ]
 

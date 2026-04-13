@@ -29,6 +29,7 @@ export interface ParsedArgs {
 	colors?: string[]
 	workspace?: string
 	envFile?: string | false
+	helpTopic?: string
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }

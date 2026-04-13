@@ -76,6 +76,7 @@ numux validate                     # Validate config and show process graph
 numux exec <name> [--] <cmd>       # Run a command in a process's environment
 numux logs [name]                  # Open the log directory or a specific process log
 numux completions <shell>          # Generate shell completions (bash, zsh, fish)
+numux help [topic]                 # Show help for a topic
 ```
 <!-- /generated:subcommands -->
 
