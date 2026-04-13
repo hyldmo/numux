@@ -1,4 +1,4 @@
-import { copyFileSync, readdirSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import type { BunPlugin } from 'bun'
 
 /**
@@ -95,3 +95,7 @@ if (tsc.exitCode !== 0) {
 
 // Bin wrapper
 copyFileSync('src/bin-wrapper.js', 'dist/bin.js')
+
+// Man page
+mkdirSync('dist/man', { recursive: true })
+copyFileSync('man/numux.1', 'dist/man/numux.1')

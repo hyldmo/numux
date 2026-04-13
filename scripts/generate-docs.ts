@@ -314,7 +314,30 @@ function generateHelpTopics(): void {
 	console.log(`src/generated/help-topics.ts written (${Object.keys(topics).length} topics)`)
 }
 
+// --- Man page ---
+
+function generateManPage(): void {
+	const readmePath = join(ROOT, 'README.md')
+	const manDir = join(ROOT, 'man')
+	mkdirSync(manDir, { recursive: true })
+
+	const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+
+	const result = Bun.spawnSync(
+		['bunx', 'marked-man', '--name', 'NUMUX', '--version', pkg.version, '--section', '1', '--manual', 'numux manual'],
+		{ stdin: Bun.file(readmePath) }
+	)
+
+	if (result.exitCode !== 0) {
+		throw new Error(`marked-man failed: ${result.stderr.toString()}`)
+	}
+
+	writeFileSync(join(manDir, 'numux.1'), result.stdout)
+	console.log('man/numux.1 generated')
+}
+
 if (import.meta.main) {
 	updateReadme()
 	generateHelpTopics()
+	generateManPage()
 }
