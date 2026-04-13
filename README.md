@@ -147,11 +147,45 @@ numux 'dev:*'              # all scripts matching dev:*
 numux 'npm:*:dev'          # explicit npm: prefix (same behavior)
 ```
 
-`*` does not match across `:` separators (like `/` in file paths), so `format:*` matches `format:store` but not `format:check:store`. Use `format:*:*` to match two levels deep.
+<!-- generated:script-pattern-rules -->
+## Script pattern rules
 
-Append `^` to skip scripts that act as group runners — scripts that have sub-scripts beneath them. For example, if `format:check` runs `numux 'format:check:*'` internally, then `format:*^` excludes it (because `format:check:store` and `format:check:odoo` exist as sub-scripts), avoiding duplicate runs.
+**Recognition:** A process name is treated as a script reference when it:
+- starts with `npm:` (e.g. `npm:dev:*`)
+- contains glob metacharacters (`*`, `?`, `[`)
+- contains a colon AND has no explicit `command` (e.g. `lint:eslint: {}`)
 
-Extra arguments after the pattern are forwarded to each matched command:
+**Glob matching:** Patterns are matched against `package.json` scripts using
+`Bun.Glob`. The `*` wildcard does NOT match across `:` separators — `dev:*`
+matches `dev:web` but not `dev:web:hmr`. Use `dev:*:*` for two levels deep.
+
+**Leaf-only (`^`):** Append `^` to skip scripts that are group runners —
+scripts that have sub-scripts beneath them. E.g. if `format:check` has
+`format:check:store` and `format:check:odoo` below it, `format:*^` excludes
+`format:check` but keeps the leaf scripts.
+
+**Extra args:** Anything after the first space in the pattern is forwarded
+as extra arguments to each matched command: `lint:* --fix` → `bun run lint:js -- --fix`.
+
+**Template inheritance:** Config properties on a pattern entry (color, env,
+dependsOn, etc.) are inherited by all expanded processes. Color arrays are
+distributed round-robin across matches.
+
+**Display names:** The glob's literal prefix and suffix are stripped from
+matched script names: `dev:*` + `dev:web` → display name `web`.
+
+## Auto-resolution
+
+When a process has no `command` and its name matches a `package.json` script,
+the command is auto-resolved to `<pm> run <name>`. This works for:
+- `true` or `{}` shorthand: `lint: true` → `bun run lint`
+- Objects without `command`: `typecheck: { dependsOn: ['db'] }` → `bun run typecheck`
+
+## npm: prefix
+
+Commands starting with `npm:` are rewritten to use the detected package
+manager: `npm:dev` → `bun run dev` (if bun is detected).
+<!-- /generated:script-pattern-rules -->
 
 ```sh
 numux 'lint:* --fix'      # → bun run lint:js --fix, bun run lint:ts --fix
@@ -168,9 +202,7 @@ export default defineConfig({
 })
 ```
 
-Template properties (color, env, dependsOn, etc.) are inherited by all matched processes. Colors given as an array are distributed round-robin.
-
-When a process has no command and its name matches a `package.json` script, the command is auto-resolved:
+Auto-resolution example:
 
 ```ts
 export default defineConfig({

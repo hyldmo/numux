@@ -204,6 +204,39 @@ function generateGlobalOptionsTable(): string {
 	return rows.join('\n')
 }
 
+// --- Script pattern rules ---
+
+function generateScriptPatternRules(): string {
+	const src = readFileSync(join(ROOT, 'src/config/expand-scripts.ts'), 'utf8')
+
+	// Extract the JSDoc block directly above expandScriptPatterns.
+	// Find the function declaration first, then look backwards for its JSDoc.
+	const funcIdx = src.indexOf('export function expandScriptPatterns')
+	if (funcIdx === -1) throw new Error('expandScriptPatterns not found')
+
+	const before = src.slice(0, funcIdx)
+	const jsdocEnd = before.lastIndexOf('*/\n')
+	if (jsdocEnd === -1) throw new Error('expandScriptPatterns JSDoc not found')
+
+	const jsdocStart = before.lastIndexOf('/**\n', jsdocEnd)
+	if (jsdocStart === -1) throw new Error('expandScriptPatterns JSDoc not found')
+
+	const jsdocBlock = before.slice(jsdocStart + 4, jsdocEnd)
+
+	// Clean JSDoc: strip leading ` * ` prefix from each line
+	const raw = jsdocBlock
+		.split('\n')
+		.map(line => line.replace(/^ \* ?/, ''))
+		.join('\n')
+		.trim()
+
+	// Only include content starting from "## Script pattern rules"
+	const rulesStart = raw.indexOf('## Script pattern rules')
+	if (rulesStart === -1) throw new Error('## Script pattern rules heading not found in JSDoc')
+
+	return raw.slice(rulesStart)
+}
+
 // --- README section replacement ---
 
 function escapeRegex(s: string): string {
@@ -213,7 +246,7 @@ function escapeRegex(s: string): string {
 function replaceSection(readme: string, name: string, content: string): string {
 	const open = `<!-- generated:${name} -->`
 	const close = `<!-- /generated:${name} -->`
-	const re = new RegExp(`${escapeRegex(open)}\n[\\s\\S]*?\n${escapeRegex(close)}`)
+	const re = new RegExp(`${escapeRegex(open)}\n[\\s\\S]*?${escapeRegex(close)}`)
 	if (!re.test(readme)) {
 		throw new Error(`Marker not found: ${name}`)
 	}
@@ -228,6 +261,7 @@ function updateReadme(): void {
 	readme = replaceSection(readme, 'options', generateOptionsTable())
 	readme = replaceSection(readme, 'config-global', generateGlobalOptionsTable())
 	readme = replaceSection(readme, 'config-process', generateProcessOptionsTable())
+	readme = replaceSection(readme, 'script-pattern-rules', generateScriptPatternRules())
 	readme = replaceSection(readme, 'keybindings', generateKeybindingsTable())
 	readme = replaceSection(readme, 'tab-icons', generateTabIconsTable())
 
