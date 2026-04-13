@@ -1,4 +1,5 @@
 import type { ParsedArgs } from './cli'
+import { CONFIG_FILES } from './config/loader'
 
 // --- Flag types ---
 
@@ -273,6 +274,20 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 			result.completions = next
 			return i
 		}
+	},
+	{
+		name: 'help',
+		description: 'Show help for a topic',
+		usage: 'help [topic]',
+		parse: (args, i, result) => {
+			result.help = true
+			const next = args[i + 1]
+			if (next !== undefined && !next.startsWith('-')) {
+				result.helpTopic = next
+				i++
+			}
+			return i
+		}
 	}
 ]
 
@@ -306,7 +321,7 @@ export function generateHelp(): string {
 		lines.push(`${left.padEnd(29)}${f.description}`)
 	}
 
-	lines.push('', 'Config files (auto-detected):', '  numux.config.ts, numux.config.js')
+	lines.push('', 'Config files (auto-detected):', `  ${CONFIG_FILES.join(', ')}, or "numux" key in package.json`)
 
 	return lines.join('\n')
 }

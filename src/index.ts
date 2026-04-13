@@ -50,7 +50,12 @@ async function main() {
 	const parsed = parseArgs(process.argv)
 
 	if (parsed.help) {
-		console.info(HELP)
+		if (parsed.helpTopic) {
+			const { showHelp } = await import('./help')
+			console.info(showHelp(parsed.helpTopic))
+		} else {
+			console.info(HELP)
+		}
 		process.exit(0)
 	}
 

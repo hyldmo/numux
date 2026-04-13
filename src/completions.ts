@@ -1,6 +1,9 @@
 import { FLAGS, type FlagDef, SUBCOMMANDS } from './cli-flags'
+import { HELP_TOPICS, TOPIC_ALIASES } from './generated/help-topics'
 
 const SUPPORTED_SHELLS = ['bash', 'zsh', 'fish'] as const
+
+const HELP_TOPIC_NAMES = [...Object.keys(HELP_TOPICS), ...Object.keys(TOPIC_ALIASES)]
 
 export function generateCompletions(shell: string): string {
 	switch (shell) {
@@ -40,6 +43,9 @@ function bashCompletions(): string {
 		}
 	}
 	caseEntries.push('    completions)\n      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )\n      return ;;')
+	caseEntries.push(
+		`    help)\n      COMPREPLY=( $(compgen -W "${HELP_TOPIC_NAMES.join(' ')}" -- "$cur") )\n      return ;;`
+	)
 
 	// All flag names for compgen
 	const allFlags = FLAGS.flatMap(f => (f.short ? [f.short, f.long] : [f.long]))
@@ -118,6 +124,17 @@ ${argsBlock}
       _describe 'subcommand' subcmds
       ;;
   esac
+
+  case "\${words[2]}" in
+    help)
+      local -a topics
+      topics=(${HELP_TOPIC_NAMES.map(t => `'${t}'`).join(' ')})
+      _describe 'topic' topics
+      ;;
+    completions)
+      _values 'shell' bash zsh fish
+      ;;
+  esac
 }
 _numux`
 }
@@ -140,6 +157,9 @@ function fishCompletions(): string {
 		'',
 		'# Completions subcommand',
 		"complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'",
+		'',
+		'# Help subcommand',
+		`complete -c numux -n '__fish_seen_subcommand_from help' -a '${HELP_TOPIC_NAMES.join(' ')}'`,
 		'',
 		'# Options'
 	)

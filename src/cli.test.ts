@@ -461,3 +461,23 @@ describe('filterConfig — no-op', () => {
 		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate', 'web'])
 	})
 })
+
+describe('help subcommand', () => {
+	test('numux help sets help flag', () => {
+		const result = parseArgs(['bun', 'script', 'help'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBeUndefined()
+	})
+
+	test('numux help <topic> sets helpTopic', () => {
+		const result = parseArgs(['bun', 'script', 'help', 'keybindings'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBe('keybindings')
+	})
+
+	test('numux --help does not set helpTopic', () => {
+		const result = parseArgs(['bun', 'script', '--help'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBeUndefined()
+	})
+})
