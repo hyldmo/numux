@@ -61,12 +61,9 @@ export const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
 
 export const ANSI_RESET = '\x1b[0m'
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping requires matching control chars
-const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()#][0-9A-Za-z]|\x1b[A-Za-z><=]/g
-
-/** Strip ANSI escape sequences from text */
+/** Strip ANSI escape sequences from text (SIMD-accelerated via Bun) */
 export function stripAnsi(str: string): string {
-	return str.replace(ANSI_RE, '')
+	return Bun.stripANSI(str)
 }
 
 /** Default palette for automatic process color assignment — cycles through BASIC_COLORS */

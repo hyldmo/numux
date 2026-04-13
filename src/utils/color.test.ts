@@ -155,4 +155,49 @@ describe('stripAnsi', () => {
 	test('handles mixed content', () => {
 		expect(stripAnsi('\x1b[1mbold\x1b[0m \x1b[?25lplain\x1b[?25h')).toBe('bold plain')
 	})
+
+	test('strips cursor movement sequences', () => {
+		expect(stripAnsi('\x1b[10;20H')).toBe('')
+		expect(stripAnsi('\x1b[5A')).toBe('')
+		expect(stripAnsi('\x1b[3B')).toBe('')
+		expect(stripAnsi('\x1b[2J')).toBe('')
+		expect(stripAnsi('\x1b[K')).toBe('')
+	})
+
+	test('strips OSC 8 hyperlinks', () => {
+		expect(stripAnsi('\x1b]8;;https://example.com\x07Link\x1b]8;;\x07')).toBe('Link')
+		expect(stripAnsi('\x1b]8;;https://example.com\x1b\\Link\x1b]8;;\x1b\\')).toBe('Link')
+	})
+
+	test('strips 256-color sequences', () => {
+		expect(stripAnsi('\x1b[38;5;196mred\x1b[0m')).toBe('red')
+		expect(stripAnsi('\x1b[48;5;21mblue bg\x1b[0m')).toBe('blue bg')
+	})
+
+	test('strips multiple SGR params', () => {
+		expect(stripAnsi('\x1b[1;3;4;31mbold italic underline red\x1b[0m')).toBe('bold italic underline red')
+	})
+
+	test('handles empty string', () => {
+		expect(stripAnsi('')).toBe('')
+	})
+
+	test('preserves text with special characters', () => {
+		expect(stripAnsi('hello → world')).toBe('hello → world')
+		expect(stripAnsi('日本語テスト')).toBe('日本語テスト')
+		expect(stripAnsi('emoji 🎉 test')).toBe('emoji 🎉 test')
+	})
+
+	test('handles consecutive escape sequences', () => {
+		expect(stripAnsi('\x1b[1m\x1b[31m\x1b[4mtext\x1b[0m')).toBe('text')
+	})
+
+	test('strips scroll region sequences', () => {
+		expect(stripAnsi('\x1b[1;24r')).toBe('')
+	})
+
+	test('handles real-world colored output', () => {
+		const npmOutput = '\x1b[32m✓\x1b[0m \x1b[90m1 test passed\x1b[0m'
+		expect(stripAnsi(npmOutput)).toBe('✓ 1 test passed')
+	})
 })
