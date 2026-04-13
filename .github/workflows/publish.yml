@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: "lts/*"
       - run: bun install --frozen-lockfile
+      - run: bun run docs
       - run: bun run typecheck
       - run: bunx biome ci
       - run: bun test
