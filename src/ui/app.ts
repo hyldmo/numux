@@ -247,7 +247,7 @@ export class App {
 
 				if (name === SHORTCUTS.clear.key) {
 					this.panes.get(this.activePane)?.clear()
-					this.logWriter.truncate(this.activePane)
+					this.logWriter.markCopyStart(this.activePane)
 					return
 				}
 
@@ -413,13 +413,11 @@ export class App {
 		}
 	}
 
-	/** Copy all text in the active pane to clipboard. */
+	/** Copy all text in the active pane to clipboard (unwrapped, from log file). */
 	private copyAllText(): void {
 		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
 
-		const text = pane.getText()
+		const text = this.logWriter.readLog(this.activePane)
 		if (!text) {
 			this.statusBar.showTemporaryMessage('No output to copy')
 			return
