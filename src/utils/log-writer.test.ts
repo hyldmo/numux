@@ -128,20 +128,76 @@ describe('LogWriter', () => {
 		writer.close()
 	})
 
-	test('truncate clears log file', () => {
+	test('readLog returns all content without markCopyStart', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'line 1\n'))
+		writer.handleEvent(outputEvent('api', 'line 2\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('line 1\nline 2\n')
+		writer.close()
+	})
+
+	test('readLog returns undefined for unknown process', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.readLog('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('readLog returns undefined when no output after markCopyStart', () => {
 		const writer = new LogWriter(dir)
 		writer.handleEvent(outputEvent('api', 'old content\n'))
+		writer.markCopyStart('api')
 
-		const contentBefore = readFileSync(join(dir, 'api.log'), 'utf-8')
-		expect(contentBefore).toContain('old content')
-
-		writer.truncate('api')
-		writer.handleEvent(outputEvent('api', 'new content\n'))
+		expect(writer.readLog('api')).toBeUndefined()
 		writer.close()
+	})
 
-		const contentAfter = readFileSync(join(dir, 'api.log'), 'utf-8')
-		expect(contentAfter).toBe('new content\n')
-		expect(contentAfter).not.toContain('old content')
+	test('markCopyStart makes readLog return only new content', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'old content\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'new content\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('new content\n')
+		expect(content).not.toContain('old content')
+
+		// Full file still has everything
+		const fullFile = readFileSync(join(dir, 'api.log'), 'utf-8')
+		expect(fullFile).toContain('old content')
+		expect(fullFile).toContain('new content')
+		writer.close()
+	})
+
+	test('markCopyStart can be called multiple times', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'first\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'second\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'third\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('third\n')
+		writer.close()
+	})
+
+	test('markCopyStart on unknown process is a no-op', () => {
+		const writer = new LogWriter(dir)
+		writer.markCopyStart('unknown') // should not throw
+		expect(writer.readLog('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('readLog strips ANSI from content', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', '\x1b[31mred\x1b[0m\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('red\n')
+		expect(content).not.toContain('\x1b')
+		writer.close()
 	})
 
 	test('createTemp creates a temp directory', () => {
