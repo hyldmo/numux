@@ -244,6 +244,14 @@ function replaceSection(readme: string, name: string, content: string): string {
 	return readme.replace(re, `${open}\n${content}\n${close}`)
 }
 
+function generateSubcommandExamples(name: string): string {
+	const sub = SUBCOMMANDS.find(s => s.name === name)
+	if (!sub?.examples?.length) return ''
+	const PAD = 35
+	const lines = sub.examples.map(([cmd, comment]) => `${cmd.padEnd(PAD)}# ${comment}`)
+	return `\`\`\`sh\n${lines.join('\n')}\n\`\`\``
+}
+
 function updateReadme(): void {
 	const readmePath = join(ROOT, 'README.md')
 	let readme = readFileSync(readmePath, 'utf8')
@@ -255,6 +263,7 @@ function updateReadme(): void {
 	readme = replaceSection(readme, 'script-pattern-rules', generateScriptPatternRules())
 	readme = replaceSection(readme, 'keybindings', generateKeybindingsTable())
 	readme = replaceSection(readme, 'tab-icons', generateTabIconsTable())
+	readme = replaceSection(readme, 'logging-usage', generateSubcommandExamples('logs'))
 
 	writeFileSync(readmePath, readme, 'utf8')
 }
