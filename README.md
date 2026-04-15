@@ -89,13 +89,6 @@ numux exec api -- npx prisma migrate
 numux exec web npm run build
 ```
 
-`logs` prints the log directory path, or a specific process's log contents:
-
-```sh
-numux logs           # Print log directory path
-numux logs api       # Print the api process log
-```
-
 Set up completions for your shell:
 
 ```sh
@@ -249,6 +242,20 @@ numux --prefix
 ```
 
 Auto-exits when all processes finish. Exit code 1 if any process failed.
+
+## Logging
+
+numux writes per-process log files (ANSI-stripped) when `--log-dir` is set or `logDir` is configured. Each session creates a timestamped subdirectory with a `latest` symlink pointing to the most recent run.
+
+<!-- generated:logging-usage -->
+```sh
+numux logs                         # Print log directory path
+numux logs api                     # Pipe the api process log to stdout
+numux logs api | grep "ERROR"      # Search process logs
+numux logs api | tail -f           # Follow process log output
+```
+<!-- /generated:logging-usage -->
+
 
 ## Config reference
 

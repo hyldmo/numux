@@ -39,6 +39,12 @@ export interface SubcommandDef {
 	name: string
 	description: string
 	usage?: string
+	/** Example usages shown in generated docs, as `[command, comment]` pairs */
+	examples?: Array<[string, string]>
+	/** Shell completion for subcommand arguments: static list, 'dynamic' for runtime resolution, or omit for none */
+	completionArgs?: string[] | 'dynamic'
+	/** Shell snippet that resolves dynamic completions (used when completionArgs is 'dynamic') */
+	completionScript?: string
 	parse: (args: string[], i: number, result: ParsedArgs) => number | 'break'
 }
 
@@ -254,6 +260,14 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 		name: 'logs',
 		description: 'Open the log directory or a specific process log',
 		usage: 'logs [name]',
+		examples: [
+			['numux logs', 'Print log directory path'],
+			['numux logs api', 'Pipe the api process log to stdout'],
+			['numux logs api | grep "ERROR"', 'Search process logs'],
+			['numux logs api | tail -f', 'Follow process log output']
+		],
+		completionArgs: 'dynamic',
+		completionScript: 'numux logs 2>/dev/null',
 		parse: (args, i, result) => {
 			result.logs = true
 			const next = args[i + 1]
@@ -268,6 +282,7 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 		name: 'completions',
 		description: 'Generate shell completions (bash, zsh, fish)',
 		usage: 'completions <shell>',
+		completionArgs: ['bash', 'zsh', 'fish'],
 		parse: (args, i, result) => {
 			const next = args[++i]
 			if (next === undefined) throw new Error('Missing value for completions')
@@ -279,6 +294,7 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 		name: 'help',
 		description: 'Show help for a topic',
 		usage: 'help [topic]',
+		completionArgs: 'dynamic',
 		parse: (args, i, result) => {
 			result.help = true
 			const next = args[i + 1]
