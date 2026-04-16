@@ -175,10 +175,46 @@ describe('parseArgs', () => {
 		expect(result.exclude).toEqual(['migrate'])
 	})
 
+	test('-o is short for --only', () => {
+		const result = parseArgs(argv('-o', 'api,web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('-x is short for --exclude', () => {
+		const result = parseArgs(argv('-x', 'migrate'))
+		expect(result.exclude).toEqual(['migrate'])
+	})
+
+	test('repeated --only merges values', () => {
+		const result = parseArgs(argv('--only', 'api', '--only', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('repeated -o merges comma-separated values', () => {
+		const result = parseArgs(argv('-o', 'api,db', '-o', 'web'))
+		expect(result.only).toEqual(['api', 'db', 'web'])
+	})
+
+	test('repeated --exclude merges values', () => {
+		const result = parseArgs(argv('--exclude', 'db', '-x', 'migrate'))
+		expect(result.exclude).toEqual(['db', 'migrate'])
+	})
+
+	test('mixed short and long flags merge', () => {
+		const result = parseArgs(argv('-o', 'api', '--only', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
 	test('--only and --exclude can coexist', () => {
 		const result = parseArgs(argv('--only', 'api,web,db', '--exclude', 'db'))
 		expect(result.only).toEqual(['api', 'web', 'db'])
 		expect(result.exclude).toEqual(['db'])
+	})
+
+	test('-o and -x can coexist', () => {
+		const result = parseArgs(argv('-o', 'api,web', '-x', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+		expect(result.exclude).toEqual(['web'])
 	})
 
 	test('init sets init flag', () => {
