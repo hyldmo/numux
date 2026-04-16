@@ -103,3 +103,51 @@ describe('Pane timestamp toggle', () => {
 		expect(pane.timestampsEnabled).toBe(true)
 	})
 })
+
+describe('Pane timestamp signs', () => {
+	test('every logical line gets a timestamp sign', async () => {
+		const pane = await createPane({ timestamps: true })
+		pane.feed(encoder.encode('line1\nline2\nline3\n'))
+		const signs = pane.getTimestampSigns()!
+		// 4 logical lines: line1, line2, line3, and trailing newline
+		expect(signs.size).toBe(4)
+		for (let i = 0; i < 4; i++) {
+			expect(signs.has(i)).toBe(true)
+			expect(signs.get(i)!.before).toBeDefined()
+		}
+	})
+
+	test('lines with identical timestamps still get individual signs', async () => {
+		const pane = await createPane({ timestamps: 'HH:mm:ss' })
+		// All lines fed in one call — same Date.now() — same formatted second
+		pane.feed(encoder.encode('a\nb\nc\n'))
+		const signs = pane.getTimestampSigns()!
+		expect(signs.size).toBe(4)
+		// All should have the same formatted value but still be present
+		const values = [...signs.values()].map(s => s.before)
+		expect(new Set(values).size).toBe(1) // same second
+		expect(values.length).toBe(4) // but every line has one
+	})
+
+	test('signs include milliseconds with default format', async () => {
+		const pane = await createPane({ timestamps: true })
+		pane.feed(encoder.encode('hello\n'))
+		const signs = pane.getTimestampSigns()!
+		const ts = signs.get(0)!.before!
+		// Default format is HH:mm:ss.SSS — 12 chars
+		expect(ts).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/)
+	})
+
+	test('signs cleared after clear()', async () => {
+		const pane = await createPane({ timestamps: true })
+		pane.feed(encoder.encode('line1\nline2\n'))
+		expect(pane.getTimestampSigns()!.size).toBeGreaterThan(0)
+		pane.clear()
+		expect(pane.getTimestampSigns()!.size).toBe(0)
+	})
+
+	test('returns null when timestamps disabled', async () => {
+		const pane = await createPane()
+		expect(pane.getTimestampSigns()).toBeNull()
+	})
+})

@@ -37,7 +37,7 @@ src/
 - Panes are **readonly by default** — keyboard input is not forwarded to processes. Press `Enter` to enter **input mode** (forwards keystrokes to the process for y/n prompts etc.), `Escape` to exit
 - Left/Right arrows cycle tabs, Up/Down arrows scroll by line, Shift+Up/Down scroll to top/bottom, PageUp/PageDown scroll by page, Home/End to top/bottom
 - Mouse drag selects text and auto-copies to clipboard (OSC 52); `Y` key also copies selection
-- `T` toggles an `HH:MM:SS` timestamp gutter in TUI mode; also enabled via `timestamps: true` config or `--timestamps` flag. Accepts a format string (e.g. `timestamps: "HH:mm:ss.SSS"`) with tokens: `YYYY`, `MM`, `DD`, `HH`, `hh`, `mm`, `ss`, `SSS`, `A`
+- `T` toggles an `HH:mm:ss.SSS` timestamp gutter in TUI mode; also enabled via `timestamps: true` config or `--timestamps` flag. Accepts a format string (e.g. `timestamps: "HH:mm:ss"`) with tokens: `YYYY`, `MM`, `DD`, `HH`, `hh`, `mm`, `ss`, `SSS`, `A`
 - Compact keybinding hints in the status bar; `H` or `?` opens a full help overlay. Config lives in `src/ui/keybindings.ts`
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor (shown during input mode)

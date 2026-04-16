@@ -138,6 +138,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--only',
+		short: '-o',
 		key: 'only',
 		description: 'Only run these processes (+ their dependencies)',
 		valueName: '<a,b,...>',
@@ -147,6 +148,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--exclude',
+		short: '-x',
 		key: 'exclude',
 		description: 'Exclude these processes',
 		valueName: '<a,b,...>',
@@ -189,7 +191,7 @@ export const FLAGS: FlagDef[] = [
 		long: '--timestamps',
 		short: '-t',
 		key: 'timestamps',
-		description: 'Add timestamps to output (default HH:mm:ss, or pass a format string)',
+		description: 'Add timestamps to output (default HH:mm:ss.SSS, or pass a format string)',
 		valueName: '<format>',
 		completionHint: 'none'
 	},

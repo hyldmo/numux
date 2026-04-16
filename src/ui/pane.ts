@@ -268,18 +268,17 @@ export class Pane {
 		return this._timestampFormat !== null
 	}
 
+	/** Returns the current line signs map from the timestamp gutter, or null if disabled. */
+	getTimestampSigns(): Map<number, LineSign> | null {
+		return this.timestampGutter?.getLineSigns() ?? null
+	}
+
 	private updateTimestampSigns(): void {
 		if (!(this.timestampGutter && this._timestampFormat)) return
 		const fmt = this._timestampFormat
 		const signs = new Map<number, LineSign>()
-		let prevFormatted = ''
 		for (let i = 0; i < this.lineTimestamps.length; i++) {
-			const formatted = formatTimestamp(new Date(this.lineTimestamps[i]), fmt)
-			// Only show timestamp when it changes from the previous line
-			if (formatted !== prevFormatted) {
-				signs.set(i, { before: formatted })
-				prevFormatted = formatted
-			}
+			signs.set(i, { before: formatTimestamp(new Date(this.lineTimestamps[i]), fmt) })
 		}
 		this.timestampGutter.setLineSigns(signs)
 	}
