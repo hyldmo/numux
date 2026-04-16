@@ -138,6 +138,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--only',
+		short: '-o',
 		key: 'only',
 		description: 'Only run these processes (+ their dependencies)',
 		valueName: '<a,b,...>',
@@ -147,6 +148,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--exclude',
+		short: '-x',
 		key: 'exclude',
 		description: 'Exclude these processes',
 		valueName: '<a,b,...>',

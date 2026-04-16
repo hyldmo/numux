@@ -292,6 +292,42 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(1)
 	}, 10000)
 
+	test('-o filters to named process and its deps', async () => {
+		const config = writeConfig(
+			'only-filter.json',
+			JSON.stringify({
+				processes: {
+					db: { command: "echo 'db ready'" },
+					api: { command: "echo 'api ready'", dependsOn: ['db'] },
+					web: { command: "echo 'web ready'" }
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, ['-o', 'api'])
+		expect(stdout).toContain('[api]')
+		expect(stdout).toContain('[db]')
+		expect(stdout).not.toContain('[web]')
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('repeated -o merges filters', async () => {
+		const config = writeConfig(
+			'only-repeated.json',
+			JSON.stringify({
+				processes: {
+					a: { command: "echo 'a'" },
+					b: { command: "echo 'b'" },
+					c: { command: "echo 'c'" }
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, ['-o', 'a', '-o', 'b'])
+		expect(stdout).toContain('[a]')
+		expect(stdout).toContain('[b]')
+		expect(stdout).not.toContain('[c]')
+		expect(exitCode).toBe(0)
+	}, 10000)
+
 	test('cursor-up sequences are stripped to preserve prefix', async () => {
 		// Use bun -e to emit real escape bytes — avoids printf portability issues
 		const config = writeConfig(

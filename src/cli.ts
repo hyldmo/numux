@@ -93,7 +93,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				const value = flag.parse ? flag.parse(next, arg) : next
 				const current = (result as any)[flag.key]
 				if (Array.isArray(current)) {
-					current.push(value)
+					if (Array.isArray(value)) current.push(...value)
+					else current.push(value)
 				} else {
 					;(result as any)[flag.key] = value
 				}

@@ -220,8 +220,8 @@ export default defineConfig({
 | `-e,` `--env-file` `<path|false>` | Env file path, or "false" to disable env file loading |
 | `--config` `<path>` | Config file path (default: auto-detect) |
 | `-p,` `--prefix` | Prefixed output mode (no TUI, for CI/scripts) |
-| `--only` `<a,b,...>` | Only run these processes (+ their dependencies) |
-| `--exclude` `<a,b,...>` | Exclude these processes |
+| `-o,` `--only` `<a,b,...>` | Only run these processes (+ their dependencies) |
+| `-x,` `--exclude` `<a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits (regardless of exit code) |
 | `--kill-others-on-fail` | Kill all processes when any exits with non-zero code |
 | `--max-restarts` `<n>` | Max auto-restarts for crashed processes |
