@@ -477,14 +477,19 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 <!-- generated:keybindings -->
 | Key | Action |
 |-----|--------|
-| `←`/`→` or `1`-`9` | Tabs |
-| `G/Shift+G` | Top/bottom |
-| `R` | Restart |
-| `S` | Stop/start |
+| `←`/`→` or `1`-`9` | Switch tabs |
+| `Enter` | Input mode |
 | `F` | Search |
+| `R` | Restart |
+| `Shift+R` | Restart all |
+| `S` | Stop/start |
 | `Y` | Copy all |
 | `L` | Clear |
 | `T` | Timestamps |
+| `↑↓` | Scroll line |
+| `Shift+↑↓` | Top/bottom |
+| `G/Shift+G` | Top/bottom |
+| `PgUp/PgDn` | Scroll page |
 | `O` | Open logs |
 | `Ctrl+Click` | Open link |
 | `Ctrl+C` | Quit |

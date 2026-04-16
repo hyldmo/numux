@@ -4,6 +4,7 @@ import type { KeyEvent, ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
+import { HelpOverlay } from './help-overlay'
 import { SHORTCUTS } from './keybindings'
 import { Pane } from './pane'
 import { SearchController } from './search'
@@ -17,8 +18,10 @@ export class App {
 	private panes = new Map<string, Pane>()
 	private tabBar!: TabBar
 	private statusBar!: StatusBar
+	private helpOverlay!: HelpOverlay
 	private search!: SearchController
 	private activePane: string | null = null
+	private inputMode = false
 	private destroyed = false
 	private names: string[]
 	private termCols = 80
@@ -93,8 +96,11 @@ export class App {
 			border: false
 		})
 
-		// Status bar (only visible during search)
+		// Status bar
 		this.statusBar = new StatusBar(this.renderer)
+
+		// Help overlay (hidden by default)
+		this.helpOverlay = new HelpOverlay(this.renderer)
 
 		// Search controller
 		this.search = new SearchController({
@@ -135,6 +141,7 @@ export class App {
 		layout.add(contentRow)
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
+		this.renderer.root.add(this.helpOverlay.renderable)
 
 		// Wire tab events (mouse clicks)
 		this.tabBar.onSelect((_index, name) => this.switchPane(name))
@@ -179,8 +186,16 @@ export class App {
 		this.renderer.keyInput.on('keypress', (key: KeyEvent) => {
 			log(key)
 
-			// Ctrl+C: quit (always works)
+			// Ctrl+C: quit (always works, except in input mode where it goes to process)
 			if (key.ctrl && key.name === 'c') {
+				if (this.helpOverlay.isVisible) {
+					this.helpOverlay.hide()
+					return
+				}
+				if (this.inputMode) {
+					this.exitInputMode()
+					return
+				}
 				if (this.search.isActive) {
 					this.search.exit()
 					return
@@ -191,9 +206,29 @@ export class App {
 				return
 			}
 
+			// Help overlay: ? toggles, Esc closes
+			if (this.helpOverlay.isVisible) {
+				if (key.name === 'escape' || key.sequence === '?' || key.name === 'h') {
+					this.helpOverlay.hide()
+				}
+				return
+			}
+
 			// Search mode input handling
 			if (this.search.isActive) {
 				this.search.handleInput(key)
+				return
+			}
+
+			// Input mode: forward keys to process, Escape exits
+			if (this.inputMode && this.activePane) {
+				if (key.name === 'escape') {
+					this.exitInputMode()
+					return
+				}
+				if (key.sequence) {
+					this.manager.write(this.activePane, key.sequence)
+				}
 				return
 			}
 
@@ -204,6 +239,18 @@ export class App {
 			// Non-interactive panes: plain keys act as shortcuts
 			if (!isInteractive) {
 				const name = key.name.toLowerCase()
+
+				// ?/H shows help overlay
+				if (key.sequence === '?' || name === 'h') {
+					this.helpOverlay.toggle()
+					return
+				}
+
+				// Enter: enter input mode
+				if (name === 'return') {
+					this.enterInputMode()
+					return
+				}
 
 				if (key.shift && name === SHORTCUTS.scrollToBottom.key) {
 					this.panes.get(this.activePane)?.scrollToBottom()
@@ -286,6 +333,17 @@ export class App {
 					return
 				}
 
+				// Up/Down: scroll by line, Shift+Up/Down: scroll to top/bottom
+				if (name === 'up' || name === 'down') {
+					const pane = this.panes.get(this.activePane)
+					if (key.shift) {
+						name === 'up' ? pane?.scrollToTop() : pane?.scrollToBottom()
+					} else {
+						pane?.scrollBy(name === 'up' ? -1 : 1)
+					}
+					return
+				}
+
 				// PageUp/PageDown: scroll by page
 				if (name === 'pageup' || name === 'pagedown') {
 					const pane = this.panes.get(this.activePane)
@@ -322,8 +380,35 @@ export class App {
 		await this.manager.startAll(termCols, termRows)
 	}
 
+	private enterInputMode(): void {
+		this.inputMode = true
+		this.statusBar.setInputMode(true)
+		// Show cursor in active pane while in input mode
+		if (this.activePane) {
+			const pane = this.panes.get(this.activePane)
+			if (pane) pane.terminal.showCursor = true
+		}
+	}
+
+	private exitInputMode(): void {
+		this.inputMode = false
+		this.statusBar.setInputMode(false)
+		// Hide cursor again unless process is natively interactive
+		if (this.activePane) {
+			const isInteractive = this.config.processes[this.activePane]?.interactive === true
+			if (!isInteractive) {
+				const pane = this.panes.get(this.activePane)
+				if (pane) pane.terminal.showCursor = false
+			}
+		}
+	}
+
 	private switchPane(name: string): void {
 		if (this.activePane === name) return
+		// Exit input mode on pane switch
+		if (this.inputMode) {
+			this.exitInputMode()
+		}
 		// In single-pane search mode, exit search on pane switch
 		if (this.search.isActive && !this.search.isAllMode) {
 			this.search.exit()
