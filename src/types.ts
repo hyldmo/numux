@@ -103,7 +103,7 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default false
 	 */
 	prefix?: boolean
-	/** Add timestamps to output lines. `true` uses default `HH:mm:ss` format, or pass a format string (e.g. `"HH:mm:ss.SSS"`) */
+	/** Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) */
 	timestamps?: boolean | string
 	/**
 	 * Kill all processes when any one exits (regardless of exit code)
