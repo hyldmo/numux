@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FLAGS, SUBCOMMANDS } from '../src/cli-flags'
-import { STATUS_HINTS } from '../src/ui/keybindings'
+import { STATUS_HINTS_FULL, toHintPair } from '../src/ui/keybindings'
 import { STATUS_ICONS } from '../src/ui/tabs'
 
 const ROOT = join(import.meta.dir, '..')
@@ -36,7 +36,8 @@ function generateSubcommandsBlock(): string {
 
 function generateKeybindingsTable(): string {
 	const rows: string[] = ['| Key | Action |', '|-----|--------|']
-	for (const [label, desc] of STATUS_HINTS) {
+	for (const hint of STATUS_HINTS_FULL) {
+		const [label, desc] = toHintPair(hint)
 		const key = label === '\u2190\u2192/1-9' ? '`\u2190`/`\u2192` or `1`-`9`' : `\`${label}\``
 		const action = desc.charAt(0).toUpperCase() + desc.slice(1)
 		rows.push(`| ${key} | ${action} |`)

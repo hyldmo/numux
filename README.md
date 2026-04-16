@@ -486,12 +486,11 @@ Keybindings are shown in the status bar at the bottom of the app. Panes are read
 | `Y` | Copy all |
 | `L` | Clear |
 | `T` | Timestamps |
-| `↑`/`↓` | Scroll line |
-| `Shift+↑`/`Shift+↓` | Scroll to top/bottom |
-| `G`/`Shift+G` | Scroll to top/bottom |
-| `PgUp`/`PgDn` | Scroll page |
+| `↑↓` | Scroll line |
+| `Shift+↑↓` | Top/bottom |
+| `G/Shift+G` | Top/bottom |
+| `PgUp/PgDn` | Scroll page |
 | `O` | Open logs |
-| `H` or `?` | Help overlay |
 | `Ctrl+Click` | Open link |
 | `Ctrl+C` | Quit |
 <!-- /generated:keybindings -->
