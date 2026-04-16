@@ -149,7 +149,7 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(1)
 	}, 15000)
 
-	test('--timestamps prepends HH:MM:SS to output lines', async () => {
+	test('--timestamps prepends HH:mm:ss.SSS to output lines', async () => {
 		const config = writeConfig(
 			'timestamps.json',
 			JSON.stringify({
@@ -157,8 +157,8 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config, ['--timestamps'])
-		// Should contain a timestamp like [12:34:56]
-		expect(stdout).toMatch(/\[\d{2}:\d{2}:\d{2}\]/)
+		// Should contain a timestamp like [12:34:56.789]
+		expect(stdout).toMatch(/\[\d{2}:\d{2}:\d{2}\.\d{3}\]/)
 		expect(stdout).toContain('hello')
 		expect(exitCode).toBe(0)
 	}, 10000)

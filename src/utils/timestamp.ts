@@ -1,5 +1,5 @@
 /** Default timestamp format */
-export const DEFAULT_TIMESTAMP_FORMAT = 'HH:mm:ss'
+export const DEFAULT_TIMESTAMP_FORMAT = 'HH:mm:ss.SSS'
 
 /**
  * Format a Date using a simple token-based format string.

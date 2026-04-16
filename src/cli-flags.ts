@@ -191,7 +191,7 @@ export const FLAGS: FlagDef[] = [
 		long: '--timestamps',
 		short: '-t',
 		key: 'timestamps',
-		description: 'Add timestamps to output (default HH:mm:ss, or pass a format string)',
+		description: 'Add timestamps to output (default HH:mm:ss.SSS, or pass a format string)',
 		valueName: '<format>',
 		completionHint: 'none'
 	},

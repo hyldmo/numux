@@ -226,7 +226,7 @@ export default defineConfig({
 | `--kill-others-on-fail` | Kill all processes when any exits with non-zero code |
 | `--max-restarts` `<n>` | Max auto-restarts for crashed processes |
 | `--no-watch` | Disable file watching even if config has watch patterns |
-| `-t,` `--timestamps` `[<format>]` | Add timestamps to output (default HH:mm:ss, or pass a format string) |
+| `-t,` `--timestamps` `[<format>]` | Add timestamps to output (default HH:mm:ss.SSS, or pass a format string) |
 | `--log-dir` `<path>` | Write per-process logs to directory |
 | `--debug` | Enable debug logging to .numux/debug.log |
 | `-h,` `--help` | Show this help |
@@ -277,7 +277,7 @@ Top-level options apply to all processes (process-level settings override):
 | `watch` | `string \| string[]` | Global watch patterns, inherited by processes without their own watch |
 | `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers. |
 | `prefix` | `boolean` | Use prefixed output mode instead of TUI (for CI/scripts) |
-| `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss` format, or pass a format string (e.g. `"HH:mm:ss.SSS"`) |
+| `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) |
 | `killOthers` | `boolean` | Kill all processes when any one exits (regardless of exit code) |
 | `killOthersOnFail` | `boolean` | Kill all processes when any one exits with a non-zero exit code |
 | `noWatch` | `boolean` | Disable file watching even if processes have watch patterns |
