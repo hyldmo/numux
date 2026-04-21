@@ -5,8 +5,9 @@ import {
 	ScrollBoxRenderable,
 	type Selection
 } from '@opentui/core'
-import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import type { HighlightRegion } from 'ghostty-opentui/terminal-buffer'
 import { DEFAULT_TIMESTAMP_FORMAT, formatTimestamp } from '../utils/timestamp'
+import { TailingTerminal } from './tailing-terminal'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
 export interface SearchMatch {
@@ -15,17 +16,21 @@ export interface SearchMatch {
 	end: number
 }
 
-// Cap the native terminal buffer to prevent unbounded growth. getJson()
-// serializes the entire buffer on each render — a huge buffer freezes the
-// event loop. Full output is always available in log files, so resetting
-// only loses in-terminal scrollback.
-const MAX_SCROLLBACK_LINES = 50_000
-// Fallback byte cap for hidden panes where lineCount isn't updated
-const MAX_BUFFER_BYTES = 10 * 1024 * 1024
+// Cap what gets serialized per render. Ghostty's native scrollback is unbounded
+// (max_scrollback = usize_max); rendering a million-line buffer via getJson()
+// freezes the event loop. Capping render output via `limit` plus the tail-view
+// offset in TailingTerminal keeps per-frame cost O(RENDER_LIMIT) regardless of
+// how much has been fed. Older lines remain in the native buffer and are
+// reachable via scroll-up paging (future phase).
+const RENDER_LIMIT = 5_000
+// OOM backstop for truly runaway output. Much higher than the old 50k cap
+// because render cost is no longer proportional to buffer size.
+const MAX_SCROLLBACK_LINES = 1_000_000
+const MAX_BUFFER_BYTES = 500 * 1024 * 1024
 
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
-	readonly terminal: GhosttyTerminalRenderable
+	readonly terminal: TailingTerminal
 	private decoder = new TextDecoder()
 	private bytesFed = 0
 
@@ -53,13 +58,14 @@ export class Pane {
 			onMouseScroll: () => this._onScroll?.()
 		})
 
-		this.terminal = new GhosttyTerminalRenderable(renderer, {
+		this.terminal = new TailingTerminal(renderer, {
 			id: `term-${name}`,
 			cols,
 			rows,
 			persistent: true,
 			showCursor: interactive,
 			trimEnd: true,
+			limit: RENDER_LIMIT,
 			flexGrow: 1
 		})
 
@@ -106,7 +112,7 @@ export class Pane {
 
 	feed(data: Uint8Array): void {
 		this.bytesFed += data.length
-		if (this.terminal.lineCount > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
+		if (this.lineCounter > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
 			this.terminal.reset()
 			this.bytesFed = 0
 			this.lineTimestamps = []
