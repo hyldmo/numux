@@ -42,16 +42,15 @@ describe('Pane timestamp tracking', () => {
 		expect(pane.lineTimestamps.length).toBe(0)
 	})
 
-	test('resets timestamps on scrollback overflow', async () => {
+	test('does not reset at 11MB (OOM backstop is much higher)', async () => {
 		const pane = await createPane()
-		// Feed some data first
 		pane.feed(encoder.encode('line1\nline2\n'))
 		expect(pane.lineTimestamps.length).toBe(3)
-		// Simulate buffer overflow by feeding >10MB
+		// The old 10MB cap would reset here. New cap is 500MB so we keep history.
 		const bigChunk = encoder.encode('x'.repeat(11 * 1024 * 1024))
 		pane.feed(bigChunk)
-		// After reset, should have 1 timestamp (for the current feed's initial line)
-		expect(pane.lineTimestamps.length).toBe(1)
+		// Still 3 (no newlines in the big chunk, no reset)
+		expect(pane.lineTimestamps.length).toBe(3)
 	})
 
 	test('timestamps are monotonically non-decreasing', async () => {
@@ -60,6 +59,157 @@ describe('Pane timestamp tracking', () => {
 		for (let i = 1; i < pane.lineTimestamps.length; i++) {
 			expect(pane.lineTimestamps[i]).toBeGreaterThanOrEqual(pane.lineTimestamps[i - 1])
 		}
+	})
+})
+
+describe('Pane scrollback retention (Phase 1: tail-render)', () => {
+	test('retains line history past the old 50k cap', async () => {
+		const pane = await createPane()
+		// Old code reset at 50k lines. Verify we now keep going.
+		const lines = `${new Array(60_000).fill('log').join('\n')}\n`
+		pane.feed(encoder.encode(lines))
+		// 1 (initial) + 60_000 newlines = 60_001
+		expect(pane.lineTimestamps.length).toBe(60_001)
+	})
+
+	test('feed stays fast on a 100k-line burst', async () => {
+		const pane = await createPane()
+		const chunk = encoder.encode(`${'line\n'.repeat(10_000)}`)
+		const start = performance.now()
+		for (let i = 0; i < 10; i++) pane.feed(chunk)
+		const elapsed = performance.now() - start
+		// Generous budget: 10× 10k feeds = 100k lines. Should be well under a second.
+		// Older code with reset + full re-serialization would be much slower.
+		expect(elapsed).toBeLessThan(2000)
+		expect(pane.lineTimestamps.length).toBe(100_001)
+	})
+
+	test('tail-render returns newest lines, not oldest', async () => {
+		const pane = await createPane()
+		const lines: string[] = []
+		for (let i = 0; i < 20_000; i++) lines.push(`line-${i}`)
+		pane.feed(encoder.encode(`${lines.join('\n')}\n`))
+
+		// Access the patched persistent terminal directly. This is the same call
+		// the render path makes each frame — verifies tail-offset injection.
+		type Pt = {
+			getJson: (opts: { limit?: number; offset?: number }) => {
+				totalLines: number
+				lines: { spans: { text: string }[] }[]
+			}
+		}
+		const pt = (pane.terminal as unknown as { _persistentTerminal: Pt })._persistentTerminal
+		const data = pt.getJson({ limit: 5000 })
+		const rendered = data.lines.map(l => l.spans.map(s => s.text).join('')).join('\n')
+		expect(rendered).toContain('line-19999')
+		// Oldest lines must not be in the rendered tail window.
+		expect(rendered).not.toContain('line-0\n')
+		expect(rendered).not.toContain('line-100\n')
+	})
+
+	test('clear() still resets buffer and timestamps', async () => {
+		const pane = await createPane()
+		pane.feed(encoder.encode('a\nb\nc\n'))
+		expect(pane.lineTimestamps.length).toBe(4)
+		pane.clear()
+		expect(pane.lineTimestamps.length).toBe(0)
+		expect(pane.terminal.getText()).toBe('')
+	})
+
+	test('tail-render includes all lines when totalLines < limit', async () => {
+		const pane = await createPane()
+		const lines: string[] = []
+		for (let i = 0; i < 100; i++) lines.push(`line-${i}`)
+		pane.feed(encoder.encode(`${lines.join('\n')}\n`))
+		type Pt = {
+			getJson: (opts: { limit?: number; offset?: number }) => {
+				totalLines: number
+				lines: { spans: { text: string }[] }[]
+			}
+		}
+		const pt = (pane.terminal as unknown as { _persistentTerminal: Pt })._persistentTerminal
+		const data = pt.getJson({ limit: 5000 })
+		const rendered = data.lines.map(l => l.spans.map(s => s.text).join('')).join('\n')
+		// Buffer has fewer lines than limit — all must be in the rendered output.
+		expect(rendered).toContain('line-0')
+		expect(rendered).toContain('line-99')
+	})
+
+	test('getJson without limit is not tail-shifted', async () => {
+		const pane = await createPane()
+		const lines: string[] = []
+		for (let i = 0; i < 100; i++) lines.push(`line-${i}`)
+		pane.feed(encoder.encode(`${lines.join('\n')}\n`))
+		type Pt = {
+			getJson: (opts: { limit?: number; offset?: number }) => {
+				totalLines: number
+				lines: { spans: { text: string }[] }[]
+			}
+		}
+		const pt = (pane.terminal as unknown as { _persistentTerminal: Pt })._persistentTerminal
+		// No limit passed — patch must be a no-op (falls through to original getJson).
+		const data = pt.getJson({})
+		expect(data.totalLines).toBeGreaterThanOrEqual(100)
+		const rendered = data.lines.map(l => l.spans.map(s => s.text).join('')).join('\n')
+		expect(rendered).toContain('line-0')
+		expect(rendered).toContain('line-99')
+	})
+
+	test('explicit offset bypasses tail injection', async () => {
+		const pane = await createPane()
+		const lines: string[] = []
+		for (let i = 0; i < 10_000; i++) lines.push(`line-${i}`)
+		pane.feed(encoder.encode(`${lines.join('\n')}\n`))
+		type Pt = {
+			getJson: (opts: { limit?: number; offset?: number }) => {
+				totalLines: number
+				lines: { spans: { text: string }[] }[]
+			}
+		}
+		const pt = (pane.terminal as unknown as { _persistentTerminal: Pt })._persistentTerminal
+		// Caller supplied its own offset — tail injection must not override.
+		const data = pt.getJson({ offset: 0, limit: 50 })
+		const rendered = data.lines.map(l => l.spans.map(s => s.text).join('')).join('\n')
+		expect(rendered).toContain('line-0')
+		expect(rendered).not.toContain('line-9999')
+	})
+
+	test('destroy does not throw after feed', async () => {
+		const pane = await createPane()
+		pane.feed(encoder.encode('hello\n'))
+		expect(() => pane.destroy()).not.toThrow()
+	})
+
+	test('resize does not break tail rendering', async () => {
+		const pane = await createPane()
+		const lines: string[] = []
+		for (let i = 0; i < 10_000; i++) lines.push(`line-${i}`)
+		pane.feed(encoder.encode(`${lines.join('\n')}\n`))
+		pane.resize(100, 30)
+		pane.feed(encoder.encode('after-resize\n'))
+		type Pt = {
+			getJson: (opts: { limit?: number; offset?: number }) => {
+				totalLines: number
+				lines: { spans: { text: string }[] }[]
+			}
+		}
+		const pt = (pane.terminal as unknown as { _persistentTerminal: Pt })._persistentTerminal
+		const data = pt.getJson({ limit: 5000 })
+		const rendered = data.lines.map(l => l.spans.map(s => s.text).join('')).join('\n')
+		expect(rendered).toContain('after-resize')
+	})
+
+	test('OOM backstop resets buffer at MAX_SCROLLBACK_LINES threshold', async () => {
+		const pane = await createPane()
+		// Feed in 250k-line chunks. Threshold is 1M, so feed 5 times: the 5th
+		// chunk sees lineCounter = 1_000_001 > MAX and triggers a reset before
+		// its own content is counted. After reset, that chunk still counts
+		// normally — 1 initial + 250k newlines = 250_001 timestamps.
+		const chunk = encoder.encode('x\n'.repeat(250_000))
+		for (let i = 0; i < 5; i++) pane.feed(chunk)
+		// Without reset we would see 1_250_001 timestamps. With reset we see
+		// only the last chunk's contribution.
+		expect(pane.lineTimestamps.length).toBe(250_001)
 	})
 })
 
