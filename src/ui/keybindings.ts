@@ -28,7 +28,7 @@ export function toHintPair(hint: Hint): [string, string] {
 /** Compact hints shown in the status bar */
 export const STATUS_HINTS_COMPACT: Hint[] = [
 	['\u2190\u2192', 'tabs'],
-	SHORTCUTS.search,
+	SHORTCUTS.stopStart,
 	SHORTCUTS.copy,
 	['Enter', 'input'],
 	['H', 'help']
