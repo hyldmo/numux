@@ -99,4 +99,46 @@ describe('numux logs', () => {
 		expect(exitCode).toBe(0)
 		expect(stdout).toBe('session data\n')
 	})
+
+	test('does not warn when --log-dir is explicit', async () => {
+		const base = join(tmpDir, 'explicit-no-warn')
+		const sessionDir = join(base, '2025-01-01T00-00-00')
+		mkdirSync(sessionDir, { recursive: true })
+		writeFileSync(join(sessionDir, 'api.log'), 'data')
+		symlinkSync(sessionDir, join(base, 'latest'))
+
+		const { stderr, exitCode } = await runLogs(base)
+		expect(exitCode).toBe(0)
+		expect(stderr).not.toContain('Warning:')
+	})
+
+	test('warns when default logDir is used and latest symlink exists', async () => {
+		const cwd = join(tmpDir, 'default-warn')
+		mkdirSync(cwd, { recursive: true })
+		const base = join(tmpdir(), 'numux', 'default-warn')
+		const sessionDir = join(base, '2025-01-01T00-00-00')
+		mkdirSync(sessionDir, { recursive: true })
+		writeFileSync(join(sessionDir, 'api.log'), 'data')
+		try {
+			symlinkSync(sessionDir, join(base, 'latest'))
+		} catch {
+			// Already exists from prior run — best effort
+		}
+
+		const proc = Bun.spawn(['bun', INDEX, 'logs'], {
+			cwd,
+			stdout: 'pipe',
+			stderr: 'pipe'
+		})
+		const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
+		const exitCode = await proc.exited
+
+		expect(exitCode).toBe(0)
+		expect(stderr).toContain('Warning:')
+		expect(stderr).toContain('latest')
+		expect(stdout.trim()).toBe(join(base, 'latest'))
+
+		// Cleanup the /tmp/numux/<basename> dir we created
+		rmSync(base, { recursive: true, force: true })
+	})
 })

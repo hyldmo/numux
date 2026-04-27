@@ -2,6 +2,19 @@ import type { App } from '../ui/app'
 import type { LogWriter } from './log-writer'
 import { log } from './logger'
 
+let finalized = false
+
+/** Print log dir and cleanup, then exit. Idempotent — only prints once. */
+export function finalizeShutdown(logWriter: LogWriter | undefined, exitCode: number): never {
+	if (finalized) process.exit(exitCode)
+	finalized = true
+	if (logWriter && !logWriter.isTemporary) {
+		process.stderr.write(`Logs saved to: ${logWriter.getDirectory()}\n`)
+	}
+	logWriter?.cleanup()
+	process.exit(exitCode)
+}
+
 export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	let shuttingDown = false
 
@@ -11,11 +24,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 		}
 		shuttingDown = true
 		app.shutdown().finally(() => {
-			if (logWriter && !logWriter.isTemporary) {
-				process.stderr.write(`Logs saved to: ${logWriter.getDirectory()}\n`)
-			}
-			logWriter?.cleanup()
-			process.exit(app.hasFailures() ? 1 : 0)
+			finalizeShutdown(logWriter, app.hasFailures() ? 1 : 0)
 		})
 	}
 

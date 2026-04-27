@@ -82,9 +82,17 @@ async function main() {
 	}
 
 	if (parsed.logs) {
-		const logDir = parsed.logDir ?? (await resolveLogDir(parsed.configPath))
+		const resolved = parsed.logDir ? { dir: parsed.logDir, explicit: true } : await resolveLogDir(parsed.configPath)
+		const logDir = resolved.dir
 		const latestDir = resolve(logDir, 'latest')
-		const target = existsSync(latestDir) ? latestDir : logDir
+		const usingLatest = existsSync(latestDir)
+		const target = usingLatest ? latestDir : logDir
+
+		if (!resolved.explicit && usingLatest) {
+			console.warn(
+				'Warning: using default log directory; "latest" may have been overwritten by another numux instance in this project.'
+			)
+		}
 
 		if (parsed.logsProcess) {
 			const logFile = resolve(target, `${parsed.logsProcess}.log`)
@@ -298,16 +306,16 @@ function printWarnings(warnings: ValidationWarning[]): void {
 	}
 }
 
-async function resolveLogDir(configPath?: string): Promise<string> {
+async function resolveLogDir(configPath?: string): Promise<{ dir: string; explicit: boolean }> {
 	try {
 		const raw = await loadConfig(configPath)
 		if (typeof raw.logDir === 'string' && raw.logDir.trim()) {
-			return resolve(raw.logDir.trim())
+			return { dir: resolve(raw.logDir.trim()), explicit: true }
 		}
 	} catch {
 		// Config may not exist — fall through to default
 	}
-	return defaultLogDir(process.cwd())
+	return { dir: defaultLogDir(process.cwd()), explicit: false }
 }
 
 main().catch(err => {

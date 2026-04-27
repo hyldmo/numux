@@ -325,8 +325,4 @@ export class TabBar {
 	setSelectedIndex(index: number): void {
 		this.renderable.setSelectedIndex(index)
 	}
-
-	focus(): void {
-		this.renderable.focus()
-	}
 }

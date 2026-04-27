@@ -245,7 +245,9 @@ Auto-exits when all processes finish. Exit code 1 if any process failed.
 
 ## Logging
 
-numux writes per-process log files (ANSI-stripped) when `--log-dir` is set or `logDir` is configured. Each session creates a timestamped subdirectory with a `latest` symlink pointing to the most recent run.
+numux writes per-process log files (ANSI-stripped) for every run. By default they go to `<tmpdir>/numux/<project-name>/`, or to `--log-dir` / the `logDir` config when set. Each session creates a timestamped subdirectory with a `latest` symlink pointing to the most recent run.
+
+The TUI prints `Logs saved to: <session-dir>` on exit (Ctrl+C or signal). Multiple numux instances in the same project share the default base dir, so each session has its own timestamped folder but the `latest` symlink will point at whichever started most recently. If `numux logs` falls back to the default and a `latest` symlink is in use, it prints a warning. To avoid the collision, set `logDir` per config or pass `--log-dir`.
 
 <!-- generated:logging-usage -->
 ```sh
