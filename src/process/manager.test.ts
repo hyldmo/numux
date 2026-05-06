@@ -92,6 +92,19 @@ describe('ProcessManager — initialization', () => {
 		expect(names.indexOf('db')).toBeLessThan(names.indexOf('api'))
 		expect(names.indexOf('api')).toBeLessThan(names.indexOf('web'))
 	})
+
+	test('sort: status returns config order (reorder is applied in TabBar)', () => {
+		const config: ResolvedNumuxConfig = {
+			sort: 'status',
+			processes: {
+				web: { command: 'echo web' },
+				api: { command: 'echo api' },
+				db: { command: 'echo db' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['web', 'api', 'db'])
+	})
 })
 
 describe('ProcessManager — startAll', () => {

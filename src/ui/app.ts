@@ -70,7 +70,7 @@ export class App {
 
 		// Tab bar (vertical sidebar)
 		const processHexColors = buildProcessHexColorMap(this.names, this.config)
-		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.config.sort === 'status')
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
