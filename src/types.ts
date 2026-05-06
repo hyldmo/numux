@@ -94,7 +94,8 @@ export interface NumuxConfig<K extends string = string> {
 	watch?: string | string[]
 	/**
 	 * Tab display order. `'config'` preserves definition order (package.json script order for wildcards),
-	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers.
+	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers,
+	 * `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom.
 	 * @default 'config'
 	 */
 	sort?: SortOrder
@@ -125,7 +126,7 @@ export interface NumuxConfig<K extends string = string> {
 	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string | true>
 }
 
-export type SortOrder = 'config' | 'alphabetical' | 'topological'
+export type SortOrder = 'config' | 'alphabetical' | 'topological' | 'status'
 
 /** Process config after validation — dependsOn is always normalized to an array */
 export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn' | 'workspaces'> {

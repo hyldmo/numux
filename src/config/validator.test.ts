@@ -614,6 +614,14 @@ describe('validateConfig — sort', () => {
 		expect(config.sort).toBe('topological')
 	})
 
+	test('preserves sort: status', () => {
+		const config = validateConfig({
+			sort: 'status',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('status')
+	})
+
 	test('throws on invalid sort value', () => {
 		expect(() =>
 			validateConfig({
