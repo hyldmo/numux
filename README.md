@@ -212,7 +212,7 @@ export default defineConfig({
 <!-- generated:options -->
 | Flag | Description |
 |------|-------------|
-| `-s,` `--sort` `<config|alphabetical|topological>` | Tab display order |
+| `-s,` `--sort` `<config|alphabetical|topological|status>` | Tab display order |
 | `-w,` `--workspace` `<script>` | Run a package.json script across all workspaces |
 | `-n,` `--name` `<name=command>` | Add a named process |
 | `-c,` `--color` `<colors>` | Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple) |
@@ -277,7 +277,7 @@ Top-level options apply to all processes (process-level settings override):
 | `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Global stop signal, inherited by all processes |
 | `errorMatcher` | `boolean \| string` | Global error matcher, inherited by all processes. `true` = detect ANSI red output, string = regex |
 | `watch` | `string \| string[]` | Global watch patterns, inherited by processes without their own watch |
-| `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers. |
+| `sort` | `'config' \| 'alphabetical' \| 'topological' \| 'status'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers, `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom. |
 | `prefix` | `boolean` | Use prefixed output mode instead of TUI (for CI/scripts) |
 | `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) |
 | `killOthers` | `boolean` | Kill all processes when any one exits (regardless of exit code) |
