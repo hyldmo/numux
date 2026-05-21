@@ -84,6 +84,19 @@ describe('Pane scrollback retention (Phase 1: tail-render)', () => {
 		expect(pane.lineTimestamps.length).toBe(100_001)
 	})
 
+	test('feed stays fast on a chunky 100k-line burst with timestamps on', async () => {
+		// Regression: pre-fix, the sign-map was rebuilt O(n) on every feed,
+		// turning this into ~28s of cumulative work.
+		const pane = await createPane({ timestamps: true })
+		const chunk = encoder.encode('x\n'.repeat(100))
+		const start = performance.now()
+		for (let i = 0; i < 1000; i++) pane.feed(chunk)
+		const elapsed = performance.now() - start
+		// Sign updates are debounced — the feed loop itself must stay fast.
+		expect(elapsed).toBeLessThan(500)
+		expect(pane.lineTimestamps.length).toBe(100_001)
+	})
+
 	test('tail-render returns newest lines, not oldest', async () => {
 		const pane = await createPane()
 		const lines: string[] = []
@@ -180,6 +193,31 @@ describe('Pane scrollback retention (Phase 1: tail-render)', () => {
 		expect(() => pane.destroy()).not.toThrow()
 	})
 
+	test('hidden→visible transition stays fast with a 100k-line buffer', async () => {
+		// Regression: pre-fix (RENDER_LIMIT=5000), this took ~340ms — the
+		// hidden→visible setStyledText call is super-linear in RENDER_LIMIT.
+		const { renderer, renderOnce } = await createTestRenderer({ width: 100, height: 30 })
+		const a = new Pane(renderer, 'a', 100, 28)
+		const b = new Pane(renderer, 'b', 100, 28)
+		renderer.root.add(a.scrollBox)
+		renderer.root.add(b.scrollBox)
+		const chunk = encoder.encode('sample log line that is somewhat realistic in length\n')
+		for (let i = 0; i < 100_000; i++) b.feed(chunk)
+		b.hide()
+		await renderOnce()
+
+		const start = performance.now()
+		a.hide()
+		b.show()
+		await renderOnce()
+		const elapsed = performance.now() - start
+		// Generous budget: target is ~32ms with RENDER_LIMIT=1500; alarm if we
+		// regress to anywhere near the old 340ms cost.
+		expect(elapsed).toBeLessThan(150)
+		a.destroy()
+		b.destroy()
+	})
+
 	test('resize does not break tail rendering', async () => {
 		const pane = await createPane()
 		const lines: string[] = []
@@ -255,9 +293,13 @@ describe('Pane timestamp toggle', () => {
 })
 
 describe('Pane timestamp signs', () => {
+	// Sign updates are debounced; wait longer than the debounce window before reading.
+	const waitForSigns = () => Bun.sleep(60)
+
 	test('every logical line gets a timestamp sign', async () => {
 		const pane = await createPane({ timestamps: true })
 		pane.feed(encoder.encode('line1\nline2\nline3\n'))
+		await waitForSigns()
 		const signs = pane.getTimestampSigns()!
 		// 4 logical lines: line1, line2, line3, and trailing newline
 		expect(signs.size).toBe(4)
@@ -271,6 +313,7 @@ describe('Pane timestamp signs', () => {
 		const pane = await createPane({ timestamps: 'HH:mm:ss' })
 		// All lines fed in one call — same Date.now() — same formatted second
 		pane.feed(encoder.encode('a\nb\nc\n'))
+		await waitForSigns()
 		const signs = pane.getTimestampSigns()!
 		expect(signs.size).toBe(4)
 		// All should have the same formatted value but still be present
@@ -282,6 +325,7 @@ describe('Pane timestamp signs', () => {
 	test('signs include milliseconds with default format', async () => {
 		const pane = await createPane({ timestamps: true })
 		pane.feed(encoder.encode('hello\n'))
+		await waitForSigns()
 		const signs = pane.getTimestampSigns()!
 		const ts = signs.get(0)!.before!
 		// Default format is HH:mm:ss.SSS — 12 chars
@@ -291,6 +335,7 @@ describe('Pane timestamp signs', () => {
 	test('signs cleared after clear()', async () => {
 		const pane = await createPane({ timestamps: true })
 		pane.feed(encoder.encode('line1\nline2\n'))
+		await waitForSigns()
 		expect(pane.getTimestampSigns()!.size).toBeGreaterThan(0)
 		pane.clear()
 		expect(pane.getTimestampSigns()!.size).toBe(0)

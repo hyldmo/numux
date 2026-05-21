@@ -20,9 +20,14 @@ export interface SearchMatch {
 // (max_scrollback = usize_max); rendering a million-line buffer via getJson()
 // freezes the event loop. Capping render output via `limit` plus the tail-view
 // offset in TailingTerminal keeps per-frame cost O(RENDER_LIMIT) regardless of
-// how much has been fed. Older lines remain in the native buffer and are
-// reachable via scroll-up paging (future phase).
-const RENDER_LIMIT = 5_000
+// how much has been fed. Older lines remain in the native buffer; full history
+// is reachable via the on-disk log file (copy-all + search both read it).
+//
+// 1500 gives ~32ms on the hidden→visible transition with a 100k-line buffer
+// (native textBufferSetStyledText is super-linear in this value: 5000 → ~350ms,
+// 2000 → ~56ms, 1500 → ~32ms, 1000 → ~16ms). At 30 rows that's ~50 screens of
+// in-pane scrollback.
+const RENDER_LIMIT = 1_500
 // OOM backstop for truly runaway output. Much higher than the old 50k cap
 // because render cost is no longer proportional to buffer size.
 const MAX_SCROLLBACK_LINES = 1_000_000
@@ -41,6 +46,11 @@ export class Pane {
 	/** Epoch ms when each logical line was first created */
 	lineTimestamps: number[] = []
 	private lineCounter = 0
+	private signedLineCount = 0
+	private timestampUpdateTimer: ReturnType<typeof setTimeout> | null = null
+	// Coalesces many feed events into one O(n) rebuild. Tied to ~2 render frames
+	// so multiple PTY chunks in quick succession share a single sign refresh.
+	private static readonly TIMESTAMP_UPDATE_DEBOUNCE_MS = 32
 
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
@@ -117,6 +127,8 @@ export class Pane {
 			this.bytesFed = 0
 			this.lineTimestamps = []
 			this.lineCounter = 0
+			this.signedLineCount = 0
+			this.timestampGutter?.clearAllLineSigns()
 		}
 		const now = Date.now()
 		// Record timestamp for first line if we haven't yet
@@ -133,9 +145,17 @@ export class Pane {
 		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
-		if (this._timestampFormat) {
-			this.updateTimestampSigns()
+		if (this._timestampFormat && this.lineTimestamps.length !== this.signedLineCount) {
+			this.scheduleTimestampUpdate()
 		}
+	}
+
+	private scheduleTimestampUpdate(): void {
+		if (this.timestampUpdateTimer) return
+		this.timestampUpdateTimer = setTimeout(() => {
+			this.timestampUpdateTimer = null
+			this.updateTimestampSigns()
+		}, Pane.TIMESTAMP_UPDATE_DEBOUNCE_MS)
 	}
 
 	resize(cols: number, rows: number): void {
@@ -228,6 +248,11 @@ export class Pane {
 		this.bytesFed = 0
 		this.lineTimestamps = []
 		this.lineCounter = 0
+		this.signedLineCount = 0
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
 		if (this._timestampFormat) {
 			this.timestampGutter?.clearAllLineSigns()
 		}
@@ -241,6 +266,13 @@ export class Pane {
 
 		if (wasEnabled === isEnabled && this._timestampFormat === newFormat) return
 		this._timestampFormat = newFormat
+		// Any pending debounced rebuild was scheduled against the old format/state.
+		// Cancel it — the branches below decide whether to rebuild synchronously.
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
+		this.signedLineCount = 0
 
 		if (isEnabled && !wasEnabled) {
 			// Wrap terminal in LineNumberRenderable for gutter + scroll sync
@@ -287,9 +319,17 @@ export class Pane {
 			signs.set(i, { before: formatTimestamp(new Date(this.lineTimestamps[i]), fmt) })
 		}
 		this.timestampGutter.setLineSigns(signs)
+		this.signedLineCount = this.lineTimestamps.length
 	}
 
 	destroy(): void {
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
+		// Detach terminal from the gutter's target before destroying it, otherwise
+		// the next render walks into a destroyed TextBufferView via the gutter.
+		this.timestampGutter?.clearTarget()
 		this.terminal.destroy()
 	}
 }
