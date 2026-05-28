@@ -492,6 +492,22 @@ describe('ProcessRunner — commandOverride', () => {
 	}, 10000)
 })
 
+describe('ProcessRunner — PTY data callback (regression guard, oven-sh/bun#25822)', () => {
+	test('delivers output emitted asynchronously after spawn', async () => {
+		// If Bun.spawn's `terminal.data` callback regresses, async output never
+		// reaches handler.onOutput and this assertion fails. When that happens,
+		// hold the Bun version pin in .github/workflows/ until #25822 closes.
+		const handler = createHandler()
+		const runner = new ProcessRunner('pty-async', { command: "sleep 0.1 && printf 'PTY_LIVE_TOKEN'" }, handler)
+
+		runner.start(80, 24)
+		await waitForExit(handler)
+
+		const allOutput = handler.outputs.join('')
+		expect(allOutput).toContain('PTY_LIVE_TOKEN')
+	}, 5000)
+})
+
 describe('ProcessRunner — errorMatcher', () => {
 	test('fires onError when error output is detected', async () => {
 		const handler = createHandler()
