@@ -36,6 +36,12 @@ export function getStatusIconHex(theme: Theme): Partial<Record<ProcessStatus, st
 /** Statuses that represent a terminal (done) state — tabs move to bottom */
 export const TERMINAL_STATUSES = new Set<ProcessStatus>(['finished', 'stopped', 'failed', 'skipped'])
 
+export function getDisplayOrder(originalNames: string[], statuses: Map<string, ProcessStatus>): string[] {
+	const active = originalNames.filter(n => !TERMINAL_STATUSES.has(statuses.get(n)!))
+	const terminal = originalNames.filter(n => TERMINAL_STATUSES.has(statuses.get(n)!))
+	return [...active, ...terminal]
+}
+
 export function formatTab(name: string, status: ProcessStatus): string {
 	return `${STATUS_ICONS[status]} ${name}`
 }
@@ -49,12 +55,6 @@ export function formatDescription(status: ProcessStatus, exitCode?: number | nul
 		desc += ` ×${restartCount}`
 	}
 	return desc
-}
-
-export function getDisplayOrder(originalNames: string[], statuses: Map<string, ProcessStatus>): string[] {
-	const active = originalNames.filter(n => !TERMINAL_STATUSES.has(statuses.get(n)!))
-	const terminal = originalNames.filter(n => TERMINAL_STATUSES.has(statuses.get(n)!))
-	return [...active, ...terminal]
 }
 
 export function resolveOptionColors(
@@ -187,14 +187,22 @@ export class TabBar {
 	private statuses: Map<string, ProcessStatus>
 	private baseDescriptions: Map<string, string>
 	private processColors: Map<string, string>
+	private reorderByStatus: boolean
 	private inputWaiting = new Set<string>()
 	private erroredProcesses = new Set<string>()
 	private searchMatchCounts = new Map<string, number>()
 	private theme: Theme
 
-	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>, theme: Theme = DARK_THEME) {
+	constructor(
+		renderer: CliRenderer,
+		names: string[],
+		colors?: Map<string, string>,
+		theme: Theme = DARK_THEME,
+		reorderByStatus = false
+	) {
 		this.originalNames = names
 		this.names = [...names]
+		this.reorderByStatus = reorderByStatus
 		this.statuses = new Map(names.map(n => [n, 'pending' as ProcessStatus]))
 		this.baseDescriptions = new Map(names.map(n => [n, 'pending']))
 		this.processColors = colors ?? new Map()
@@ -281,24 +289,19 @@ export class TabBar {
 	}
 
 	private refreshOptions(): void {
-		// Preserve currently selected name
-		const currentIdx = this.renderable.getSelectedIndex()
-		const currentName = this.names[currentIdx]
-
-		// Reorder: active first, terminal states at bottom
-		this.names = getDisplayOrder(this.originalNames, this.statuses)
-
+		if (this.reorderByStatus) {
+			const currentIdx = this.renderable.getSelectedIndex()
+			const currentName = this.names[currentIdx]
+			this.names = getDisplayOrder(this.originalNames, this.statuses)
+			const newIdx = this.names.indexOf(currentName)
+			if (newIdx >= 0 && newIdx !== currentIdx) {
+				this.renderable.setSelectedIndex(newIdx)
+			}
+		}
 		this.renderable.options = this.names.map(n => ({
 			name: formatTab(n, this.statuses.get(n)!),
 			description: this.getDescription(n)
 		}))
-
-		// Restore selection by name
-		const newIdx = this.names.indexOf(currentName)
-		if (newIdx >= 0 && newIdx !== currentIdx) {
-			this.renderable.setSelectedIndex(newIdx)
-		}
-
 		this.updateOptionColors()
 	}
 
@@ -336,9 +339,5 @@ export class TabBar {
 
 	setSelectedIndex(index: number): void {
 		this.renderable.setSelectedIndex(index)
-	}
-
-	focus(): void {
-		this.renderable.focus()
 	}
 }

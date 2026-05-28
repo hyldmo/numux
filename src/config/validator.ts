@@ -226,7 +226,7 @@ function validateErrorMatcher(name: string, value: unknown): boolean | string | 
 	return undefined
 }
 
-const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological'])
+const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological', 'status'])
 
 function validateSort(value: unknown): SortOrder | undefined {
 	if (typeof value === 'string') {

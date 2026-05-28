@@ -67,7 +67,7 @@ interface FieldDoc {
 
 /** Known type aliases to expand for readability */
 const TYPE_ALIASES: Record<string, string> = {
-	SortOrder: "'config' | 'alphabetical' | 'topological'",
+	SortOrder: "'config' | 'alphabetical' | 'topological' | 'status'",
 	Color: 'string'
 }
 

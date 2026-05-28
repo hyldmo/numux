@@ -212,7 +212,7 @@ export default defineConfig({
 <!-- generated:options -->
 | Flag | Description |
 |------|-------------|
-| `-s,` `--sort` `<config|alphabetical|topological>` | Tab display order |
+| `-s,` `--sort` `<config|alphabetical|topological|status>` | Tab display order |
 | `-w,` `--workspace` `<script>` | Run a package.json script across all workspaces |
 | `-n,` `--name` `<name=command>` | Add a named process |
 | `-c,` `--color` `<colors>` | Comma-separated colors (hex or names: black, red, green, yellow, blue, magenta, cyan, white, gray, orange, purple) |
@@ -246,7 +246,9 @@ Auto-exits when all processes finish. Exit code 1 if any process failed.
 
 ## Logging
 
-numux writes per-process log files (ANSI-stripped) when `--log-dir` is set or `logDir` is configured. Each session creates a timestamped subdirectory with a `latest` symlink pointing to the most recent run.
+numux writes per-process log files (ANSI-stripped) for every run. By default they go to `<tmpdir>/numux/<project-name>/`, or to `--log-dir` / the `logDir` config when set. Each session creates a timestamped subdirectory with a `latest` symlink pointing to the most recent run.
+
+The TUI prints `Logs saved to: <session-dir>` on exit (Ctrl+C or signal). Multiple numux instances in the same project share the default base dir, so each session has its own timestamped folder but the `latest` symlink will point at whichever started most recently. If `numux logs` falls back to the default and a `latest` symlink is in use, it prints a warning. To avoid the collision, set `logDir` per config or pass `--log-dir`.
 
 <!-- generated:logging-usage -->
 ```sh
@@ -276,7 +278,7 @@ Top-level options apply to all processes (process-level settings override):
 | `stopSignal` | `'SIGTERM' \| 'SIGINT' \| 'SIGHUP'` | Global stop signal, inherited by all processes |
 | `errorMatcher` | `boolean \| string` | Global error matcher, inherited by all processes. `true` = detect ANSI red output, string = regex |
 | `watch` | `string \| string[]` | Global watch patterns, inherited by processes without their own watch |
-| `sort` | `'config' \| 'alphabetical' \| 'topological'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers. |
+| `sort` | `'config' \| 'alphabetical' \| 'topological' \| 'status'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers, `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom. |
 | `prefix` | `boolean` | Use prefixed output mode instead of TUI (for CI/scripts) |
 | `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) |
 | `killOthers` | `boolean` | Kill all processes when any one exits (regardless of exit code) |

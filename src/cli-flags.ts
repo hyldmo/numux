@@ -65,7 +65,7 @@ export const FLAGS: FlagDef[] = [
 		short: '-s',
 		key: 'sort',
 		description: 'Tab display order',
-		valueName: '<config|alphabetical|topological>',
+		valueName: '<config|alphabetical|topological|status>',
 		completionHint: 'none'
 	},
 	{

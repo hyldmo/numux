@@ -4,6 +4,7 @@ import type { KeyEvent, ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
+import { finalizeShutdown } from '../utils/shutdown'
 import { DARK_THEME, resolveTheme, type Theme } from '../utils/theme'
 import { HelpOverlay } from './help-overlay'
 import { SHORTCUTS } from './keybindings'
@@ -78,7 +79,7 @@ export class App {
 
 		// Tab bar (vertical sidebar)
 		const processHexColors = buildProcessHexColorMap(this.names, this.config, this.theme.palette)
-		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.theme)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.theme, this.config.sort === 'status')
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -211,7 +212,7 @@ export class App {
 					return
 				}
 				this.shutdown().then(() => {
-					process.exit(this.hasFailures() ? 1 : 0)
+					finalizeShutdown(this.logWriter, this.hasFailures() ? 1 : 0)
 				})
 				return
 			}
@@ -380,10 +381,10 @@ export class App {
 			}
 		})
 
-		// Show first pane and focus sidebar for keyboard navigation
+		// Show first pane. Tab bar is not focused — keyboard navigation (1-9, Left/Right)
+		// is handled by the global keypress handler so Up/Down can scroll the active pane.
 		if (this.names.length > 0) {
 			this.switchPane(this.names[0])
-			this.tabBar.focus()
 		}
 
 		// Start all processes
