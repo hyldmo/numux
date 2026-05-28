@@ -1,6 +1,7 @@
 import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
 import type { ResolvedNumuxConfig } from './types'
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface ParsedArgs {
 	help: boolean
@@ -29,6 +30,7 @@ export interface ParsedArgs {
 	colors?: string[]
 	workspace?: string
 	envFile?: string | false
+	theme?: ThemePref
 	helpTopic?: string
 	commands: string[]
 	named: Array<{ name: string; command: string }>

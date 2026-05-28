@@ -1,11 +1,12 @@
 import { BoxRenderable, type CliRenderer, TextRenderable } from '@opentui/core'
+import { DARK_THEME, type Theme } from '../utils/theme'
 import { STATUS_HINTS_FULL, toHintPair } from './keybindings'
 
 export class HelpOverlay {
 	readonly renderable: BoxRenderable
 	private textRenderable: TextRenderable
 
-	constructor(renderer: CliRenderer) {
+	constructor(renderer: CliRenderer, theme: Theme = DARK_THEME) {
 		this.renderable = new BoxRenderable(renderer, {
 			id: 'help-overlay',
 			position: 'absolute',
@@ -23,7 +24,7 @@ export class HelpOverlay {
 			position: 'absolute',
 			width: '100%',
 			height: '100%',
-			backgroundColor: '#000000',
+			backgroundColor: theme.helpBackdropBg,
 			opacity: 0.7
 		})
 
@@ -33,9 +34,9 @@ export class HelpOverlay {
 			flexDirection: 'column',
 			padding: 1,
 			paddingX: 5,
-			backgroundColor: '#1a1a2e',
+			backgroundColor: theme.helpBoxBg,
 			border: true,
-			borderColor: '#444',
+			borderColor: theme.helpBorder,
 			zIndex: 101
 		})
 
@@ -53,7 +54,7 @@ export class HelpOverlay {
 		this.textRenderable = new TextRenderable(renderer, {
 			id: 'help-text',
 			content: lines.join('\n'),
-			fg: '#cccccc'
+			fg: theme.helpText
 		})
 
 		box.add(this.textRenderable)

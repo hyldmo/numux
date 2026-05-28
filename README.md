@@ -228,6 +228,7 @@ export default defineConfig({
 | `--no-watch` | Disable file watching even if config has watch patterns |
 | `-t,` `--timestamps` `[<format>]` | Add timestamps to output (default HH:mm:ss.SSS, or pass a format string) |
 | `--log-dir` `<path>` | Write per-process logs to directory |
+| `--theme` `<light|dark|auto>` | TUI theme (auto detects terminal background) |
 | `--debug` | Enable debug logging to .numux/debug.log |
 | `-h,` `--help` | Show this help |
 | `-v,` `--version` | Show version |
@@ -284,6 +285,7 @@ Top-level options apply to all processes (process-level settings override):
 | `killOthersOnFail` | `boolean` | Kill all processes when any one exits with a non-zero exit code |
 | `noWatch` | `boolean` | Disable file watching even if processes have watch patterns |
 | `logDir` | `string` | Directory to write per-process log files |
+| `theme` | `ThemePref` | TUI color theme. `'auto'` detects the terminal background via OSC 11 (falling back to `COLORFGBG` then dark). `'light'`/`'dark'` skip detection. |
 <!-- /generated:config-global -->
 
 ```ts

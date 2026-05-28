@@ -1,5 +1,6 @@
 import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
 import { type Color, isValidColor } from '../utils/color'
+import type { ThemePref } from '../utils/theme'
 
 export type ValidationWarning = { process: string; message: string }
 
@@ -49,6 +50,7 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 	const killOthersOnFail = config.killOthersOnFail === true ? true : undefined
 	const noWatch = config.noWatch === true ? true : undefined
 	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
+	const theme = validateTheme(config.theme)
 
 	const validated: Record<string, ResolvedProcessConfig> = {}
 
@@ -182,8 +184,19 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 		...(killOthersOnFail ? { killOthersOnFail } : {}),
 		...(noWatch ? { noWatch } : {}),
 		...(logDir ? { logDir } : {}),
+		...(theme ? { theme } : {}),
 		processes: validated
 	}
+}
+
+const VALID_THEME_VALUES = new Set<ThemePref>(['light', 'dark', 'auto'])
+
+function validateTheme(value: unknown): ThemePref | undefined {
+	if (value === undefined) return undefined
+	if (typeof value !== 'string' || !VALID_THEME_VALUES.has(value as ThemePref)) {
+		throw new Error(`theme must be one of: light, dark, auto. Got "${String(value)}"`)
+	}
+	return value as ThemePref
 }
 
 function validateStringOrStringArray(value: unknown): string | string[] | undefined {
