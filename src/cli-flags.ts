@@ -204,6 +204,20 @@ export const FLAGS: FlagDef[] = [
 		completionHint: 'directory'
 	},
 	{
+		type: 'value',
+		long: '--theme',
+		key: 'theme',
+		description: 'TUI theme (auto detects terminal background)',
+		valueName: '<light|dark|auto>',
+		completionHint: 'none',
+		parse(raw: string, flag: string) {
+			if (raw !== 'light' && raw !== 'dark' && raw !== 'auto') {
+				throw new Error(`${flag} must be light, dark, or auto. Got "${raw}"`)
+			}
+			return raw
+		}
+	},
+	{
 		type: 'boolean',
 		long: '--debug',
 		key: 'debug',

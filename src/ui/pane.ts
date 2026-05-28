@@ -6,6 +6,7 @@ import {
 	type Selection
 } from '@opentui/core'
 import type { HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import { DARK_THEME, type Theme } from '../utils/theme'
 import { DEFAULT_TIMESTAMP_FORMAT, formatTimestamp } from '../utils/timestamp'
 import { TailingTerminal } from './tailing-terminal'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
@@ -45,9 +46,18 @@ export class Pane {
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
 	private _onLinkClick: ((link: DetectedLink) => void) | null = null
+	private theme: Theme
 
-	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
+	constructor(
+		renderer: CliRenderer,
+		name: string,
+		cols: number,
+		rows: number,
+		interactive = false,
+		theme: Theme = DARK_THEME
+	) {
 		this.renderer = renderer
+		this.theme = theme
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
 			flexGrow: 1,
@@ -55,7 +65,13 @@ export class Pane {
 			stickyScroll: true,
 			stickyStart: 'bottom',
 			visible: false,
-			onMouseScroll: () => this._onScroll?.()
+			onMouseScroll: () => this._onScroll?.(),
+			scrollbarOptions: {
+				trackOptions: {
+					backgroundColor: theme.scrollTrackBg,
+					foregroundColor: theme.scrollThumbBg
+				}
+			}
 		})
 
 		this.terminal = new TailingTerminal(renderer, {
@@ -208,7 +224,7 @@ export class Pane {
 				line: m.line,
 				start: m.start,
 				end: m.end,
-				backgroundColor: i === currentIndex ? '#b58900' : '#073642'
+				backgroundColor: i === currentIndex ? this.theme.searchCurrentBg : this.theme.searchMatchBg
 			})
 		}
 		this.terminal.highlights = regions

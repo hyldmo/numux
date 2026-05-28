@@ -9,6 +9,7 @@ import {
 	TextRenderable,
 	yellow
 } from '@opentui/core'
+import { DARK_THEME, type Theme } from '../utils/theme'
 import { STATUS_BAR_TEXT } from './keybindings'
 
 function plain(text: string): TextChunk {
@@ -27,11 +28,11 @@ export class StatusBar {
 	private _tempTimer: ReturnType<typeof setTimeout> | null = null
 	private _inputMode = false
 
-	constructor(renderer: CliRenderer) {
+	constructor(renderer: CliRenderer, theme: Theme = DARK_THEME) {
 		this.renderable = new BoxRenderable(renderer, {
 			id: 'status-bar',
 			width: '100%',
-			backgroundColor: '#1a1a1a',
+			backgroundColor: theme.statusBarBg,
 			paddingX: 1,
 			minHeight: 1
 		})
@@ -40,6 +41,7 @@ export class StatusBar {
 			id: 'status-bar-text',
 			width: '100%',
 			wrapMode: 'word',
+			fg: theme.statusBarText,
 			content: this.buildContent()
 		})
 		this.text.selectable = false

@@ -258,6 +258,10 @@ async function main() {
 		config = filterConfig(config, parsed.only, parsed.exclude)
 	}
 
+	if (parsed.theme) {
+		config.theme = parsed.theme
+	}
+
 	if (parsed.autoColors) {
 		for (const [name, proc] of Object.entries(config.processes)) {
 			if (!proc.color) {

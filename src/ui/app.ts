@@ -4,6 +4,7 @@ import type { KeyEvent, ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
+import { DARK_THEME, resolveTheme, type Theme } from '../utils/theme'
 import { HelpOverlay } from './help-overlay'
 import { SHORTCUTS } from './keybindings'
 import { Pane } from './pane'
@@ -30,6 +31,7 @@ export class App {
 
 	private config: ResolvedNumuxConfig
 	private logWriter: LogWriter
+	private theme: Theme = DARK_THEME
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -45,6 +47,13 @@ export class App {
 	}
 
 	async start(): Promise<void> {
+		// Resolve theme before the renderer takes over stdin (OSC 11 needs raw stdin)
+		log(
+			`theme detect: pref=${this.config.theme ?? 'auto'} stdin.isTTY=${process.stdin.isTTY} stdout.isTTY=${process.stdout.isTTY} COLORFGBG=${process.env.COLORFGBG ?? '(unset)'}`
+		)
+		this.theme = await resolveTheme(this.config.theme)
+		log(`theme resolved: ${this.theme.mode}`)
+
 		this.renderer = await createCliRenderer({
 			exitOnCtrlC: false,
 			useMouse: true,
@@ -68,8 +77,8 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		const processHexColors = buildProcessHexColorMap(this.names, this.config)
-		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
+		const processHexColors = buildProcessHexColorMap(this.names, this.config, this.theme.palette)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.theme)
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -85,7 +94,8 @@ export class App {
 			width: this.sidebarWidth,
 			height: '100%',
 			border: ['right'],
-			borderColor: '#444'
+			borderColor: this.theme.sidebarBorder,
+			backgroundColor: this.theme.sidebarBg
 		})
 		sidebar.add(this.tabBar.renderable)
 
@@ -97,10 +107,10 @@ export class App {
 		})
 
 		// Status bar
-		this.statusBar = new StatusBar(this.renderer)
+		this.statusBar = new StatusBar(this.renderer, this.theme)
 
 		// Help overlay (hidden by default)
-		this.helpOverlay = new HelpOverlay(this.renderer)
+		this.helpOverlay = new HelpOverlay(this.renderer, this.theme)
 
 		// Search controller
 		this.search = new SearchController({
@@ -114,7 +124,7 @@ export class App {
 		// Create a pane per process
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
-			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
+			const pane = new Pane(this.renderer, name, termCols, termRows, interactive, this.theme)
 			if (this.config.timestamps) {
 				pane.setTimestamps(this.config.timestamps)
 			}

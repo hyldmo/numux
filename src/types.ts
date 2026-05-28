@@ -1,4 +1,5 @@
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface NumuxProcessConfig<K extends string = string> {
 	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
@@ -122,6 +123,12 @@ export interface NumuxConfig<K extends string = string> {
 	noWatch?: boolean
 	/** Directory to write per-process log files */
 	logDir?: string
+	/**
+	 * TUI color theme. `'auto'` detects the terminal background via OSC 11 (falling back
+	 * to `COLORFGBG` then dark). `'light'`/`'dark'` skip detection.
+	 * @default 'auto'
+	 */
+	theme?: ThemePref
 	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string | true>
 }
 
@@ -141,6 +148,7 @@ export interface ResolvedNumuxConfig {
 	killOthersOnFail?: boolean
 	noWatch?: boolean
 	logDir?: string
+	theme?: ThemePref
 	processes: Record<string, ResolvedProcessConfig>
 }
 

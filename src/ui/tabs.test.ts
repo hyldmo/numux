@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type { ProcessStatus } from '../types'
+import { DARK_THEME } from '../utils/theme'
 import {
 	formatDescription,
 	formatTab,
 	getDisplayOrder,
+	getStatusIconHex,
 	resolveOptionColors,
-	STATUS_ICON_HEX,
 	STATUS_ICONS,
 	TERMINAL_STATUSES
 } from './tabs'
@@ -144,7 +145,8 @@ describe('resolveOptionColors', () => {
 			new Map(Object.entries(statuses)),
 			new Map(Object.entries(opts?.processColors ?? {})),
 			new Set(opts?.inputWaiting ?? []),
-			new Set(opts?.errored ?? [])
+			new Set(opts?.errored ?? []),
+			DARK_THEME
 		)
 	}
 
@@ -155,8 +157,8 @@ describe('resolveOptionColors', () => {
 
 	test('falls back to process color when no status color', () => {
 		const result = resolve(['web'], { web: 'running' }, { processColors: { web: '#ff0000' } })
-		// running has no STATUS_ICON_HEX entry
-		expect(STATUS_ICON_HEX.running).toBeUndefined()
+		// running has no status icon entry
+		expect(getStatusIconHex(DARK_THEME).running).toBeUndefined()
 		expect(result[0].iconHex).toBe('#ff0000')
 	})
 
