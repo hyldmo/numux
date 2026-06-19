@@ -61,7 +61,9 @@ export class App {
 			useKittyKeyboard: {}
 		})
 
-		this.forceFullRepaints(this.renderer)
+		if (this.config.autowrap === false) {
+			this.disableAutowrap()
+		}
 
 		const { width, height } = this.renderer
 		const maxNameLen = Math.max(...this.names.map(n => n.length))
@@ -417,34 +419,25 @@ export class App {
 	}
 
 	/**
-	 * Force OpenTUI to repaint every cell on every frame instead of diffing.
+	 * Disable the host terminal's autowrap (DECAWM, `\x1b[?7l`). Opt-in via the
+	 * `autowrap: false` config; restored (`?7h`) in `shutdown()`.
 	 *
-	 * OpenTUI emits only changed cells via absolute cursor moves. When the host
-	 * terminal's cursor tracking drifts from OpenTUI's model — ambiguous-width
-	 * glyphs, autowrap at the screen edge, or a sequence the emulator mishandles —
-	 * the diff path never self-corrects: pane output smears into the tab sidebar
-	 * and the scrollbar drops out. A full repaint (the path resize already used)
-	 * re-emits the whole buffer, so the corruption can't accumulate.
+	 * Works around an OpenTUI renderer bug: its incremental diff positions every
+	 * run with an absolute cursor move and never relies on autowrap, but it also
+	 * never disables it and skips its right-edge cursor re-home to avoid tripping a
+	 * wrap (renderer.zig). So a run that fills the last column wraps the cursor to
+	 * column 1 of the next row, and the trailing bytes paint that row's leftmost
+	 * cells — right-pane output smears into the tab sidebar. Because the diff
+	 * records the *intended* cell (`syncCell`), the stray cells are never re-emitted
+	 * and the corruption persists until a full repaint (resize).
 	 *
-	 * The renderer clears `forceFullRepaintRequested` after each native render, so
-	 * we re-raise it in a frame callback — which runs before the render reads it,
-	 * and only fires on demand-driven frames (no idle cost). Composition stays
-	 * dirty-tracked, so the only overhead is more stdout bytes during active
-	 * output (bounded by targetFps).
-	 *
-	 * Done in app code rather than a `bun patch`, because `patchedDependencies`
-	 * does not propagate to projects that install numux as a dependency — only a
-	 * fix shipped in numux's own bundle reaches consumers.
+	 * Pane content keeps wrapping inside its own VT grid — only the host emit-cursor
+	 * wrap is turned off, so nothing in the render path depends on it. Off by default
+	 * because it changes a global terminal mode; see anomalyco/opentui#1187 for the
+	 * upstream fix this mirrors.
 	 */
-	private forceFullRepaints(renderer: CliRenderer): void {
-		const r = renderer as unknown as { forceFullRepaintRequested?: boolean }
-		if (!('forceFullRepaintRequested' in r)) {
-			log('warning: @opentui/core has no forceFullRepaintRequested flag — render-drift workaround inactive')
-			return
-		}
-		renderer.setFrameCallback(async () => {
-			r.forceFullRepaintRequested = true
-		})
+	private disableAutowrap(): void {
+		process.stdout.write('\x1b[?7l')
 	}
 
 	private switchPane(name: string): void {
@@ -571,6 +564,11 @@ export class App {
 		await this.manager.stopAll()
 		for (const pane of this.panes.values()) {
 			pane.destroy()
+		}
+		// Restore autowrap if we disabled it in start(), so the user's shell wraps
+		// normally after numux exits.
+		if (this.config.autowrap === false) {
+			process.stdout.write('\x1b[?7h')
 		}
 		if (!this.renderer.isDestroyed) {
 			this.renderer.destroy()

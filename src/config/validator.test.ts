@@ -622,6 +622,29 @@ describe('validateConfig — sort', () => {
 		expect(config.sort).toBe('status')
 	})
 
+	test('autowrap defaults to undefined (host autowrap left enabled)', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.autowrap).toBeUndefined()
+	})
+
+	test('preserves autowrap: false', () => {
+		const config = validateConfig({
+			autowrap: false,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.autowrap).toBe(false)
+	})
+
+	test('autowrap: true is a no-op (left undefined)', () => {
+		const config = validateConfig({
+			autowrap: true,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.autowrap).toBeUndefined()
+	})
+
 	test('throws on invalid sort value', () => {
 		expect(() =>
 			validateConfig({

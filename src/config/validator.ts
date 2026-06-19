@@ -51,6 +51,8 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 	const noWatch = config.noWatch === true ? true : undefined
 	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
 	const theme = validateTheme(config.theme)
+	// Only carry an explicit `false` (disable host autowrap); default/true is a no-op.
+	const autowrap = config.autowrap === false ? false : undefined
 
 	const validated: Record<string, ResolvedProcessConfig> = {}
 
@@ -185,6 +187,7 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 		...(noWatch ? { noWatch } : {}),
 		...(logDir ? { logDir } : {}),
 		...(theme ? { theme } : {}),
+		...(autowrap === false ? { autowrap: false } : {}),
 		processes: validated
 	}
 }
