@@ -39,6 +39,7 @@ src/
 - Mouse drag selects text and auto-copies to clipboard (OSC 52); `Y` key also copies selection
 - `T` toggles an `HH:mm:ss.SSS` timestamp gutter in TUI mode; also enabled via `timestamps: true` config or `--timestamps` flag. Accepts a format string (e.g. `timestamps: "HH:mm:ss"`) with tokens: `YYYY`, `MM`, `DD`, `HH`, `hh`, `mm`, `ss`, `SSS`, `A`
 - Compact keybinding hints in the status bar; `H` or `?` opens a full help overlay. Config lives in `src/ui/keybindings.ts`
+- `App.forceFullRepaints()` registers a frame callback that re-raises OpenTUI's `forceFullRepaintRequested` flag every frame, so each render is a full repaint instead of an incremental cell-diff. OpenTUI's diff emitter desyncs from the host terminal's cursor (ambiguous-width glyphs / autowrap / emulator quirks) and never self-corrects — pane output smears into the sidebar, the scrollbar drops. Frame callbacks fire before the render reads the flag and only on demand-driven frames (no idle cost); composition stays dirty-tracked, so the only overhead is more stdout bytes during active output (bounded by `targetFps`). Lives in app code, not a `bun patch`, so the fix ships in numux's bundle and reaches consumers (`patchedDependencies` doesn't propagate to dependents)
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
 - Non-interactive panes hide the terminal cursor (shown during input mode)
 - Set `errorMatcher: true` to detect ANSI red output, or a regex string to match custom patterns — shows a red indicator on the tab while the process keeps running
@@ -54,10 +55,6 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 ## CI
 
 Runs on PRs: commitlint, typecheck, lint, test.
-
-## Patches
-
-`patches/@opentui%2Fcore@0.4.1.patch` (bun patch) flips the renderer's per-frame `force` flag to always-`true`, so every native `lib.render` is a **full repaint** instead of an incremental cell-diff. OpenTUI's diff emitter desyncs from the host terminal's cursor (ambiguous-width glyphs / autowrap / emulator quirks) and never self-corrects — pane output smears into the sidebar, the scrollbar drops. The diff is the only thing that desyncs; forcing full repaints (the path resize already used) makes the corruption impossible. Composition stays dirty-tracked, so the only cost is more stdout bytes during active output (bounded by `targetFps`, 30). It's a band-aid for an upstream bug — do not revert to "restore the diff optimization" without confirming the drift is fixed in `@opentui/core`. The patch fails loud on upgrade (hashed bundle filename); reapply via `bun patch @opentui/core`.
 
 ## Hooks
 
