@@ -286,6 +286,7 @@ Top-level options apply to all processes (process-level settings override):
 | `noWatch` | `boolean` | Disable file watching even if processes have watch patterns |
 | `logDir` | `string` | Directory to write per-process log files |
 | `theme` | `ThemePref` | TUI color theme. `'auto'` detects the terminal background via OSC 11 (falling back to `COLORFGBG` then dark). `'light'`/`'dark'` skip detection. |
+| `autowrap` | `boolean` | Whether to leave the host terminal's autowrap (DECAWM) enabled. Set `false` to have numux disable host autowrap (`\x1b[?7l`) on startup, restoring it on exit. This works around an OpenTUI renderer bug where a run that fills the last screen column wraps right-pane output into the tab sidebar ([anomalyco/opentui#1187](https://github.com/anomalyco/opentui/issues/1187)). Pane content still wraps within its own grid — only the host emit-cursor wrap is turned off. Leave enabled (the default) unless you hit the smear. |
 <!-- /generated:config-global -->
 
 ```ts
