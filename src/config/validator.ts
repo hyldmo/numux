@@ -1,9 +1,10 @@
 import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
 import { type Color, isValidColor } from '../utils/color'
+import type { ThemePref } from '../utils/theme'
 
 export type ValidationWarning = { process: string; message: string }
 
-export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): ResolvedNumuxConfig {
+export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): ResolvedNumuxConfig {
 	if (!raw || typeof raw !== 'object') {
 		throw new Error('Config must be an object')
 	}
@@ -28,7 +29,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		typeof config.maxRestarts === 'number' && config.maxRestarts >= 0 ? config.maxRestarts : undefined
 	const globalReadyTimeout =
 		typeof config.readyTimeout === 'number' && config.readyTimeout > 0 ? config.readyTimeout : undefined
-	const globalPersistent = typeof config.persistent === 'boolean' ? config.persistent : undefined
 	const globalStopSignal = validateStopSignal(config.stopSignal)
 	const globalErrorMatcher = validateErrorMatcher('(global)', config.errorMatcher)
 	const globalWatch = validateStringOrStringArray(config.watch)
@@ -44,11 +44,13 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 	const sort = validateSort(config.sort)
 	const prefix = config.prefix === true ? true : undefined
-	const timestamps = config.timestamps === true ? true : undefined
+	const timestamps =
+		config.timestamps === true ? true : typeof config.timestamps === 'string' ? config.timestamps : undefined
 	const killOthers = config.killOthers === true ? true : undefined
 	const killOthersOnFail = config.killOthersOnFail === true ? true : undefined
 	const noWatch = config.noWatch === true ? true : undefined
 	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
+	const theme = validateTheme(config.theme)
 
 	const validated: Record<string, ResolvedProcessConfig> = {}
 
@@ -106,7 +108,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
-		const persistent = typeof p.persistent === 'boolean' ? p.persistent : (globalPersistent ?? true)
 		const readyPattern =
 			p.readyPattern instanceof RegExp
 				? p.readyPattern
@@ -122,14 +123,6 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 					cause: err
 				})
 			}
-		}
-
-		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
-		if (readyPattern && !persistent) {
-			warnings?.push({
-				process: name,
-				message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)'
-			})
 		}
 
 		// Validate env values are strings
@@ -158,13 +151,13 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		validated[name] = {
 			command: p.command,
+			...(p.optional === true ? { optional: true } : {}),
 			cwd: processCwd ?? globalCwd,
 			env: globalEnv || processEnv ? { ...globalEnv, ...processEnv } : undefined,
 			envFile: processEnvFile ?? globalEnvFile,
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern,
-			persistent,
-			maxRestarts: processMaxRestarts ?? globalMaxRestarts,
+			maxRestarts: processMaxRestarts ?? globalMaxRestarts ?? 0,
 			readyTimeout: processReadyTimeout ?? globalReadyTimeout,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
@@ -191,8 +184,19 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		...(killOthersOnFail ? { killOthersOnFail } : {}),
 		...(noWatch ? { noWatch } : {}),
 		...(logDir ? { logDir } : {}),
+		...(theme ? { theme } : {}),
 		processes: validated
 	}
+}
+
+const VALID_THEME_VALUES = new Set<ThemePref>(['light', 'dark', 'auto'])
+
+function validateTheme(value: unknown): ThemePref | undefined {
+	if (value === undefined) return undefined
+	if (typeof value !== 'string' || !VALID_THEME_VALUES.has(value as ThemePref)) {
+		throw new Error(`theme must be one of: light, dark, auto. Got "${String(value)}"`)
+	}
+	return value as ThemePref
 }
 
 function validateStringOrStringArray(value: unknown): string | string[] | undefined {
@@ -222,7 +226,7 @@ function validateErrorMatcher(name: string, value: unknown): boolean | string | 
 	return undefined
 }
 
-const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological'])
+const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological', 'status'])
 
 function validateSort(value: unknown): SortOrder | undefined {
 	if (typeof value === 'string') {

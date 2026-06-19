@@ -75,6 +75,20 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv('--timestamps')).timestamps).toBe(true)
 	})
 
+	test('--timestamps accepts a format string', () => {
+		expect(parseArgs(argv('--timestamps', 'HH:mm:ss.SSS')).timestamps).toBe('HH:mm:ss.SSS')
+	})
+
+	test('-t accepts a format string', () => {
+		expect(parseArgs(argv('-t', 'hh:mm A')).timestamps).toBe('hh:mm A')
+	})
+
+	test('--timestamps without value before another flag defaults to true', () => {
+		const parsed = parseArgs(argv('--timestamps', '--prefix'))
+		expect(parsed.timestamps).toBe(true)
+		expect(parsed.prefix).toBe(true)
+	})
+
 	test('timestamps is false by default', () => {
 		expect(parseArgs(argv()).timestamps).toBe(false)
 	})
@@ -161,10 +175,46 @@ describe('parseArgs', () => {
 		expect(result.exclude).toEqual(['migrate'])
 	})
 
+	test('-o is short for --only', () => {
+		const result = parseArgs(argv('-o', 'api,web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('-x is short for --exclude', () => {
+		const result = parseArgs(argv('-x', 'migrate'))
+		expect(result.exclude).toEqual(['migrate'])
+	})
+
+	test('repeated --only merges values', () => {
+		const result = parseArgs(argv('--only', 'api', '--only', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
+	test('repeated -o merges comma-separated values', () => {
+		const result = parseArgs(argv('-o', 'api,db', '-o', 'web'))
+		expect(result.only).toEqual(['api', 'db', 'web'])
+	})
+
+	test('repeated --exclude merges values', () => {
+		const result = parseArgs(argv('--exclude', 'db', '-x', 'migrate'))
+		expect(result.exclude).toEqual(['db', 'migrate'])
+	})
+
+	test('mixed short and long flags merge', () => {
+		const result = parseArgs(argv('-o', 'api', '--only', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+	})
+
 	test('--only and --exclude can coexist', () => {
 		const result = parseArgs(argv('--only', 'api,web,db', '--exclude', 'db'))
 		expect(result.only).toEqual(['api', 'web', 'db'])
 		expect(result.exclude).toEqual(['db'])
+	})
+
+	test('-o and -x can coexist', () => {
+		const result = parseArgs(argv('-o', 'api,web', '-x', 'web'))
+		expect(result.only).toEqual(['api', 'web'])
+		expect(result.exclude).toEqual(['web'])
 	})
 
 	test('init sets init flag', () => {
@@ -247,18 +297,37 @@ describe('parseArgs', () => {
 		expect(parseArgs(argv()).autoColors).toBe(false)
 	})
 
+	test('logs sets logs flag', () => {
+		const result = parseArgs(argv('logs'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBeUndefined()
+	})
+
+	test('logs with process name', () => {
+		const result = parseArgs(argv('logs', 'api'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBe('api')
+	})
+
+	test('logs with --log-dir flag', () => {
+		const result = parseArgs(argv('--log-dir', './my-logs', 'logs', 'web'))
+		expect(result.logs).toBe(true)
+		expect(result.logsProcess).toBe('web')
+		expect(result.logDir).toBe('./my-logs')
+	})
+
 	test('exec parses process name and command', () => {
-		const result = parseArgs(argv('exec', 'api', 'npx', 'prisma', 'migrate'))
+		const result = parseArgs(argv('exec', 'api', 'bunx', 'prisma', 'migrate'))
 		expect(result.exec).toBe(true)
 		expect(result.execName).toBe('api')
-		expect(result.execCommand).toBe('npx prisma migrate')
+		expect(result.execCommand).toBe('bunx prisma migrate')
 	})
 
 	test('exec supports -- separator', () => {
-		const result = parseArgs(argv('exec', 'api', '--', 'npx', 'prisma', 'migrate', '--force'))
+		const result = parseArgs(argv('exec', 'api', '--', 'bunx', 'prisma', 'migrate', '--force'))
 		expect(result.exec).toBe(true)
 		expect(result.execName).toBe('api')
-		expect(result.execCommand).toBe('npx prisma migrate --force')
+		expect(result.execCommand).toBe('bunx prisma migrate --force')
 	})
 
 	test('exec requires a process name', () => {
@@ -314,20 +383,32 @@ describe('parseArgs', () => {
 describe('buildConfigFromArgs', () => {
 	test('named processes become config entries', () => {
 		const config = buildConfigFromArgs([], [{ name: 'api', command: 'bun run dev' }])
-		expect(config.processes.api).toEqual({ command: 'bun run dev', persistent: true })
+		expect(config.processes.api).toEqual({ command: 'bun run dev' })
 	})
 
-	test('positional commands get names from first word', () => {
-		const config = buildConfigFromArgs(['npm start', 'bun run dev'], [])
-		expect(config.processes.npm).toEqual({ command: 'npm start', persistent: true })
-		expect(config.processes.bun).toEqual({ command: 'bun run dev', persistent: true })
+	test('positional commands use last arg as name when first word is a package runner', () => {
+		const config = buildConfigFromArgs(['npm start', 'bun run dev', 'yarn format:check'], [])
+		expect(config.processes.start).toEqual({ command: 'npm start' })
+		expect(config.processes.dev).toEqual({ command: 'bun run dev' })
+		expect(config.processes['format:check']).toEqual({ command: 'yarn format:check' })
+	})
+
+	test('npm run script:name derives process name from script', () => {
+		const config = buildConfigFromArgs(['npm run studio:dev'], [])
+		expect(config.processes['studio:dev']).toEqual({ command: 'npm run studio:dev' })
+	})
+
+	test('positional commands use first word for non-runner commands', () => {
+		const config = buildConfigFromArgs(['echo hello', '/usr/bin/node server.js'], [])
+		expect(config.processes.echo).toEqual({ command: 'echo hello' })
+		expect(config.processes.node).toEqual({ command: '/usr/bin/node server.js' })
 	})
 
 	test('duplicate command names get index suffix', () => {
 		const config = buildConfigFromArgs(['echo hello', 'echo world'], [])
 		expect(Object.keys(config.processes)).toHaveLength(2)
-		expect(config.processes.echo).toEqual({ command: 'echo hello', persistent: true })
-		expect(config.processes['echo-1']).toEqual({ command: 'echo world', persistent: true })
+		expect(config.processes.echo).toEqual({ command: 'echo hello' })
+		expect(config.processes['echo-1']).toEqual({ command: 'echo world' })
 	})
 
 	test('path-based commands use basename', () => {
@@ -349,7 +430,7 @@ describe('buildConfigFromArgs', () => {
 const CHAIN_CONFIG: ResolvedNumuxConfig = {
 	processes: {
 		db: { command: 'echo db' },
-		migrate: { command: 'echo migrate', persistent: false, dependsOn: ['db'] },
+		migrate: { command: 'echo migrate', dependsOn: ['db'] },
 		api: { command: 'echo api', dependsOn: ['migrate'] },
 		web: { command: 'echo web', dependsOn: ['api'] }
 	}
@@ -414,5 +495,25 @@ describe('filterConfig — no-op', () => {
 	test('returns full config when neither only nor exclude provided', () => {
 		const result = filterConfig(CHAIN_CONFIG)
 		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'migrate', 'web'])
+	})
+})
+
+describe('help subcommand', () => {
+	test('numux help sets help flag', () => {
+		const result = parseArgs(['bun', 'script', 'help'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBeUndefined()
+	})
+
+	test('numux help <topic> sets helpTopic', () => {
+		const result = parseArgs(['bun', 'script', 'help', 'keybindings'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBe('keybindings')
+	})
+
+	test('numux --help does not set helpTopic', () => {
+		const result = parseArgs(['bun', 'script', '--help'])
+		expect(result.help).toBe(true)
+		expect(result.helpTopic).toBeUndefined()
 	})
 })

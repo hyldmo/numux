@@ -116,11 +116,7 @@ export class ProcessRunner implements Runner {
 			this.handler.onOutput(encoder.encode(msg))
 		}
 
-		this.handler.onStatus(this.config.persistent !== false ? 'running' : 'starting')
-
-		if (this.readiness.isImmediatelyReady) {
-			this.markReady()
-		}
+		this.handler.onStatus('running')
 
 		this.startReadyTimeout(gen)
 
@@ -175,7 +171,7 @@ export class ProcessRunner implements Runner {
 
 	private startReadyTimeout(gen: number): void {
 		const timeout = this.config.readyTimeout
-		if (!(timeout && this.config.readyPattern) || this.config.persistent === false) return
+		if (!(timeout && this.config.readyPattern)) return
 
 		this.readyTimer = setTimeout(() => {
 			this.readyTimer = null
@@ -284,8 +280,6 @@ export class ProcessRunner implements Runner {
 	}
 
 	write(data: string): void {
-		if (this.config.interactive && this.proc?.terminal) {
-			this.proc.terminal.write(data)
-		}
+		this.proc?.terminal?.write(data)
 	}
 }

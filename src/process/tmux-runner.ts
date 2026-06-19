@@ -145,11 +145,7 @@ export class TmuxRunner implements Runner {
 
 		if (this.generation !== gen) return
 
-		this.handler.onStatus(this.config.persistent !== false ? 'running' : 'starting')
-
-		if (this.readiness.isImmediatelyReady) {
-			this.markReady()
-		}
+		this.handler.onStatus('running')
 
 		this.startReadyTimeout(gen)
 		this.monitorOutput(pipePath, gen)
@@ -255,7 +251,7 @@ export class TmuxRunner implements Runner {
 
 	private startReadyTimeout(gen: number): void {
 		const timeout = this.config.readyTimeout
-		if (!(timeout && this.config.readyPattern) || this.config.persistent === false) return
+		if (!(timeout && this.config.readyPattern)) return
 
 		this.readyTimer = setTimeout(() => {
 			this.readyTimer = null

@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, rmSync, symlinkSync, unlinkSync, writeSync } from 'node:fs'
+import { closeSync, mkdirSync, openSync, readSync, rmSync, symlinkSync, unlinkSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { ProcessEvent } from '../types'
@@ -17,6 +17,7 @@ export class LogWriter {
 	private dir: string
 	private isTemp: boolean
 	private files = new Map<string, number>()
+	private copyOffsets = new Map<string, number>()
 	private decoder = new TextDecoder()
 	private encoder = new TextEncoder()
 
@@ -92,6 +93,38 @@ export class LogWriter {
 			// Disk full, permissions, deleted dir — warn once and stop writing
 			this.errored = true
 			process.stderr.write(`numux: log writing failed for ${this.dir}, disabling log output\n`)
+		}
+	}
+
+	/** Mark the current end of the log file as the start point for readLog. */
+	markCopyStart(name: string): void {
+		const path = this.getLogPath(name)
+		if (!path) return
+		try {
+			this.copyOffsets.set(name, Bun.file(path).size)
+		} catch {
+			// Ignore — file may not exist yet
+		}
+	}
+
+	/** Read log file content for a process (from last clear point). */
+	readLog(name: string): string | undefined {
+		const path = this.getLogPath(name)
+		if (!path) return undefined
+		try {
+			const size = Bun.file(path).size
+			const offset = this.copyOffsets.get(name) ?? 0
+			if (size <= offset) return undefined
+			const fd = openSync(path, 'r')
+			try {
+				const buf = Buffer.alloc(size - offset)
+				readSync(fd, buf, 0, buf.length, offset)
+				return buf.toString('utf-8')
+			} finally {
+				closeSync(fd)
+			}
+		} catch {
+			return undefined
 		}
 	}
 
@@ -204,20 +237,6 @@ export class LogWriter {
 			return matches
 		} catch {
 			return []
-		}
-	}
-
-	/** Truncate a process's log file (used when pane is cleared). */
-	truncate(name: string): void {
-		const fd = this.files.get(name)
-		if (fd === undefined) return
-		try {
-			closeSync(fd)
-			const path = join(this.dir, `${name}.log`)
-			const newFd = openSync(path, 'w')
-			this.files.set(name, newFd)
-		} catch {
-			// Ignore errors — file may have been deleted
 		}
 	}
 

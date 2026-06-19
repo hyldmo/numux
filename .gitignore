@@ -4,3 +4,5 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .claude/worktrees/
+man/
+src/generated/

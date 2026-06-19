@@ -2,61 +2,39 @@ import { describe, expect, test } from 'bun:test'
 import { createReadinessChecker } from './ready'
 
 describe('createReadinessChecker', () => {
-	test('persistent + no pattern → immediately ready', () => {
-		const checker = createReadinessChecker({ command: 'echo hi', persistent: true })
-		expect(checker.isImmediatelyReady).toBe(true)
-		expect(checker.dependsOnExit).toBe(false)
+	test('no readyPattern → depends on exit', () => {
+		const checker = createReadinessChecker({ command: 'echo hi' })
+		expect(checker.dependsOnExit).toBe(true)
 	})
 
-	test('persistent + pattern → not immediately ready, needs output match', () => {
+	test('readyPattern → needs output match, does not depend on exit', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: 'listening on port \\d+'
 		})
-		expect(checker.isImmediatelyReady).toBe(false)
 		expect(checker.dependsOnExit).toBe(false)
 
 		expect(checker.feedOutput('Starting server...')).toBe(false)
 		expect(checker.feedOutput('listening on port 3000')).toBe(true)
 	})
 
-	test('non-persistent → depends on exit, not immediately ready', () => {
-		const checker = createReadinessChecker({ command: 'echo hi', persistent: false })
-		expect(checker.isImmediatelyReady).toBe(false)
-		expect(checker.dependsOnExit).toBe(true)
-	})
-
-	test('default persistent (undefined) → treated as persistent', () => {
-		const checker = createReadinessChecker({ command: 'echo hi' })
-		expect(checker.isImmediatelyReady).toBe(true)
-		expect(checker.dependsOnExit).toBe(false)
-	})
-
 	test('pattern match accumulates across multiple feeds', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: 'ready to accept'
 		})
 		expect(checker.feedOutput('ready to ')).toBe(false)
 		expect(checker.feedOutput('accept connections')).toBe(true)
 	})
 
-	test('non-persistent ignores feedOutput', () => {
-		const checker = createReadinessChecker({
-			command: 'echo hi',
-			persistent: false,
-			readyPattern: 'done'
-		})
-		// Non-persistent processes depend on exit code, not pattern
-		expect(checker.feedOutput('done')).toBe(false)
+	test('feedOutput returns false when no readyPattern', () => {
+		const checker = createReadinessChecker({ command: 'echo hi' })
+		expect(checker.feedOutput('anything')).toBe(false)
 	})
 
 	test('string pattern does not extract captures', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: 'listening at (?<url>http://\\S+)'
 		})
 		expect(checker.feedOutput('listening at http://localhost:3000')).toBe(true)
@@ -66,7 +44,6 @@ describe('createReadinessChecker', () => {
 	test('RegExp extracts named capture groups', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: /listening at (?<url>http:\/\/\S+)/
 		})
 		expect(checker.captures).toBeNull()
@@ -80,7 +57,6 @@ describe('createReadinessChecker', () => {
 	test('RegExp extracts positional capture groups', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: /port (\d+) on (\w+)/
 		})
 		expect(checker.feedOutput('port 3000 on localhost')).toBe(true)
@@ -93,7 +69,6 @@ describe('createReadinessChecker', () => {
 	test('RegExp without groups returns null captures', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: /ready/
 		})
 		expect(checker.feedOutput('ready')).toBe(true)
@@ -103,7 +78,6 @@ describe('createReadinessChecker', () => {
 	test('RegExp extracts mixed named and positional groups', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: /(?<host>\w+):(\d+)/
 		})
 		expect(checker.feedOutput('localhost:3000')).toBe(true)
@@ -117,7 +91,6 @@ describe('createReadinessChecker', () => {
 	test('matches pattern against ANSI-stripped text', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: '- Local:\\s+http://localhost:\\d+'
 		})
 		// Simulate Next.js colored output: "- Local:" is green, then reset before spaces
@@ -127,7 +100,6 @@ describe('createReadinessChecker', () => {
 	test('RegExp captures from ANSI-stripped text', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: /- Local:\s+(?<url>http:\/\/localhost:(?<port>\d+))/
 		})
 		expect(checker.feedOutput('\x1b[32m- Local:\x1b[0m        http://localhost:3000')).toBe(true)
@@ -142,7 +114,6 @@ describe('createReadinessChecker', () => {
 	test('buffer is capped to prevent unbounded memory growth', () => {
 		const checker = createReadinessChecker({
 			command: 'echo hi',
-			persistent: true,
 			readyPattern: 'READY'
 		})
 		// Feed 100 KB of filler — buffer should be trimmed to ~64 KB

@@ -5,8 +5,8 @@ describe('filterByPlatform', () => {
 	test('no platform field — all kept', () => {
 		const config = {
 			processes: {
-				web: { command: 'echo web', persistent: true, interactive: false, showCommand: true },
-				api: { command: 'echo api', persistent: true, interactive: false, showCommand: true }
+				web: { command: 'echo web', interactive: false, showCommand: true },
+				api: { command: 'echo api', interactive: false, showCommand: true }
 			}
 		}
 		const result = filterByPlatform(config, 'darwin')
@@ -18,7 +18,6 @@ describe('filterByPlatform', () => {
 			processes: {
 				web: {
 					command: 'echo web',
-					persistent: true,
 					interactive: false,
 					showCommand: true,
 					platform: 'darwin'
@@ -32,7 +31,7 @@ describe('filterByPlatform', () => {
 	test('non-matching string — removed', () => {
 		const config = {
 			processes: {
-				web: { command: 'echo web', persistent: true, interactive: false, showCommand: true, platform: 'win32' }
+				web: { command: 'echo web', interactive: false, showCommand: true, platform: 'win32' }
 			}
 		}
 		const result = filterByPlatform(config, 'darwin')
@@ -44,7 +43,6 @@ describe('filterByPlatform', () => {
 			processes: {
 				web: {
 					command: 'echo web',
-					persistent: true,
 					interactive: false,
 					showCommand: true,
 					platform: ['darwin', 'linux']
@@ -60,7 +58,6 @@ describe('filterByPlatform', () => {
 			processes: {
 				web: {
 					command: 'echo web',
-					persistent: true,
 					interactive: false,
 					showCommand: true,
 					platform: ['darwin', 'linux']
@@ -74,10 +71,9 @@ describe('filterByPlatform', () => {
 	test('dependent dependsOn stripped of removed process', () => {
 		const config = {
 			processes: {
-				db: { command: 'echo db', persistent: true, interactive: false, showCommand: true, platform: 'linux' },
+				db: { command: 'echo db', interactive: false, showCommand: true, platform: 'linux' },
 				api: {
 					command: 'echo api',
-					persistent: true,
 					interactive: false,
 					showCommand: true,
 					dependsOn: ['db']
@@ -93,11 +89,10 @@ describe('filterByPlatform', () => {
 	test('all deps removed — dependsOn becomes undefined', () => {
 		const config = {
 			processes: {
-				a: { command: 'echo a', persistent: true, interactive: false, showCommand: true, platform: 'linux' },
-				b: { command: 'echo b', persistent: true, interactive: false, showCommand: true, platform: 'linux' },
+				a: { command: 'echo a', interactive: false, showCommand: true, platform: 'linux' },
+				b: { command: 'echo b', interactive: false, showCommand: true, platform: 'linux' },
 				c: {
 					command: 'echo c',
-					persistent: true,
 					interactive: false,
 					showCommand: true,
 					dependsOn: ['a', 'b']
@@ -111,7 +106,7 @@ describe('filterByPlatform', () => {
 	test('all processes excluded — empty processes object', () => {
 		const config = {
 			processes: {
-				web: { command: 'echo web', persistent: true, interactive: false, showCommand: true, platform: 'linux' }
+				web: { command: 'echo web', interactive: false, showCommand: true, platform: 'linux' }
 			}
 		}
 		const result = filterByPlatform(config, 'darwin')

@@ -92,13 +92,26 @@ describe('ProcessManager — initialization', () => {
 		expect(names.indexOf('db')).toBeLessThan(names.indexOf('api'))
 		expect(names.indexOf('api')).toBeLessThan(names.indexOf('web'))
 	})
+
+	test('sort: status returns config order (reorder is applied in TabBar)', () => {
+		const config: ResolvedNumuxConfig = {
+			sort: 'status',
+			processes: {
+				web: { command: 'echo web' },
+				api: { command: 'echo api' },
+				db: { command: 'echo db' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['web', 'api', 'db'])
+	})
 })
 
 describe('ProcessManager — startAll', () => {
-	test('starts a non-persistent process and completes', async () => {
+	test('starts a one-shot process and completes', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				task: { command: 'true', persistent: false }
+				task: { command: 'true' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -113,10 +126,10 @@ describe('ProcessManager — startAll', () => {
 		await mgr.stopAll()
 	}, 5000)
 
-	test('persistent process without readyPattern becomes ready immediately', async () => {
+	test('process with readyPattern becomes ready on match', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				server: { command: 'sleep 10', persistent: true }
+				server: { command: "echo 'listening' && sleep 10", readyPattern: 'listening' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -135,8 +148,8 @@ describe('ProcessManager — startAll', () => {
 	test('respects dependency order across tiers', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				dep: { command: 'true', persistent: false },
-				child: { command: 'true', persistent: false, dependsOn: ['dep'] }
+				dep: { command: 'true' },
+				child: { command: 'true', dependsOn: ['dep'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -156,9 +169,9 @@ describe('ProcessManager — startAll', () => {
 	test('starts dependent as soon as its dependency is ready, not entire tier', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				fast: { command: 'true', persistent: false },
-				slow: { command: 'sleep 60', persistent: true },
-				child: { command: 'true', persistent: false, dependsOn: ['fast'] }
+				fast: { command: 'true' },
+				slow: { command: "echo 'listening' && sleep 60", readyPattern: 'listening' },
+				child: { command: 'true', dependsOn: ['fast'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -187,8 +200,8 @@ describe('ProcessManager — skip propagation', () => {
 	test('skips dependents when a dependency fails', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				failing: { command: "sh -c 'exit 1'", persistent: false },
-				child: { command: 'true', persistent: false, dependsOn: ['failing'] }
+				failing: { command: "sh -c 'exit 1'" },
+				child: { command: 'true', dependsOn: ['failing'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -208,9 +221,9 @@ describe('ProcessManager — skip propagation', () => {
 	test('skips transitive dependents', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				root: { command: "sh -c 'exit 1'", persistent: false },
-				mid: { command: 'true', persistent: false, dependsOn: ['root'] },
-				leaf: { command: 'true', persistent: false, dependsOn: ['mid'] }
+				root: { command: "sh -c 'exit 1'" },
+				mid: { command: 'true', dependsOn: ['root'] },
+				leaf: { command: 'true', dependsOn: ['mid'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -226,10 +239,10 @@ describe('ProcessManager — skip propagation', () => {
 	test('only skips affected branch, not siblings', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				good: { command: 'true', persistent: false },
-				bad: { command: "sh -c 'exit 1'", persistent: false },
-				child_of_good: { command: 'true', persistent: false, dependsOn: ['good'] },
-				child_of_bad: { command: 'true', persistent: false, dependsOn: ['bad'] }
+				good: { command: 'true' },
+				bad: { command: "sh -c 'exit 1'" },
+				child_of_good: { command: 'true', dependsOn: ['good'] },
+				child_of_bad: { command: 'true', dependsOn: ['bad'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -248,8 +261,8 @@ describe('ProcessManager — event emission', () => {
 	test('emits exit events with correct code', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				ok: { command: 'true', persistent: false },
-				fail: { command: "sh -c 'exit 42'", persistent: false }
+				ok: { command: 'true' },
+				fail: { command: "sh -c 'exit 42'" }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -293,8 +306,8 @@ describe('ProcessManager — manual restart', () => {
 	test('ignores restart for skipped process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				dep: { command: "sh -c 'exit 1'", persistent: false },
-				child: { command: 'true', persistent: false, dependsOn: ['dep'] }
+				dep: { command: "sh -c 'exit 1'" },
+				child: { command: 'true', dependsOn: ['dep'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -311,8 +324,8 @@ describe('ProcessManager — restartAll', () => {
 	test('restarts all running processes', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				a: { command: 'sleep 60' },
-				b: { command: 'sleep 60' }
+				a: { command: "echo 'ready' && sleep 60", readyPattern: 'ready' },
+				b: { command: "echo 'ready' && sleep 60", readyPattern: 'ready' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -321,8 +334,51 @@ describe('ProcessManager — restartAll', () => {
 		mgr.restartAll(80, 24)
 		// Wait for restarts to complete
 		await new Promise(r => setTimeout(r, 1000))
-		expect(mgr.getState('a')?.restartCount).toBe(1)
-		expect(mgr.getState('b')?.restartCount).toBe(1)
+		expect(mgr.getState('a')?.restartCount).toBe(0)
+		expect(mgr.getState('b')?.restartCount).toBe(0)
+		await mgr.stopAll()
+	}, 10000)
+})
+
+describe('ProcessManager — manual restart resets restartCount', () => {
+	test('restart() resets auto-restart count to 0', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for at least one auto-restart (1s backoff)
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('crasher')?.restartCount).toBeGreaterThan(0)
+
+		// Manual restart should reset the counter
+		mgr.restart('crasher', 80, 24)
+		expect(mgr.getState('crasher')?.restartCount).toBe(0)
+
+		await mgr.stopAll()
+	}, 10000)
+
+	test('start() resets restartCount on stopped process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for auto-restarts to accumulate
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('server')?.restartCount).toBeGreaterThan(0)
+
+		await mgr.stop('server')
+		// start() should reset the counter
+		mgr.start('server', 80, 24)
+		expect(mgr.getState('server')?.restartCount).toBe(0)
+
 		await mgr.stopAll()
 	}, 10000)
 })
@@ -331,7 +387,7 @@ describe('ProcessManager — maxRestarts', () => {
 	test('stops auto-restarting after maxRestarts is reached', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 2 }
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: 2 }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -360,10 +416,10 @@ describe('ProcessManager — maxRestarts', () => {
 		await mgr.stopAll()
 	}, 10000)
 
-	test('maxRestarts: 0 prevents any auto-restart', async () => {
+	test('default maxRestarts (0) prevents any auto-restart', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 0 }
+				crasher: { command: "sh -c 'exit 1'" }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -385,10 +441,10 @@ describe('ProcessManager — maxRestarts', () => {
 		await mgr.stopAll()
 	}, 5000)
 
-	test('undefined maxRestarts allows unlimited restarts', async () => {
+	test('maxRestarts: Infinity allows unlimited restarts', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				crasher: { command: "sh -c 'exit 1'", persistent: true }
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -417,7 +473,7 @@ describe('ProcessManager — stop (individual)', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				server: { command: 'sleep 60', persistent: true }
+				server: { command: "echo 'listening' && sleep 60", readyPattern: 'listening' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -435,7 +491,6 @@ describe('ProcessManager — stop (individual)', () => {
 			processes: {
 				server: {
 					command: 'sleep 60',
-					persistent: true,
 					readyPattern: 'will_never_match',
 					readyTimeout: 200
 				}
@@ -458,7 +513,7 @@ describe('ProcessManager — stop (individual)', () => {
 	test('no-op for already finished process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				task: { command: 'true', persistent: false }
+				task: { command: 'true' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -497,7 +552,7 @@ describe('ProcessManager — stop (individual)', () => {
 	test('cancels pending auto-restart timer', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				crasher: { command: "sh -c 'exit 1'", persistent: true }
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -529,7 +584,7 @@ describe('ProcessManager — start (individual)', () => {
 	test('starts a stopped process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				server: { command: 'sleep 60', persistent: true }
+				server: { command: "echo 'listening' && sleep 60", readyPattern: 'listening' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -552,7 +607,7 @@ describe('ProcessManager — start (individual)', () => {
 	test('starts a failed process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				task: { command: "sh -c 'exit 1'", persistent: false }
+				task: { command: "sh -c 'exit 1'" }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -571,7 +626,7 @@ describe('ProcessManager — start (individual)', () => {
 	test('no-op for running process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				server: { command: 'sleep 60', persistent: true }
+				server: { command: "echo 'listening' && sleep 60", readyPattern: 'listening' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -598,7 +653,7 @@ describe('ProcessManager — start (individual)', () => {
 	test('resets backoff counter', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				crasher: { command: "sh -c 'exit 1'", persistent: true, maxRestarts: 1 }
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: 1 }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -631,8 +686,8 @@ describe('ProcessManager — delay', () => {
 	test('delays process start by the configured amount', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				fast: { command: 'true', persistent: false },
-				slow: { command: 'true', persistent: false, delay: 500 }
+				fast: { command: 'true' },
+				slow: { command: 'true', delay: 500 }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -653,8 +708,8 @@ describe('ProcessManager — delay', () => {
 	test('delay does not block other processes in the same tier', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				a: { command: 'true', persistent: false, delay: 500 },
-				b: { command: 'true', persistent: false }
+				a: { command: 'true', delay: 500 },
+				b: { command: 'true' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -678,7 +733,7 @@ describe('ProcessManager — delay', () => {
 	test('stopAll cancels pending delay timer', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				delayed: { command: 'sleep 60', persistent: true, delay: 2000 }
+				delayed: { command: "echo 'listening' && sleep 60", readyPattern: 'listening', delay: 2000 }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -699,12 +754,64 @@ describe('ProcessManager — delay', () => {
 	}, 5000)
 })
 
+describe('ProcessManager — optional', () => {
+	test('optional process starts as stopped', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process can be manually started', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'true', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+
+		mgr.start('studio', 80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		const status = mgr.getState('studio')?.status
+		expect(status === 'finished' || status === 'ready').toBe(true)
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process does not block dependents', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true },
+				child: { command: 'true', dependsOn: ['studio'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		// child should have started and finished — not blocked by optional dep
+		const childStatus = mgr.getState('child')?.status
+		expect(childStatus).not.toBe('pending')
+		expect(childStatus).not.toBe('skipped')
+		await mgr.stopAll()
+	}, 5000)
+})
+
 describe('ProcessManager — condition', () => {
 	test('skips process when condition env var is unset', async () => {
 		delete process.env.NUMUX_TEST_CONDITION
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+				guarded: { command: 'true', condition: 'NUMUX_TEST_CONDITION' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -718,7 +825,7 @@ describe('ProcessManager — condition', () => {
 		process.env.NUMUX_TEST_CONDITION = '1'
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+				guarded: { command: 'true', condition: 'NUMUX_TEST_CONDITION' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -733,7 +840,7 @@ describe('ProcessManager — condition', () => {
 		process.env.NUMUX_TEST_CONDITION = 'false'
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				guarded: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' }
+				guarded: { command: 'true', condition: 'NUMUX_TEST_CONDITION' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -748,7 +855,7 @@ describe('ProcessManager — condition', () => {
 		delete process.env.NUMUX_TEST_CONDITION
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				guarded: { command: 'true', persistent: false, condition: '!NUMUX_TEST_CONDITION' }
+				guarded: { command: 'true', condition: '!NUMUX_TEST_CONDITION' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -762,7 +869,7 @@ describe('ProcessManager — condition', () => {
 		process.env.NUMUX_TEST_CONDITION = 'yes'
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				guarded: { command: 'true', persistent: false, condition: '!NUMUX_TEST_CONDITION' }
+				guarded: { command: 'true', condition: '!NUMUX_TEST_CONDITION' }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -777,8 +884,8 @@ describe('ProcessManager — condition', () => {
 		delete process.env.NUMUX_TEST_CONDITION
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				parent: { command: 'true', persistent: false, condition: 'NUMUX_TEST_CONDITION' },
-				child: { command: 'true', persistent: false, dependsOn: ['parent'] }
+				parent: { command: 'true', condition: 'NUMUX_TEST_CONDITION' },
+				child: { command: 'true', dependsOn: ['parent'] }
 			}
 		}
 		const mgr = new ProcessManager(config)
@@ -796,12 +903,10 @@ describe('ProcessManager — dependency capture expansion in env', () => {
 			processes: {
 				server: {
 					command: "echo 'listening on http://localhost:4000' && sleep 60",
-					persistent: true,
 					readyPattern: /listening on (?<url>http:\/\/[^ ]+)/
 				},
 				client: {
 					command: 'echo $API_URL',
-					persistent: false,
 					dependsOn: ['server'],
 					env: { API_URL: '$server.url', STATIC: 'keep' }
 				}
@@ -829,7 +934,7 @@ describe('ProcessManager — stopAll', () => {
 	test('stops a running process', async () => {
 		const config: ResolvedNumuxConfig = {
 			processes: {
-				server: { command: 'sleep 60', persistent: true }
+				server: { command: "echo 'listening' && sleep 60", readyPattern: 'listening' }
 			}
 		}
 		const mgr = new ProcessManager(config)
