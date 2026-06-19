@@ -1,6 +1,6 @@
 {
 	"scripts": {
-		"setup": "bun install",
+		"setup": "bun install && bun run docs",
 		"run": "bun run dev",
 		"archive": "rm -rf node_modules"
 	},

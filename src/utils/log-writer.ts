@@ -1,18 +1,75 @@
-import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs'
-import { join } from 'node:path'
+import { closeSync, mkdirSync, openSync, readSync, rmSync, symlinkSync, unlinkSync, writeSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import type { ProcessEvent } from '../types'
+import type { SearchMatch } from '../ui/pane'
 import { stripAnsi } from './color'
+
+export interface CrossProcessMatch {
+	process: string
+	line: number
+	start: number
+	end: number
+}
 
 /** Writes process output to per-process log files in the given directory. */
 export class LogWriter {
 	private dir: string
+	private isTemp: boolean
 	private files = new Map<string, number>()
+	private copyOffsets = new Map<string, number>()
 	private decoder = new TextDecoder()
 	private encoder = new TextEncoder()
 
-	constructor(dir: string) {
+	constructor(dir: string, isTemp = false) {
 		this.dir = dir
+		this.isTemp = isTemp
 		mkdirSync(dir, { recursive: true })
+	}
+
+	/** Create a LogWriter in a temporary directory (cleaned up on close). */
+	static createTemp(): LogWriter {
+		const dir = join(tmpdir(), `numux-${process.pid}`)
+		return new LogWriter(dir, true)
+	}
+
+	/** Create a LogWriter in a timestamped subdirectory with a `latest` symlink. */
+	static createPersistent(baseDir: string): LogWriter {
+		mkdirSync(baseDir, { recursive: true })
+		const now = new Date()
+		const ts = now
+			.toISOString()
+			.replace(/:/g, '-')
+			.replace(/\.\d+Z$/, '')
+		const sessionDir = join(baseDir, ts)
+		mkdirSync(sessionDir, { recursive: true })
+		const latestLink = join(baseDir, 'latest')
+		try {
+			unlinkSync(latestLink)
+		} catch {
+			// Link may not exist yet
+		}
+		try {
+			symlinkSync(sessionDir, latestLink)
+		} catch {
+			// Symlinks may not be supported
+		}
+		return new LogWriter(sessionDir, false)
+	}
+
+	/** Whether this log directory is temporary (cleaned up on close). */
+	get isTemporary(): boolean {
+		return this.isTemp
+	}
+
+	/** Get the log directory path. */
+	getDirectory(): string {
+		return this.dir
+	}
+
+	/** Get the names of all processes that have written output. */
+	getProcessNames(): string[] {
+		return [...this.files.keys()]
 	}
 
 	private errored = false
@@ -39,10 +96,166 @@ export class LogWriter {
 		}
 	}
 
+	/** Mark the current end of the log file as the start point for readLog. */
+	markCopyStart(name: string): void {
+		const path = this.getLogPath(name)
+		if (!path) return
+		try {
+			this.copyOffsets.set(name, Bun.file(path).size)
+		} catch {
+			// Ignore — file may not exist yet
+		}
+	}
+
+	/** Read log file content for a process (from last clear point). */
+	readLog(name: string): string | undefined {
+		const path = this.getLogPath(name)
+		if (!path) return undefined
+		try {
+			const size = Bun.file(path).size
+			const offset = this.copyOffsets.get(name) ?? 0
+			if (size <= offset) return undefined
+			const fd = openSync(path, 'r')
+			try {
+				const buf = Buffer.alloc(size - offset)
+				readSync(fd, buf, 0, buf.length, offset)
+				return buf.toString('utf-8')
+			} finally {
+				closeSync(fd)
+			}
+		} catch {
+			return undefined
+		}
+	}
+
+	/** Get the log file path for a process, or undefined if no output yet. */
+	getLogPath(name: string): string | undefined {
+		if (this.files.has(name)) {
+			return join(this.dir, `${name}.log`)
+		}
+		return undefined
+	}
+
+	/** Search a process's log file using grep. Returns matches with 0-based line numbers. */
+	async search(name: string, query: string): Promise<SearchMatch[]> {
+		if (!query) return []
+		const path = this.getLogPath(name)
+		if (!path) return []
+
+		try {
+			const cmd =
+				process.platform === 'win32' ? ['findstr', '/i', '/n', query, path] : ['grep', '-inF', query, path]
+			const proc = Bun.spawn(cmd, {
+				stdout: 'pipe',
+				stderr: 'ignore'
+			})
+
+			const output = await new Response(proc.stdout).text()
+			await proc.exited
+
+			const matches: SearchMatch[] = []
+			const lowerQuery = query.toLowerCase()
+
+			for (const line of output.split('\n')) {
+				if (!line) continue
+				const colonIdx = line.indexOf(':')
+				if (colonIdx === -1) continue
+
+				const lineNumber = Number.parseInt(line.slice(0, colonIdx), 10)
+				if (Number.isNaN(lineNumber)) continue
+
+				const lineText = line.slice(colonIdx + 1).toLowerCase()
+				let pos = 0
+				while (true) {
+					const idx = lineText.indexOf(lowerQuery, pos)
+					if (idx === -1) break
+					matches.push({
+						line: lineNumber - 1, // grep is 1-based, terminal is 0-based
+						start: idx,
+						end: idx + query.length
+					})
+					pos = idx + 1
+				}
+			}
+
+			return matches
+		} catch {
+			return []
+		}
+	}
+
+	/** Search all process log files using grep. Returns matches across all processes. */
+	async searchAll(query: string): Promise<CrossProcessMatch[]> {
+		if (!query) return []
+		const paths = [...this.files.keys()].map(name => join(this.dir, `${name}.log`))
+		if (paths.length === 0) return []
+
+		try {
+			const proc = Bun.spawn(['grep', '-inFH', query, ...paths], {
+				stdout: 'pipe',
+				stderr: 'ignore'
+			})
+
+			const output = await new Response(proc.stdout).text()
+			await proc.exited
+
+			const matches: CrossProcessMatch[] = []
+			const lowerQuery = query.toLowerCase()
+
+			for (const line of output.split('\n')) {
+				if (!line) continue
+				// Format: /path/name.log:lineNumber:text
+				const firstColon = line.indexOf(':')
+				if (firstColon === -1) continue
+				const filePath = line.slice(0, firstColon)
+				const rest = line.slice(firstColon + 1)
+
+				const secondColon = rest.indexOf(':')
+				if (secondColon === -1) continue
+				const lineNumber = Number.parseInt(rest.slice(0, secondColon), 10)
+				if (Number.isNaN(lineNumber)) continue
+
+				// Extract process name from filename (strip .log extension)
+				const fileName = basename(filePath)
+				const processName = fileName.replace(/\.log$/, '')
+
+				const lineText = rest.slice(secondColon + 1).toLowerCase()
+				let pos = 0
+				while (true) {
+					const idx = lineText.indexOf(lowerQuery, pos)
+					if (idx === -1) break
+					matches.push({
+						process: processName,
+						line: lineNumber - 1, // grep is 1-based, terminal is 0-based
+						start: idx,
+						end: idx + query.length
+					})
+					pos = idx + 1
+				}
+			}
+
+			return matches
+		} catch {
+			return []
+		}
+	}
+
 	close(): void {
 		for (const fd of this.files.values()) {
 			closeSync(fd)
 		}
 		this.files.clear()
+	}
+
+	/** Close files and remove the directory if it was auto-created. */
+	cleanup(): void {
+		this.close()
+		if (this.isTemp) {
+			try {
+				rmSync(this.dir, { recursive: true })
+			} catch {
+				// Ignore cleanup errors
+			}
+		}
 	}
 }

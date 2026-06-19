@@ -1,4 +1,5 @@
 import type { ParsedArgs } from './cli'
+import { CONFIG_FILES } from './config/loader'
 
 // --- Flag types ---
 
@@ -21,12 +22,29 @@ interface ValueFlag {
 	parse?: (raw: string, flag: string) => unknown
 }
 
-export type FlagDef = BooleanFlag | ValueFlag
+/** Flag that acts as boolean when used alone, or accepts a value: --flag or --flag <value> */
+interface OptionalValueFlag {
+	type: 'optional-value'
+	long: string
+	short?: string
+	key: keyof ParsedArgs
+	description: string
+	valueName: string
+	completionHint?: 'file' | 'directory' | 'none'
+}
+
+export type FlagDef = BooleanFlag | ValueFlag | OptionalValueFlag
 
 export interface SubcommandDef {
 	name: string
 	description: string
 	usage?: string
+	/** Example usages shown in generated docs, as `[command, comment]` pairs */
+	examples?: Array<[string, string]>
+	/** Shell completion for subcommand arguments: static list, 'dynamic' for runtime resolution, or omit for none */
+	completionArgs?: string[] | 'dynamic'
+	/** Shell snippet that resolves dynamic completions (used when completionArgs is 'dynamic') */
+	completionScript?: string
 	parse: (args: string[], i: number, result: ParsedArgs) => number | 'break'
 }
 
@@ -41,6 +59,15 @@ const commaSplit = (raw: string): string[] =>
 // --- Definitions ---
 
 export const FLAGS: FlagDef[] = [
+	{
+		type: 'value',
+		long: '--sort',
+		short: '-s',
+		key: 'sort',
+		description: 'Tab display order',
+		valueName: '<config|alphabetical|topological|status>',
+		completionHint: 'none'
+	},
 	{
 		type: 'value',
 		long: '--workspace',
@@ -111,6 +138,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--only',
+		short: '-o',
 		key: 'only',
 		description: 'Only run these processes (+ their dependencies)',
 		valueName: '<a,b,...>',
@@ -120,6 +148,7 @@ export const FLAGS: FlagDef[] = [
 	{
 		type: 'value',
 		long: '--exclude',
+		short: '-x',
 		key: 'exclude',
 		description: 'Exclude these processes',
 		valueName: '<a,b,...>',
@@ -130,13 +159,26 @@ export const FLAGS: FlagDef[] = [
 		type: 'boolean',
 		long: '--kill-others',
 		key: 'killOthers',
-		description: 'Kill all processes when any exits'
+		description: 'Kill all processes when any exits (regardless of exit code)'
 	},
 	{
 		type: 'boolean',
-		long: '--no-restart',
-		key: 'noRestart',
-		description: 'Disable auto-restart for crashed processes'
+		long: '--kill-others-on-fail',
+		key: 'killOthersOnFail',
+		description: 'Kill all processes when any exits with non-zero code'
+	},
+	{
+		type: 'value',
+		long: '--max-restarts',
+		key: 'maxRestarts',
+		description: 'Max auto-restarts for crashed processes',
+		valueName: '<n>',
+		completionHint: 'none',
+		parse(raw: string, flag: string) {
+			const n = Number(raw)
+			if (!Number.isInteger(n) || n < 0) throw new Error(`${flag} must be a non-negative integer, got "${raw}"`)
+			return n
+		}
 	},
 	{
 		type: 'boolean',
@@ -151,11 +193,13 @@ export const FLAGS: FlagDef[] = [
 		description: 'Disable automatic config file watching for live reloads'
 	},
 	{
-		type: 'boolean',
+		type: 'optional-value',
 		long: '--timestamps',
 		short: '-t',
 		key: 'timestamps',
-		description: 'Add timestamps to prefixed output lines'
+		description: 'Add timestamps to output (default HH:mm:ss.SSS, or pass a format string)',
+		valueName: '<format>',
+		completionHint: 'none'
 	},
 	{
 		type: 'value',
@@ -164,6 +208,20 @@ export const FLAGS: FlagDef[] = [
 		description: 'Write per-process logs to directory',
 		valueName: '<path>',
 		completionHint: 'directory'
+	},
+	{
+		type: 'value',
+		long: '--theme',
+		key: 'theme',
+		description: 'TUI theme (auto detects terminal background)',
+		valueName: '<light|dark|auto>',
+		completionHint: 'none',
+		parse(raw: string, flag: string) {
+			if (raw !== 'light' && raw !== 'dark' && raw !== 'auto') {
+				throw new Error(`${flag} must be light, dark, or auto. Got "${raw}"`)
+			}
+			return raw
+		}
 	},
 	{
 		type: 'boolean',
@@ -221,13 +279,51 @@ export const SUBCOMMANDS: SubcommandDef[] = [
 		}
 	},
 	{
+		name: 'logs',
+		description: 'Open the log directory or a specific process log',
+		usage: 'logs [name]',
+		examples: [
+			['numux logs', 'Print log directory path'],
+			['numux logs api', 'Pipe the api process log to stdout'],
+			['numux logs api | grep "ERROR"', 'Search process logs'],
+			['numux logs api | tail -f', 'Follow process log output']
+		],
+		completionArgs: 'dynamic',
+		completionScript: 'numux logs 2>/dev/null',
+		parse: (args, i, result) => {
+			result.logs = true
+			const next = args[i + 1]
+			if (next !== undefined && !next.startsWith('-')) {
+				result.logsProcess = next
+				i++
+			}
+			return i
+		}
+	},
+	{
 		name: 'completions',
 		description: 'Generate shell completions (bash, zsh, fish)',
 		usage: 'completions <shell>',
+		completionArgs: ['bash', 'zsh', 'fish'],
 		parse: (args, i, result) => {
 			const next = args[++i]
 			if (next === undefined) throw new Error('Missing value for completions')
 			result.completions = next
+			return i
+		}
+	},
+	{
+		name: 'help',
+		description: 'Show help for a topic',
+		usage: 'help [topic]',
+		completionArgs: 'dynamic',
+		parse: (args, i, result) => {
+			result.help = true
+			const next = args[i + 1]
+			if (next !== undefined && !next.startsWith('-')) {
+				result.helpTopic = next
+				i++
+			}
 			return i
 		}
 	}
@@ -258,11 +354,12 @@ export function generateHelp(): string {
 		if (f.short) parts.push(`${f.short},`)
 		parts.push(f.long)
 		if (f.type === 'value') parts.push(f.valueName)
+		if (f.type === 'optional-value') parts.push(`[${f.valueName}]`)
 		const left = `  ${parts.join(' ')}`
 		lines.push(`${left.padEnd(29)}${f.description}`)
 	}
 
-	lines.push('', 'Config files (auto-detected):', '  numux.config.ts, numux.config.js')
+	lines.push('', 'Config files (auto-detected):', `  ${CONFIG_FILES.join(', ')}, or "numux" key in package.json`)
 
 	return lines.join('\n')
 }

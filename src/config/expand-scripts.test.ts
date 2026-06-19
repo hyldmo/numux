@@ -47,7 +47,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -199,7 +199,7 @@ describe('expandScriptPatterns', () => {
 			},
 			dir
 		)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'e2e', 'unit', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api', 'unit', 'e2e'])
 	})
 
 	test('multiple wildcards with colliding short names throws', () => {
@@ -233,7 +233,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:app-*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api'])
 		expect(result.processes['lib-core']).toBeUndefined()
 	})
 
@@ -254,7 +254,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -353,11 +353,38 @@ describe('expandScriptPatterns', () => {
 		)
 	})
 
-	test('non-glob names without command are not expanded', () => {
-		// Names like "web" that don't contain glob chars should NOT be treated as patterns
-		const config: NumuxConfig = { processes: { web: { env: { FOO: 'bar' } } } }
-		// This should passthrough, not try to expand
-		expect(expandScriptPatterns(config)).toBe(config)
+	test('commandless entry auto-resolves when name matches a script', () => {
+		const dir = setupDir('auto-resolve', {
+			'package.json': pkgJson({ lint: 'eslint .', dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: {}, dev: { env: { PORT: '3000' } } } }, dir)
+		expect(proc(result, 'lint').command).toBe('npm run lint')
+		expect(proc(result, 'dev').command).toBe('npm run dev')
+		expect(proc(result, 'dev').env).toEqual({ PORT: '3000' })
+	})
+
+	test('true value auto-resolves when name matches a script', () => {
+		const dir = setupDir('auto-resolve-true', {
+			'package.json': pkgJson({ lint: 'eslint .', dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: true as any, dev: true as any } }, dir)
+		expect(result.processes.lint).toBe('npm run lint')
+		expect(result.processes.dev).toBe('npm run dev')
+	})
+
+	test('commandless entry not matching a script passes through unchanged', () => {
+		const dir = setupDir('auto-resolve-miss', {
+			'package.json': pkgJson({ dev: 'next dev' })
+		})
+		const result = expandScriptPatterns({ processes: { web: { env: { FOO: 'bar' } } } }, dir)
+		// Not a script match — passes through as-is (validator will catch missing command)
+		expect(proc(result, 'web').command).toBeUndefined()
+	})
+
+	test('no package.json — commandless entries pass through', () => {
+		const dir = setupDir('auto-resolve-no-pkg', {})
+		const result = expandScriptPatterns({ processes: { web: {} } }, dir)
+		expect(proc(result, 'web').command).toBeUndefined()
 	})
 
 	test('extra args are forwarded to expanded commands', () => {
@@ -366,8 +393,8 @@ describe('expandScriptPatterns', () => {
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix': {} } }, dir)
 		expect(Object.keys(result.processes).sort()).toEqual(['js', 'ts'])
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
-		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts -- --fix')
 	})
 
 	test('npm: prefix with extra args', () => {
@@ -375,8 +402,8 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint', 'lint:ts': 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint:* --fix': {} } }, dir)
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix')
-		expect(proc(result, 'ts').command).toBe('npm run lint:ts --fix')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix')
+		expect(proc(result, 'ts').command).toBe('npm run lint:ts -- --fix')
 	})
 
 	test('multiple extra args forwarded', () => {
@@ -384,7 +411,7 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ 'lint:js': 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'lint:* --fix --quiet': {} } }, dir)
-		expect(proc(result, 'js').command).toBe('npm run lint:js --fix --quiet')
+		expect(proc(result, 'js').command).toBe('npm run lint:js -- --fix --quiet')
 	})
 
 	test('npm: exact script name with extra args', () => {
@@ -392,7 +419,36 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ lint: 'eslint' })
 		})
 		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
-		expect(proc(result, 'lint').command).toBe('npm run lint --fix')
+		expect(proc(result, 'lint').command).toBe('npm run lint -- --fix')
+	})
+
+	test('npm:studio:dev shorthand expands to npm run studio:dev', () => {
+		const dir = setupDir('studio-dev', {
+			'package.json': pkgJson({ 'studio:dev': 'prisma studio' })
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:studio:dev': { color: '#5A67D8' } } }, dir)
+		expect(proc(result, 'studio:dev').command).toBe('npm run studio:dev')
+		expect(proc(result, 'studio:dev').color).toBe('#5A67D8')
+	})
+
+	test('command value npm:script shorthand expands to pm run script', () => {
+		const dir = setupDir('cmd-shorthand', {
+			'package.json': pkgJson({ 'studio:dev': 'prisma studio' })
+		})
+		const result = expandScriptPatterns(
+			{ processes: { prisma: { command: 'npm:studio:dev', color: '#5A67D8' } } },
+			dir
+		)
+		expect(proc(result, 'prisma').command).toBe('npm run studio:dev')
+		expect(proc(result, 'prisma').color).toBe('#5A67D8')
+	})
+
+	test('command value npm:script with extra args', () => {
+		const dir = setupDir('cmd-shorthand-args', {
+			'package.json': pkgJson({ lint: 'eslint' })
+		})
+		const result = expandScriptPatterns({ processes: { lint: { command: 'npm:lint --fix' } } }, dir)
+		expect(proc(result, 'lint').command).toBe('npm run lint -- --fix')
 	})
 
 	test('prefix glob strips common prefix from process names', () => {
@@ -405,7 +461,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { 'dev:*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'db', 'web'])
+		expect(Object.keys(result.processes)).toEqual(['web', 'api', 'db'])
 		// Commands must still reference full script name
 		expect(proc(result, 'web').command).toBe('npm run dev:web')
 		expect(proc(result, 'api').command).toBe('npm run dev:api')
@@ -420,7 +476,7 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['api', 'store'])
+		expect(Object.keys(result.processes)).toEqual(['store', 'api'])
 		expect(proc(result, 'store').command).toBe('npm run store:dev')
 		expect(proc(result, 'api').command).toBe('npm run api:dev')
 	})
@@ -430,7 +486,178 @@ describe('expandScriptPatterns', () => {
 			'package.json': pkgJson({ dev: 'vite', build: 'tsc' })
 		})
 		const result = expandScriptPatterns({ processes: { '*': {} } }, dir)
-		expect(Object.keys(result.processes).sort()).toEqual(['build', 'dev'])
+		expect(Object.keys(result.processes)).toEqual(['dev', 'build'])
+	})
+
+	test('* does not match across colon separators', () => {
+		const dir = setupDir('colon-depth', {
+			'package.json': pkgJson({
+				'format:store': 'prettier --write .',
+				'format:odoo': 'yarn workspace odoo format',
+				'format:check': 'numux format:check:*',
+				'format:check:store': 'prettier --check .',
+				'format:check:odoo': 'yarn workspace odoo format:check'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'format:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Should match format:store, format:odoo, format:check (1 colon each)
+		// Should NOT match format:check:store, format:check:odoo (2 colons)
+		expect(names.sort()).toEqual(['check', 'odoo', 'store'])
+	})
+
+	test('* does not match across colon separators with npm: prefix', () => {
+		const dir = setupDir('colon-depth-npm', {
+			'package.json': pkgJson({
+				'format:store': 'prettier --write .',
+				'format:check:store': 'prettier --check .'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:format:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		expect(names).toEqual(['store'])
+	})
+
+	test('multi-level wildcard *:* matches two-colon scripts only', () => {
+		const dir = setupDir('colon-depth-multi', {
+			'package.json': pkgJson({
+				'format': 'numux format:*',
+				'format:store': 'prettier --write .',
+				'format:odoo': 'yarn workspace odoo format',
+				'format:check:store': 'prettier --check .',
+				'format:check:odoo': 'yarn workspace odoo format:check',
+				'format:lint:deep:store': 'some deep script'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'format:*:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Should match format:check:store, format:check:odoo (2 colons)
+		// Should NOT match format:store (1 colon) or format:lint:deep:store (3 colons)
+		expect(names.sort()).toEqual(['check:odoo', 'check:store'])
+	})
+
+	test('exact colon name expands as script reference', () => {
+		const dir = setupDir('colon-exact', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .', 'lint:ts': 'tsc --noEmit' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:eslint': {} } }, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint')
+	})
+
+	test('exact colon name with extra args', () => {
+		const dir = setupDir('colon-exact-args', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:eslint --fix': {} } }, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint -- --fix')
+	})
+
+	test('exact colon name inherits template properties', () => {
+		const dir = setupDir('colon-exact-template', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const result = expandScriptPatterns(
+			{ processes: { 'lint:eslint': { env: { FIX: '1' }, color: '#ff0000' } } },
+			dir
+		)
+		expect(proc(result, 'lint:eslint').env).toEqual({ FIX: '1' })
+		expect(proc(result, 'lint:eslint').color).toBe('#ff0000')
+	})
+
+	test('exact colon name with string value is NOT expanded', () => {
+		const dir = setupDir('colon-exact-string', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const config: NumuxConfig = { processes: { 'lint:eslint': 'custom-command' } }
+		const result = expandScriptPatterns(config, dir)
+		expect(result.processes['lint:eslint']).toBe('custom-command')
+	})
+
+	test('exact colon name with explicit command is NOT expanded', () => {
+		const dir = setupDir('colon-exact-cmd', {
+			'package.json': pkgJson({ 'lint:eslint': 'eslint .' })
+		})
+		const config: NumuxConfig = {
+			processes: { 'lint:eslint': { command: 'custom-command' } }
+		}
+		const result = expandScriptPatterns(config, dir)
+		expect(proc(result, 'lint:eslint').command).toBe('custom-command')
+	})
+
+	test('exact colon name not in scripts throws', () => {
+		const dir = setupDir('colon-exact-missing', {
+			'package.json': pkgJson({ dev: 'next dev', build: 'tsc' })
+		})
+		expect(() => expandScriptPatterns({ processes: { 'lint:eslint': {} } }, dir)).toThrow(
+			/no scripts matched.*Available scripts/
+		)
+	})
+
+	test('exact colon name mixed with regular and glob processes', () => {
+		const dir = setupDir('colon-exact-mixed', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'dev:web': 'next dev',
+				'dev:api': 'bun api'
+			})
+		})
+		const result = expandScriptPatterns(
+			{
+				processes: {
+					db: 'docker compose up',
+					'lint:eslint': {},
+					'dev:*': {}
+				}
+			},
+			dir
+		)
+		expect(result.processes.db).toBe('docker compose up')
+		expect(proc(result, 'lint:eslint').command).toBe('npm run lint:eslint')
+		expect(proc(result, 'web').command).toBe('npm run dev:web')
+		expect(proc(result, 'api').command).toBe('npm run dev:api')
+	})
+
+	test('only string-value colon names do not trigger package.json read', () => {
+		// No package.json needed — all colon names have string values
+		const config: NumuxConfig = {
+			processes: {
+				'docker:compose': 'docker compose up',
+				web: 'echo hi'
+			}
+		}
+		expect(expandScriptPatterns(config)).toBe(config)
+	})
+
+	test('^  suffix excludes scripts that have children', () => {
+		const dir = setupDir('leaf-only', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'lint:ts': 'tsc --noEmit',
+				'lint:style': 'numux lint:style:*',
+				'lint:style:css': 'stylelint **/*.css',
+				'lint:style:scss': 'stylelint **/*.scss'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:*^': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// lint:style has children — excluded by ^
+		expect(names.sort()).toEqual(['eslint', 'ts'])
+	})
+
+	test('^ without suffix includes parent scripts', () => {
+		const dir = setupDir('no-leaf-only', {
+			'package.json': pkgJson({
+				'lint:eslint': 'eslint .',
+				'lint:ts': 'tsc --noEmit',
+				'lint:style': 'numux lint:style:*',
+				'lint:style:css': 'stylelint **/*.css',
+				'lint:style:scss': 'stylelint **/*.scss'
+			})
+		})
+		const result = expandScriptPatterns({ processes: { 'lint:*': {} } }, dir)
+		const names = Object.keys(result.processes)
+		// Without ^, lint:style is included
+		expect(names.sort()).toEqual(['eslint', 'style', 'ts'])
 	})
 
 	test('bare glob from CLI-style usage does not match non-colon scripts', () => {
@@ -445,8 +672,8 @@ describe('expandScriptPatterns', () => {
 			})
 		})
 		const result = expandScriptPatterns({ processes: { '*:dev': { color: ['#00ff00', '#00ffff'] } } }, dir)
-		const names = Object.keys(result.processes).sort()
-		expect(names).toEqual(['api', 'store'])
+		const names = Object.keys(result.processes)
+		expect(names).toEqual(['store', 'api'])
 		// "dev" script should NOT match *:dev (no colon)
 		expect(result.processes.dev).toBeUndefined()
 	})

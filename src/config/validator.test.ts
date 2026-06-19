@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { type ValidationWarning, validateConfig } from './validator'
+import { validateConfig } from './validator'
 
 describe('validateConfig', () => {
 	test('accepts a valid config', () => {
@@ -9,7 +9,7 @@ describe('validateConfig', () => {
 			}
 		})
 		expect(config.processes.web.command).toBe('echo hello')
-		expect(config.processes.web.persistent).toBe(true)
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('applies defaults for optional fields', () => {
@@ -22,17 +22,8 @@ describe('validateConfig', () => {
 		expect(config.processes.web.env).toBeUndefined()
 		expect(config.processes.web.dependsOn).toBeUndefined()
 		expect(config.processes.web.readyPattern).toBeUndefined()
-		expect(config.processes.web.persistent).toBe(true)
+		expect(config.processes.web.maxRestarts).toBe(0)
 		expect(config.processes.web.color).toBeUndefined()
-	})
-
-	test('preserves explicit persistent: false', () => {
-		const config = validateConfig({
-			processes: {
-				migrate: { command: 'bun run migrate', persistent: false }
-			}
-		})
-		expect(config.processes.migrate.persistent).toBe(false)
 	})
 
 	test('preserves dependsOn array', () => {
@@ -56,6 +47,24 @@ describe('validateConfig', () => {
 
 	test('throws on empty processes', () => {
 		expect(() => validateConfig({ processes: {} })).toThrow('at least one process')
+	})
+
+	test('passes through optional: true', () => {
+		const config = validateConfig({
+			processes: {
+				studio: { command: 'prisma studio', optional: true }
+			}
+		})
+		expect(config.processes.studio.optional).toBe(true)
+	})
+
+	test('ignores non-boolean optional values', () => {
+		const config = validateConfig({
+			processes: {
+				studio: { command: 'prisma studio', optional: 'yes' }
+			}
+		})
+		expect(config.processes.studio.optional).toBeUndefined()
 	})
 
 	test('throws on missing command', () => {
@@ -110,7 +119,7 @@ describe('validateConfig', () => {
 				web: { command: 'echo hi', maxRestarts: -1 }
 			}
 		})
-		expect(config.processes.web.maxRestarts).toBeUndefined()
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('ignores non-number maxRestarts', () => {
@@ -119,7 +128,7 @@ describe('validateConfig', () => {
 				web: { command: 'echo hi', maxRestarts: 'abc' }
 			}
 		})
-		expect(config.processes.web.maxRestarts).toBeUndefined()
+		expect(config.processes.web.maxRestarts).toBe(0)
 	})
 
 	test('preserves explicit readyTimeout', () => {
@@ -280,15 +289,25 @@ describe('validateConfig', () => {
 		expect(config.processes.b.envFile).toBe(false)
 	})
 
-	test('throws on non-array dependsOn', () => {
+	test('normalizes string dependsOn to array', () => {
+		const config = validateConfig({
+			processes: {
+				db: { command: 'echo db' },
+				web: { command: 'echo hi', dependsOn: 'db' as any }
+			}
+		})
+		expect(config.processes.web.dependsOn).toEqual(['db'])
+	})
+
+	test('throws on non-string non-array dependsOn', () => {
 		expect(() =>
 			validateConfig({
 				processes: {
 					db: { command: 'echo db' },
-					web: { command: 'echo hi', dependsOn: 'db' }
+					web: { command: 'echo hi', dependsOn: 123 as any }
 				}
 			})
-		).toThrow('dependsOn must be an array')
+		).toThrow('dependsOn must be a string or array')
 	})
 
 	test('accepts string shorthand for processes', () => {
@@ -299,7 +318,6 @@ describe('validateConfig', () => {
 			}
 		})
 		expect(config.processes.web.command).toBe('bun dev:web')
-		expect(config.processes.web.persistent).toBe(true)
 		expect(config.processes.api.command).toBe('bun dev:api')
 	})
 
@@ -326,15 +344,6 @@ describe('validateConfig', () => {
 			}
 		})
 		expect(config.processes.web.color).toBe('#ff8800')
-	})
-
-	test('accepts hex color without hash', () => {
-		const config = validateConfig({
-			processes: {
-				web: { command: 'echo hi', color: 'ff8800' }
-			}
-		})
-		expect(config.processes.web.color).toBe('ff8800')
 	})
 
 	test('accepts basic color names', () => {
@@ -366,35 +375,6 @@ describe('validateConfig', () => {
 		).toThrow('basic name')
 	})
 
-	test('warns when readyPattern is set on non-persistent process', () => {
-		const warnings: ValidationWarning[] = []
-		const config = validateConfig(
-			{
-				processes: {
-					migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
-				}
-			},
-			warnings
-		)
-		expect(config.processes.migrate.readyPattern).toBe('done')
-		expect(warnings).toHaveLength(1)
-		expect(warnings[0].process).toBe('migrate')
-		expect(warnings[0].message).toContain('readyPattern is ignored')
-	})
-
-	test('no warning when readyPattern is set on persistent process', () => {
-		const warnings: ValidationWarning[] = []
-		validateConfig(
-			{
-				processes: {
-					web: { command: 'echo hi', readyPattern: 'ready' }
-				}
-			},
-			warnings
-		)
-		expect(warnings).toHaveLength(0)
-	})
-
 	test('throws on non-string env values', () => {
 		expect(() =>
 			validateConfig({
@@ -418,7 +398,7 @@ describe('validateConfig', () => {
 		// Should not throw when warnings param is omitted
 		const config = validateConfig({
 			processes: {
-				migrate: { command: 'bun migrate', persistent: false, readyPattern: 'done' }
+				migrate: { command: 'bun migrate', readyPattern: 'done' }
 			}
 		})
 		expect(config.processes.migrate.readyPattern).toBe('done')
@@ -533,6 +513,131 @@ describe('validateConfig', () => {
 			})
 		).toThrow('not a valid regex')
 	})
+
+	test('throws on invalid readyPattern regex', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', readyPattern: '[invalid' }
+				}
+			})
+		).toThrow('not a valid regex')
+	})
+
+	test('accepts readyPattern with capture groups', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyPattern: 'port (?<port>\\d+)' }
+			}
+		})
+		expect(config.processes.web.readyPattern).toBe('port (?<port>\\d+)')
+	})
+
+	test('accepts RegExp literal as readyPattern', () => {
+		const pattern = /listening at (?<url>http:\/\/\S+)/
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', readyPattern: pattern }
+			}
+		})
+		expect(config.processes.web.readyPattern).toBe(pattern)
+	})
+
+	test('preserves valid platform string', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', platform: 'darwin' }
+			}
+		})
+		expect(config.processes.web.platform).toBe('darwin')
+	})
+
+	test('preserves valid platform array', () => {
+		const config = validateConfig({
+			processes: {
+				web: { command: 'echo hi', platform: ['darwin', 'linux'] }
+			}
+		})
+		expect(config.processes.web.platform).toEqual(['darwin', 'linux'])
+	})
+
+	test('throws on invalid platform string', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', platform: 'macos' }
+				}
+			})
+		).toThrow('not valid')
+	})
+
+	test('throws on invalid entry in platform array', () => {
+		expect(() =>
+			validateConfig({
+				processes: {
+					web: { command: 'echo hi', platform: ['darwin', 'macos'] }
+				}
+			})
+		).toThrow('not valid')
+	})
+})
+
+describe('validateConfig — sort', () => {
+	test('sort defaults to undefined', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBeUndefined()
+	})
+
+	test('preserves sort: config', () => {
+		const config = validateConfig({
+			sort: 'config',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('config')
+	})
+
+	test('preserves sort: alphabetical', () => {
+		const config = validateConfig({
+			sort: 'alphabetical',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('alphabetical')
+	})
+
+	test('preserves sort: topological', () => {
+		const config = validateConfig({
+			sort: 'topological',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('topological')
+	})
+
+	test('preserves sort: status', () => {
+		const config = validateConfig({
+			sort: 'status',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBe('status')
+	})
+
+	test('throws on invalid sort value', () => {
+		expect(() =>
+			validateConfig({
+				sort: 'random',
+				processes: { a: { command: 'echo a' } }
+			})
+		).toThrow('sort must be one of')
+	})
+
+	test('ignores non-string sort value', () => {
+		const config = validateConfig({
+			sort: 123,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.sort).toBeUndefined()
+	})
 })
 
 describe('validateConfig — global options', () => {
@@ -620,5 +725,210 @@ describe('validateConfig — global options', () => {
 		expect(config.processes.a.cwd).toBeUndefined()
 		expect(config.processes.a.env).toBeUndefined()
 		expect(config.processes.a.envFile).toBeUndefined()
+	})
+
+	test('showCommand defaults to true', () => {
+		const config = validateConfig({
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.showCommand).toBe(true)
+	})
+
+	test('global showCommand: false is inherited', () => {
+		const config = validateConfig({
+			showCommand: false,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.showCommand).toBe(false)
+		expect(config.processes.b.showCommand).toBe(false)
+	})
+
+	test('process showCommand overrides global showCommand', () => {
+		const config = validateConfig({
+			showCommand: false,
+			processes: {
+				a: { command: 'echo a', showCommand: true },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.showCommand).toBe(true)
+		expect(config.processes.b.showCommand).toBe(false)
+	})
+
+	test('global maxRestarts is inherited by all processes', () => {
+		const config = validateConfig({
+			maxRestarts: 3,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(3)
+		expect(config.processes.b.maxRestarts).toBe(3)
+	})
+
+	test('process maxRestarts overrides global maxRestarts', () => {
+		const config = validateConfig({
+			maxRestarts: 3,
+			processes: {
+				a: { command: 'echo a', maxRestarts: 10 },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(10)
+		expect(config.processes.b.maxRestarts).toBe(3)
+	})
+
+	test('process maxRestarts: 0 overrides global maxRestarts', () => {
+		const config = validateConfig({
+			maxRestarts: 5,
+			processes: {
+				a: { command: 'echo a', maxRestarts: 0 }
+			}
+		})
+		expect(config.processes.a.maxRestarts).toBe(0)
+	})
+
+	test('global readyTimeout is inherited by all processes', () => {
+		const config = validateConfig({
+			readyTimeout: 5000,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.readyTimeout).toBe(5000)
+		expect(config.processes.b.readyTimeout).toBe(5000)
+	})
+
+	test('process readyTimeout overrides global readyTimeout', () => {
+		const config = validateConfig({
+			readyTimeout: 5000,
+			processes: {
+				a: { command: 'echo a', readyTimeout: 30000 },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.readyTimeout).toBe(30000)
+		expect(config.processes.b.readyTimeout).toBe(5000)
+	})
+
+	test('global stopSignal is inherited by all processes', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGINT',
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.stopSignal).toBe('SIGINT')
+		expect(config.processes.b.stopSignal).toBe('SIGINT')
+	})
+
+	test('process stopSignal overrides global stopSignal', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGINT',
+			processes: {
+				a: { command: 'echo a', stopSignal: 'SIGHUP' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.stopSignal).toBe('SIGHUP')
+		expect(config.processes.b.stopSignal).toBe('SIGINT')
+	})
+
+	test('global errorMatcher is inherited by all processes', () => {
+		const config = validateConfig({
+			errorMatcher: true,
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe(true)
+		expect(config.processes.b.errorMatcher).toBe(true)
+	})
+
+	test('global errorMatcher regex string is inherited', () => {
+		const config = validateConfig({
+			errorMatcher: 'ERROR:',
+			processes: {
+				a: { command: 'echo a' }
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe('ERROR:')
+	})
+
+	test('process errorMatcher overrides global errorMatcher', () => {
+		const config = validateConfig({
+			errorMatcher: true,
+			processes: {
+				a: { command: 'echo a', errorMatcher: 'FATAL' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.errorMatcher).toBe('FATAL')
+		expect(config.processes.b.errorMatcher).toBe(true)
+	})
+
+	test('global watch is inherited by all processes', () => {
+		const config = validateConfig({
+			watch: '.env',
+			processes: {
+				a: { command: 'echo a' },
+				b: 'echo b'
+			}
+		})
+		expect(config.processes.a.watch).toBe('.env')
+		expect(config.processes.b.watch).toBe('.env')
+	})
+
+	test('global watch array is inherited', () => {
+		const config = validateConfig({
+			watch: ['.env', 'config.json'],
+			processes: {
+				a: { command: 'echo a' }
+			}
+		})
+		expect(config.processes.a.watch).toEqual(['.env', 'config.json'])
+	})
+
+	test('process watch overrides global watch', () => {
+		const config = validateConfig({
+			watch: '.env',
+			processes: {
+				a: { command: 'echo a', watch: 'src/**/*.ts' },
+				b: { command: 'echo b' }
+			}
+		})
+		expect(config.processes.a.watch).toBe('src/**/*.ts')
+		expect(config.processes.b.watch).toBe('.env')
+	})
+
+	test('invalid global maxRestarts is ignored', () => {
+		const config = validateConfig({
+			maxRestarts: -1,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.maxRestarts).toBe(0)
+	})
+
+	test('invalid global readyTimeout is ignored', () => {
+		const config = validateConfig({
+			readyTimeout: 0,
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.readyTimeout).toBeUndefined()
+	})
+
+	test('invalid global stopSignal is ignored', () => {
+		const config = validateConfig({
+			stopSignal: 'SIGKILL',
+			processes: { a: { command: 'echo a' } }
+		})
+		expect(config.processes.a.stopSignal).toBeUndefined()
 	})
 })

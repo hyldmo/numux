@@ -1,6 +1,16 @@
-import { FLAGS, type FlagDef, SUBCOMMANDS } from './cli-flags'
+import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
+import { HELP_TOPICS, TOPIC_ALIASES } from './generated/help-topics'
 
 const SUPPORTED_SHELLS = ['bash', 'zsh', 'fish'] as const
+
+const HELP_TOPIC_NAMES = [...Object.keys(HELP_TOPICS), ...Object.keys(TOPIC_ALIASES)]
+
+/** Resolve completionArgs for a subcommand — expands 'dynamic' for help using generated topics */
+function resolveArgs(sub: SubcommandDef): string[] | 'dynamic' | undefined {
+	if (!sub.completionArgs) return undefined
+	if (sub.completionArgs === 'dynamic' && sub.name === 'help') return HELP_TOPIC_NAMES
+	return sub.completionArgs
+}
 
 export function generateCompletions(shell: string): string {
 	switch (shell) {
@@ -39,7 +49,24 @@ function bashCompletions(): string {
 			caseEntries.push(`    ${names})\n      return ;;`)
 		}
 	}
-	caseEntries.push('    completions)\n      COMPREPLY=( $(compgen -W "bash zsh fish" -- "$cur") )\n      return ;;')
+
+	// Subcommand argument completions — generated from SubcommandDef.completionArgs
+	for (const sub of SUBCOMMANDS) {
+		const args = resolveArgs(sub)
+		if (!args) continue
+		if (args === 'dynamic') {
+			const script = sub.completionScript
+			if (!script) continue
+			const dir = `$(${script})`
+			caseEntries.push(
+				`    ${sub.name})\n      local logdir\n      logdir="${dir}"\n      if [ -n "$logdir" ] && [ -d "$logdir" ]; then\n        local names\n        names="$(ls "$logdir"/*.log 2>/dev/null | xargs -I{} basename {} .log)"\n        COMPREPLY=( $(compgen -W "$names" -- "$cur") )\n      fi\n      return ;;`
+			)
+		} else {
+			caseEntries.push(
+				`    ${sub.name})\n      COMPREPLY=( $(compgen -W "${args.join(' ')}" -- "$cur") )\n      return ;;`
+			)
+		}
+	}
 
 	// All flag names for compgen
 	const allFlags = FLAGS.flatMap(f => (f.short ? [f.short, f.long] : [f.long]))
@@ -98,6 +125,24 @@ function zshCompletions(): string {
 	// Join with ' \' line continuation
 	const argsBlock = argLines.map(l => `${l} \\`).join('\n')
 
+	// Subcommand argument completions
+	const subcmdCases: string[] = []
+	for (const sub of SUBCOMMANDS) {
+		const args = resolveArgs(sub)
+		if (!args) continue
+		if (args === 'dynamic') {
+			const script = sub.completionScript
+			if (!script) continue
+			subcmdCases.push(
+				`    ${sub.name})\n      local logdir names\n      logdir="\\$(${script})"\n      if [[ -n "\\$logdir" ]] && [[ -d "\\$logdir" ]]; then\n        names=( \\$(ls "\\$logdir"/*.log 2>/dev/null | xargs -I{} basename {} .log) )\n        _describe 'process' names\n      fi\n      ;;`
+			)
+		} else {
+			subcmdCases.push(
+				`    ${sub.name})\n      local -a args\n      args=(${args.map(a => `'${a}'`).join(' ')})\n      _describe '${sub.name}' args\n      ;;`
+			)
+		}
+	}
+
 	return `#compdef numux
 # numux zsh completions
 # Add to ~/.zshrc: eval "$(numux completions zsh)"
@@ -118,6 +163,10 @@ ${argsBlock}
       _describe 'subcommand' subcmds
       ;;
   esac
+
+  case "\${words[2]}" in
+${subcmdCases.join('\n')}
+  esac
 }
 _numux`
 }
@@ -136,13 +185,24 @@ function fishCompletions(): string {
 		lines.push(`complete -c numux -n __fish_use_subcommand -a ${s.name} -d '${sq(s.description)}'`)
 	}
 
-	lines.push(
-		'',
-		'# Completions subcommand',
-		"complete -c numux -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'",
-		'',
-		'# Options'
-	)
+	// Subcommand argument completions
+	for (const sub of SUBCOMMANDS) {
+		const args = resolveArgs(sub)
+		if (!args) continue
+		lines.push('')
+		lines.push(`# ${sub.name} subcommand`)
+		if (args === 'dynamic') {
+			const script = sub.completionScript
+			if (!script) continue
+			lines.push(
+				`complete -c numux -n '__fish_seen_subcommand_from ${sub.name}' -a '(set -l d (${script}); and ls $d/*.log 2>/dev/null | xargs -I{} basename {} .log)'`
+			)
+		} else {
+			lines.push(`complete -c numux -n '__fish_seen_subcommand_from ${sub.name}' -a '${args.join(' ')}'`)
+		}
+	}
+
+	lines.push('', '# Options')
 
 	for (const f of FLAGS) {
 		const parts = ['complete -c numux']

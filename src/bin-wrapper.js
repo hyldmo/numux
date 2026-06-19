@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const child = spawn('bun', ['run', join(__dirname, 'numux.js'), ...process.argv.slice(2)], {
+const child = spawn('bun', ['run', '--conditions=default', join(__dirname, 'numux.js'), ...process.argv.slice(2)], {
 	stdio: 'inherit'
 })
 

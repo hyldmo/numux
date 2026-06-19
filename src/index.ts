@@ -1,23 +1,25 @@
 #!/usr/bin/env bun
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildConfigFromArgs, filterConfig, type ParsedArgs, parseArgs } from './cli'
+import { buildConfigFromArgs, deriveProcessName, filterConfig, type ParsedArgs, parseArgs } from './cli'
 import { generateHelp } from './cli-flags'
 import { generateCompletions } from './completions'
 import { watchConfig } from './config/config-watcher'
 import { expandScriptPatterns } from './config/expand-scripts'
 import { loadConfig, resolveConfigPath } from './config/loader'
+import { filterByPlatform } from './config/platform'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
-import { resolveWorkspaceProcesses } from './config/workspaces'
+import { expandWorkspaces, resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
-import type { NumuxProcessConfig, ResolvedNumuxConfig } from './types'
+import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
-import { colorFromName } from './utils/color'
+import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
+import { defaultLogDir } from './utils/project-name'
 import { setupShutdownHandlers } from './utils/shutdown'
 
 const HELP = generateHelp()
@@ -49,7 +51,12 @@ async function main() {
 	const parsed = parseArgs(process.argv)
 
 	if (parsed.help) {
-		console.info(HELP)
+		if (parsed.helpTopic) {
+			const { showHelp } = await import('./help')
+			console.info(showHelp(parsed.helpTopic))
+		} else {
+			console.info(HELP)
+		}
 		process.exit(0)
 	}
 
@@ -75,10 +82,46 @@ async function main() {
 		process.exit(0)
 	}
 
+	if (parsed.logs) {
+		const resolved = parsed.logDir ? { dir: parsed.logDir, explicit: true } : await resolveLogDir(parsed.configPath)
+		const logDir = resolved.dir
+		const latestDir = resolve(logDir, 'latest')
+		const usingLatest = existsSync(latestDir)
+		const target = usingLatest ? latestDir : logDir
+
+		if (!resolved.explicit && usingLatest) {
+			console.warn(
+				'Warning: using default log directory; "latest" may have been overwritten by another numux instance in this project.'
+			)
+		}
+
+		if (parsed.logsProcess) {
+			const logFile = resolve(target, `${parsed.logsProcess}.log`)
+			if (!existsSync(logFile)) {
+				const { readdirSync } = await import('node:fs')
+				const files = readdirSync(target)
+					.filter(f => f.endsWith('.log'))
+					.map(f => f.replace(/\.log$/, ''))
+				const available = files.length > 0 ? `Available: ${files.join(', ')}` : 'No log files found'
+				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
+				process.exit(1)
+			}
+			const child = Bun.spawn(['cat', logFile], {
+				stdout: 'inherit',
+				stderr: 'inherit'
+			})
+			process.exit(await child.exited)
+		}
+
+		console.info(target)
+		process.exit(0)
+	}
+
 	if (parsed.validate) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const warnings: ValidationWarning[] = []
 		let config = validateConfig(raw, warnings)
+		config = filterByPlatform(config)
 
 		if (parsed.only || parsed.exclude) {
 			config = filterConfig(config, parsed.only, parsed.exclude)
@@ -95,9 +138,13 @@ async function main() {
 				const flags: string[] = []
 				if (proc.dependsOn?.length) flags.push(`depends on: ${proc.dependsOn.join(', ')}`)
 				if (proc.readyPattern) flags.push(`ready: /${proc.readyPattern}/`)
-				if (proc.persistent === false) flags.push('one-shot')
+				if (!proc.readyPattern) flags.push('one-shot')
 				if (proc.delay) flags.push(`delay: ${proc.delay}ms`)
 				if (proc.condition) flags.push(`if: ${proc.condition}`)
+				if (proc.platform) {
+					const p = Array.isArray(proc.platform) ? proc.platform : [proc.platform]
+					flags.push(`platform: ${p.join(', ')}`)
+				}
 				if (proc.watch) {
 					const patterns = Array.isArray(proc.watch) ? proc.watch : [proc.watch]
 					flags.push(`watch: ${patterns.join(', ')}`)
@@ -111,7 +158,7 @@ async function main() {
 	}
 
 	if (parsed.exec) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const config = validateConfig(raw)
 		const proc = config.processes[parsed.execName!]
 		if (!proc) {
@@ -146,7 +193,8 @@ async function main() {
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0 || parsed.workspace) {
-		const isScriptPattern = (c: string) => c.startsWith('npm:') || /[*?[]/.test(c)
+		const isScriptPattern = (c: string) =>
+			c.startsWith('npm:') || /[*?[]/.test(c) || c.split(/\s+/)[0].includes(':')
 		const hasNpmPatterns = parsed.commands.some(isScriptPattern)
 		if (hasNpmPatterns) {
 			// Expand npm:/glob patterns into named processes, pass remaining commands as-is
@@ -155,12 +203,12 @@ async function main() {
 			const processes: Record<string, NumuxProcessConfig | string> = {}
 			for (const pattern of npmPatterns) {
 				const entry: Partial<NumuxProcessConfig> = {}
-				if (parsed.colors?.length) entry.color = parsed.colors
+				if (parsed.colors?.length) entry.color = parsed.colors as Color[]
 				processes[pattern] = entry as NumuxProcessConfig
 			}
 			for (let i = 0; i < otherCommands.length; i++) {
 				const cmd = otherCommands[i]
-				let name = cmd.split(/\s+/)[0].split('/').pop()!
+				let name = deriveProcessName(cmd)
 				if (processes[name]) name = `${name}-${i}`
 				processes[name] = cmd
 			}
@@ -171,8 +219,7 @@ async function main() {
 			config = validateConfig(expanded, warnings)
 		} else {
 			config = buildConfigFromArgs(parsed.commands, parsed.named, {
-				noRestart: parsed.noRestart,
-				colors: parsed.colors
+				colors: parsed.colors as Color[]
 			})
 		}
 
@@ -186,20 +233,18 @@ async function main() {
 					while (config.processes[`${finalName}-${suffix}`]) suffix++
 					finalName = `${finalName}-${suffix}`
 				}
-				if (parsed.noRestart) proc.maxRestarts = 0
 				config.processes[finalName] = proc
 			}
 		}
 	} else {
 		configFilePath = resolveConfigPath(parsed.configPath)
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		config = validateConfig(raw, warnings)
+		config = filterByPlatform(config)
+	}
 
-		if (parsed.noRestart) {
-			for (const proc of Object.values(config.processes)) {
-				proc.maxRestarts = 0
-			}
-		}
+	if (parsed.sort) {
+		config.sort = parsed.sort as SortOrder
 	}
 
 	if (parsed.envFile !== undefined) {
@@ -208,7 +253,13 @@ async function main() {
 		}
 	}
 
-	if (parsed.noWatch) {
+	if (parsed.maxRestarts !== undefined) {
+		for (const proc of Object.values(config.processes)) {
+			proc.maxRestarts = parsed.maxRestarts
+		}
+	}
+
+	if (parsed.noWatch || config.noWatch) {
 		for (const proc of Object.values(config.processes)) {
 			delete proc.watch
 		}
@@ -216,6 +267,10 @@ async function main() {
 
 	if (parsed.only || parsed.exclude) {
 		config = filterConfig(config, parsed.only, parsed.exclude)
+	}
+
+	if (parsed.theme) {
+		config.theme = parsed.theme
 	}
 
 	if (parsed.autoColors) {
@@ -228,36 +283,29 @@ async function main() {
 
 	const manager = new ProcessManager(config)
 
-	let logWriter: LogWriter | undefined
-	if (parsed.logDir) {
-		logWriter = new LogWriter(parsed.logDir)
-	}
+	const logDir = parsed.logDir ?? config.logDir ?? defaultLogDir(process.cwd())
+	const logWriter = LogWriter.createPersistent(logDir)
 
 	printWarnings(warnings)
 
-	if (parsed.prefix) {
-		// Default to no restarts in prefix mode (CI/scripts)
-		if (!parsed.noRestart) {
-			for (const proc of Object.values(config.processes)) {
-				proc.maxRestarts ??= 0
-			}
-		}
+	const timestamps = parsed.timestamps || config.timestamps
+	const usePrefix = parsed.prefix || config.prefix
+	if (usePrefix) {
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
-			killOthers: parsed.killOthers,
-			timestamps: parsed.timestamps
+			killOthers: parsed.killOthers || config.killOthers,
+			killOthersOnFail: parsed.killOthersOnFail || config.killOthersOnFail,
+			timestamps
 		})
 		await display.start()
 	} else {
-		if (logWriter) {
-			manager.on(logWriter.handleEvent)
-		}
-		const app = new App(manager, config)
+		if (timestamps) config.timestamps = timestamps
+		manager.on(logWriter.handleEvent)
+		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)
 
 		// Set up config file watching (on by default in TUI mode with a config file)
-		const allOneShot = Object.values(config.processes).every(p => p.persistent === false)
-		if (configFilePath && !parsed.noConfigWatch && !allOneShot) {
+		if (configFilePath && !parsed.noConfigWatch) {
 			const watcher = watchConfig(
 				configFilePath,
 				config,
@@ -282,12 +330,13 @@ function printWarnings(warnings: ValidationWarning[]): void {
 
 /** Reload config from file and re-apply CLI overrides. Used by config watcher. */
 async function loadAndApplyConfig(parsed: ParsedArgs): Promise<ResolvedNumuxConfig> {
-	const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+	const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 	let config = validateConfig(raw)
+	config = filterByPlatform(config)
 
-	if (parsed.noRestart) {
+	if (parsed.maxRestarts !== undefined) {
 		for (const proc of Object.values(config.processes)) {
-			proc.maxRestarts = 0
+			proc.maxRestarts = parsed.maxRestarts
 		}
 	}
 	if (parsed.envFile !== undefined) {
@@ -309,6 +358,18 @@ async function loadAndApplyConfig(parsed: ParsedArgs): Promise<ResolvedNumuxConf
 		}
 	}
 	return config
+}
+
+async function resolveLogDir(configPath?: string): Promise<{ dir: string; explicit: boolean }> {
+	try {
+		const raw = await loadConfig(configPath)
+		if (typeof raw.logDir === 'string' && raw.logDir.trim()) {
+			return { dir: resolve(raw.logDir.trim()), explicit: true }
+		}
+	} catch {
+		// Config may not exist — fall through to default
+	}
+	return { dir: defaultLogDir(process.cwd()), explicit: false }
 }
 
 main().catch(err => {

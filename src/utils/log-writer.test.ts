@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ProcessEvent } from '../types'
@@ -67,5 +67,278 @@ describe('LogWriter', () => {
 		writer.close()
 
 		expect(existsSync(join(nested, 'api.log'))).toBe(true)
+	})
+
+	test('getLogPath returns path for known process', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello'))
+
+		expect(writer.getLogPath('api')).toBe(join(dir, 'api.log'))
+		expect(writer.getLogPath('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('search finds matches in log file', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello world\n'))
+		writer.handleEvent(outputEvent('api', 'foo bar\n'))
+		writer.handleEvent(outputEvent('api', 'hello again\n'))
+
+		const matches = await writer.search('api', 'hello')
+		expect(matches.length).toBe(2)
+		expect(matches[0]).toEqual({ line: 0, start: 0, end: 5 })
+		expect(matches[1]).toEqual({ line: 2, start: 0, end: 5 })
+		writer.close()
+	})
+
+	test('search is case-insensitive', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'Hello World\n'))
+		writer.handleEvent(outputEvent('api', 'HELLO again\n'))
+
+		const matches = await writer.search('api', 'hello')
+		expect(matches.length).toBe(2)
+		writer.close()
+	})
+
+	test('search returns empty for unknown process', async () => {
+		const writer = new LogWriter(dir)
+		const matches = await writer.search('unknown', 'test')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('search returns empty for empty query', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello\n'))
+		const matches = await writer.search('api', '')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('search finds multiple matches on same line', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'foo foo foo\n'))
+
+		const matches = await writer.search('api', 'foo')
+		expect(matches.length).toBe(3)
+		expect(matches[0]).toEqual({ line: 0, start: 0, end: 3 })
+		expect(matches[1]).toEqual({ line: 0, start: 4, end: 7 })
+		expect(matches[2]).toEqual({ line: 0, start: 8, end: 11 })
+		writer.close()
+	})
+
+	test('readLog returns all content without markCopyStart', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'line 1\n'))
+		writer.handleEvent(outputEvent('api', 'line 2\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('line 1\nline 2\n')
+		writer.close()
+	})
+
+	test('readLog returns undefined for unknown process', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.readLog('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('readLog returns undefined when no output after markCopyStart', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'old content\n'))
+		writer.markCopyStart('api')
+
+		expect(writer.readLog('api')).toBeUndefined()
+		writer.close()
+	})
+
+	test('markCopyStart makes readLog return only new content', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'old content\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'new content\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('new content\n')
+		expect(content).not.toContain('old content')
+
+		// Full file still has everything
+		const fullFile = readFileSync(join(dir, 'api.log'), 'utf-8')
+		expect(fullFile).toContain('old content')
+		expect(fullFile).toContain('new content')
+		writer.close()
+	})
+
+	test('markCopyStart can be called multiple times', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'first\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'second\n'))
+		writer.markCopyStart('api')
+		writer.handleEvent(outputEvent('api', 'third\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('third\n')
+		writer.close()
+	})
+
+	test('markCopyStart on unknown process is a no-op', () => {
+		const writer = new LogWriter(dir)
+		writer.markCopyStart('unknown') // should not throw
+		expect(writer.readLog('unknown')).toBeUndefined()
+		writer.close()
+	})
+
+	test('readLog strips ANSI from content', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', '\x1b[31mred\x1b[0m\n'))
+
+		const content = writer.readLog('api')
+		expect(content).toBe('red\n')
+		expect(content).not.toContain('\x1b')
+		writer.close()
+	})
+
+	test('createTemp creates a temp directory', () => {
+		const writer = LogWriter.createTemp()
+		writer.handleEvent(outputEvent('api', 'test'))
+		const path = writer.getLogPath('api')
+		expect(path).toBeDefined()
+		expect(existsSync(path!)).toBe(true)
+		writer.cleanup()
+	})
+
+	test('cleanup removes temp directory', () => {
+		const writer = LogWriter.createTemp()
+		writer.handleEvent(outputEvent('api', 'test'))
+		const path = writer.getLogPath('api')!
+		expect(existsSync(path)).toBe(true)
+
+		writer.cleanup()
+		expect(existsSync(path)).toBe(false)
+	})
+
+	test('cleanup does not remove user-specified directory', () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'test'))
+		writer.cleanup()
+
+		// Directory still exists (only files closed, dir not removed)
+		expect(existsSync(dir)).toBe(true)
+	})
+
+	test('isTemporary returns true for temp writers', () => {
+		const writer = LogWriter.createTemp()
+		expect(writer.isTemporary).toBe(true)
+		writer.cleanup()
+	})
+
+	test('isTemporary returns false for user-specified directory', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.isTemporary).toBe(false)
+		writer.close()
+	})
+
+	test('getDirectory returns the log directory path', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.getDirectory()).toBe(dir)
+		writer.close()
+	})
+
+	test('getProcessNames returns names of processes with output', () => {
+		const writer = new LogWriter(dir)
+		expect(writer.getProcessNames()).toEqual([])
+
+		writer.handleEvent(outputEvent('api', 'hello'))
+		writer.handleEvent(outputEvent('web', 'world'))
+
+		const names = writer.getProcessNames()
+		expect(names).toContain('api')
+		expect(names).toContain('web')
+		expect(names.length).toBe(2)
+		writer.close()
+	})
+
+	test('searchAll finds matches across multiple processes', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello world\n'))
+		writer.handleEvent(outputEvent('api', 'foo bar\n'))
+		writer.handleEvent(outputEvent('web', 'hello again\n'))
+		writer.handleEvent(outputEvent('web', 'baz\n'))
+
+		const matches = await writer.searchAll('hello')
+		expect(matches.length).toBe(2)
+
+		const apiMatches = matches.filter(m => m.process === 'api')
+		const webMatches = matches.filter(m => m.process === 'web')
+		expect(apiMatches.length).toBe(1)
+		expect(webMatches.length).toBe(1)
+		expect(apiMatches[0]).toEqual({ process: 'api', line: 0, start: 0, end: 5 })
+		expect(webMatches[0]).toEqual({ process: 'web', line: 0, start: 0, end: 5 })
+		writer.close()
+	})
+
+	test('searchAll returns empty for empty query', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'hello\n'))
+		const matches = await writer.searchAll('')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('searchAll returns empty when no processes have output', async () => {
+		const writer = new LogWriter(dir)
+		const matches = await writer.searchAll('hello')
+		expect(matches).toEqual([])
+		writer.close()
+	})
+
+	test('searchAll is case-insensitive', async () => {
+		const writer = new LogWriter(dir)
+		writer.handleEvent(outputEvent('api', 'Hello World\n'))
+		writer.handleEvent(outputEvent('web', 'HELLO again\n'))
+
+		const matches = await writer.searchAll('hello')
+		expect(matches.length).toBe(2)
+		writer.close()
+	})
+
+	test('createPersistent creates timestamped subdirectory', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+
+		expect(writer.isTemporary).toBe(false)
+		expect(writer.getDirectory()).toContain(baseDir)
+		expect(writer.getDirectory()).not.toBe(baseDir)
+
+		// Session dir exists
+		expect(existsSync(writer.getDirectory())).toBe(true)
+
+		writer.close()
+	})
+
+	test('createPersistent creates latest symlink', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+
+		const latestLink = join(baseDir, 'latest')
+		expect(existsSync(latestLink)).toBe(true)
+		expect(lstatSync(latestLink).isSymbolicLink()).toBe(true)
+		expect(readlinkSync(latestLink)).toBe(writer.getDirectory())
+
+		writer.close()
+	})
+
+	test('createPersistent does not clean up on cleanup', () => {
+		const baseDir = join(dir, 'logs')
+		const writer = LogWriter.createPersistent(baseDir)
+		writer.handleEvent(outputEvent('api', 'test'))
+		const sessionDir = writer.getDirectory()
+
+		writer.cleanup()
+
+		// Session directory should still exist
+		expect(existsSync(sessionDir)).toBe(true)
 	})
 })

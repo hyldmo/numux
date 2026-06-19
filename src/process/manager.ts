@@ -25,6 +25,7 @@ export class ProcessManager {
 	private restartTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private startTimes = new Map<string, number>()
 	private pendingReadyResolvers = new Map<string, () => void>()
+	private readyCaptures = new Map<string, Record<string, string>>()
 	private fileWatcher?: FileWatcher
 
 	constructor(config: ResolvedNumuxConfig) {
@@ -61,9 +62,16 @@ export class ProcessManager {
 		return [...this.states.values()]
 	}
 
-	/** Names in display order (topological) */
+	/** Names in display order (determined by config.sort) */
 	getProcessNames(): string[] {
-		return this.tiers.flat()
+		switch (this.config.sort) {
+			case 'alphabetical':
+				return Object.keys(this.config.processes).sort()
+			case 'topological':
+				return this.tiers.flat()
+			default:
+				return Object.keys(this.config.processes)
+		}
 	}
 
 	async startAll(cols: number, rows: number): Promise<void> {
@@ -71,53 +79,78 @@ export class ProcessManager {
 		this.lastCols = cols
 		this.lastRows = rows
 
-		for (const tier of this.tiers) {
-			const readyPromises: Promise<void>[] = []
+		// Create a ready promise per process — each resolves when that process is ready
+		const readyPromises = new Map<string, Promise<void>>()
+		const readyResolvers = new Map<string, () => void>()
 
-			for (const name of tier) {
-				const proc = this.config.processes[name]
-
-				// Evaluate condition
-				if (proc.condition && !evaluateCondition(proc.condition)) {
-					log(`Skipping ${name}: condition "${proc.condition}" not met`)
-					this.updateStatus(name, 'skipped')
-					continue
-				}
-
-				// Check if any dependency failed or was skipped
-				const deps = proc.dependsOn ?? []
-				const failedDep = deps.find(d => {
-					const s = this.states.get(d)!.status
-					return s === 'failed' || s === 'skipped'
-				})
-
-				if (failedDep) {
-					log(`Skipping ${name}: dependency ${failedDep} failed`)
-					this.updateStatus(name, 'skipped')
-					continue
-				}
-
-				const { promise, resolve } = Promise.withResolvers<void>()
-				readyPromises.push(promise)
-
-				this.pendingReadyResolvers.set(name, resolve)
-				this.createRunner(name, () => {
-					this.pendingReadyResolvers.delete(name)
-					resolve()
-				})
-				this.startProcess(name, cols, rows)
-			}
-
-			// Wait for all processes in this tier to become ready
-			if (readyPromises.length > 0) {
-				await Promise.all(readyPromises)
-			}
+		for (const name of this.tiers.flat()) {
+			const { promise, resolve } = Promise.withResolvers<void>()
+			readyPromises.set(name, promise)
+			readyResolvers.set(name, resolve)
 		}
 
+		// Launch all processes concurrently; each waits only for its declared dependencies
+		const launches = this.tiers.flat().map(async name => {
+			const proc = this.config.processes[name]
+			const resolve = readyResolvers.get(name)!
+
+			// Optional processes start as stopped — resolve immediately so dependents aren't blocked
+			if (proc.optional) {
+				this.updateStatus(name, 'stopped')
+				this.createRunner(name)
+				resolve()
+				return
+			}
+
+			// Wait for declared dependencies only
+			const deps = proc.dependsOn ?? []
+			if (deps.length > 0) {
+				await Promise.all(deps.map(d => readyPromises.get(d)!))
+			}
+
+			if (this.stopping) {
+				resolve()
+				return
+			}
+
+			// Evaluate condition
+			if (proc.condition && !evaluateCondition(proc.condition)) {
+				log(`Skipping ${name}: condition "${proc.condition}" not met`)
+				this.updateStatus(name, 'skipped')
+				resolve()
+				return
+			}
+
+			// Check if any dependency failed or was skipped
+			const failedDep = deps.find(d => {
+				const s = this.states.get(d)!.status
+				return s === 'failed' || s === 'skipped'
+			})
+
+			if (failedDep) {
+				log(`Skipping ${name}: dependency ${failedDep} failed`)
+				this.updateStatus(name, 'skipped')
+				resolve()
+				return
+			}
+
+			this.pendingReadyResolvers.set(name, resolve)
+			this.createRunner(name, () => {
+				this.pendingReadyResolvers.delete(name)
+				resolve()
+			})
+			this.startProcess(name, cols, rows)
+
+			// Wait for this process to become ready before completing
+			await readyPromises.get(name)!
+		})
+
+		await Promise.all(launches)
 		this.setupWatchers()
 	}
 
 	private startProcess(name: string, cols: number, rows: number): void {
+		const { command, env } = this.expandDependencyCaptures(name)
 		const delay = this.config.processes[name].delay
 		if (delay) {
 			log(`[${name}] Delaying start by ${delay}ms`)
@@ -125,12 +158,12 @@ export class ProcessManager {
 				this.restartTimers.delete(name)
 				if (this.stopping) return
 				this.startTimes.set(name, Date.now())
-				this.runners.get(name)!.start(cols, rows)
+				this.runners.get(name)!.start(cols, rows, command, env)
 			}, delay)
 			this.restartTimers.set(name, timer)
 		} else {
 			this.startTimes.set(name, Date.now())
-			this.runners.get(name)!.start(cols, rows)
+			this.runners.get(name)!.start(cols, rows, command, env)
 		}
 	}
 
@@ -149,7 +182,10 @@ export class ProcessManager {
 				}
 				this.scheduleAutoRestart(name, code)
 			},
-			onReady: () => {
+			onReady: captures => {
+				if (captures) {
+					this.readyCaptures.set(name, captures)
+				}
 				if (!readyResolved) {
 					readyResolved = true
 					onInitialReady!()
@@ -163,7 +199,6 @@ export class ProcessManager {
 	private scheduleAutoRestart(name: string, exitCode: number | null): void {
 		if (this.stopping) return
 		const proc = this.config.processes[name]
-		if (proc.persistent === false) return
 		if (exitCode === 0) return
 		// null exitCode means spawn failed — retrying won't help
 		if (exitCode === null) return
@@ -177,9 +212,9 @@ export class ProcessManager {
 
 		const attempt = this.restartAttempts.get(name) ?? 0
 
-		// Enforce maxRestarts limit
-		const maxRestarts = proc.maxRestarts
-		if (maxRestarts !== undefined && attempt >= maxRestarts) {
+		// Enforce maxRestarts limit (defaults to 0 = no restarts)
+		const maxRestarts = proc.maxRestarts ?? 0
+		if (attempt >= maxRestarts) {
 			log(`[${name}] Reached maxRestarts limit (${maxRestarts}), not restarting`)
 			if (maxRestarts > 0) {
 				const encoder = new TextEncoder()
@@ -193,7 +228,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, attempt + 1)
 
 		const encoder = new TextEncoder()
-		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1}${maxRestarts !== undefined ? `/${maxRestarts}` : ''})...\x1b[0m\r\n`
+		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1}${Number.isFinite(maxRestarts) ? `/${maxRestarts}` : ''})...\x1b[0m\r\n`
 		this.emit({ type: 'output', name, data: encoder.encode(msg) })
 
 		const timer = setTimeout(() => {
@@ -221,11 +256,12 @@ export class ProcessManager {
 			this.fileWatcher.watch(name, patterns, cwd, changedFile => {
 				const state = this.states.get(name)
 				if (!state) return
-				// Don't restart processes that are stopped/finished, pending, stopping, or skipped
+				// Don't restart processes that are stopped, pending, stopping, or skipped
+				// Note: 'finished' is intentionally allowed so one-shot processes
+				// (e.g. codegen) are re-run when watched files change.
 				if (
 					state.status === 'pending' ||
 					state.status === 'stopped' ||
-					state.status === 'finished' ||
 					state.status === 'stopping' ||
 					state.status === 'skipped'
 				)
@@ -239,12 +275,61 @@ export class ProcessManager {
 		}
 	}
 
+	/**
+	 * Replace $dep.group references in a process command and env with captured values from dependencies.
+	 * Returns expanded command/env, with undefined fields when no expansion was needed.
+	 */
+	private expandDependencyCaptures(name: string): {
+		command?: string
+		env?: Record<string, string>
+	} {
+		const proc = this.config.processes[name]
+		const deps = proc.dependsOn
+		if (!deps?.length) return {}
+
+		// Collect all available captures keyed by process name
+		const allCaptures = new Map<string, Record<string, string>>()
+		for (const dep of deps) {
+			const captures = this.readyCaptures.get(dep)
+			if (captures) allCaptures.set(dep, captures)
+		}
+		if (allCaptures.size === 0) return {}
+
+		// Build a regex that matches $processName.groupKey for all deps with captures
+		const depNames = [...allCaptures.keys()].map(n => escapeRegExp(n)).join('|')
+		const refPattern = new RegExp(`\\$(${depNames})\\.(\\w+)`, 'g')
+
+		const replacer = (match: string, dep: string, key: string) => {
+			const captures = allCaptures.get(dep)
+			if (captures && key in captures) return captures[key]
+			return match // leave unmatched references as-is
+		}
+
+		let command: string | undefined
+		const expandedCmd = proc.command.replace(refPattern, replacer)
+		if (expandedCmd !== proc.command) command = expandedCmd
+
+		let env: Record<string, string> | undefined
+		if (proc.env) {
+			const expandedEnv: Record<string, string> = {}
+			let hadReplacement = false
+			for (const [k, v] of Object.entries(proc.env)) {
+				const expanded = v.replace(refPattern, replacer)
+				expandedEnv[k] = expanded
+				if (expanded !== v) hadReplacement = true
+			}
+			if (hadReplacement) env = expandedEnv
+		}
+
+		return { command, env }
+	}
+
 	private updateStatus(name: string, status: ProcessStatus): void {
 		const state = this.states.get(name)!
 		state.status = status
 		// Reset backoff counter when a process with readyPattern signals readiness,
-		// meaning it actually stabilized. Processes without readyPattern are immediately
-		// ready on spawn, so we rely on the time-based reset in scheduleAutoRestart instead.
+		// meaning it actually stabilized. Processes without readyPattern become ready
+		// on exit, so we rely on the time-based reset in scheduleAutoRestart instead.
 		if (status === 'ready' && this.config.processes[name].readyPattern) {
 			this.restartAttempts.set(name, 0)
 		}
@@ -268,9 +353,10 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
-		runner.restart(cols, rows)
+		const { command, env } = this.expandDependencyCaptures(name)
+		runner.restart(cols, rows, command, env)
 	}
 
 	/** Stop a single process. No-op if already stopped or not running. */
@@ -323,9 +409,10 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
-		this.runners.get(name)?.restart(cols, rows)
+		const { command, env } = this.expandDependencyCaptures(name)
+		this.runners.get(name)?.restart(cols, rows, command, env)
 	}
 
 	/** Restart all processes. Restarts each runner in-place without dependency re-resolution. */
@@ -497,6 +584,10 @@ export class ProcessManager {
 			await Promise.allSettled(tier.map(name => this.runners.get(name)?.stop()).filter(Boolean))
 		}
 	}
+}
+
+function escapeRegExp(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 const FALSY_VALUES = new Set(['', '0', 'false', 'no', 'off'])

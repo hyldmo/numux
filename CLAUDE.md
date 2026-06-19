@@ -34,17 +34,30 @@ src/
 
 ## Key behavior
 
-- Panes are **readonly by default** — keyboard input is not forwarded to processes
-- Arrow keys (Up/Down) navigate between tabs, PageUp/PageDown scroll by page, Home/End to top/bottom
+- Panes are **readonly by default** — keyboard input is not forwarded to processes. Press `Enter` to enter **input mode** (forwards keystrokes to the process for y/n prompts etc.), `Escape` to exit
+- Left/Right arrows cycle tabs, Up/Down arrows scroll by line, Shift+Up/Down scroll to top/bottom, PageUp/PageDown scroll by page, Home/End to top/bottom
 - Mouse drag selects text and auto-copies to clipboard (OSC 52); `Y` key also copies selection
-- Keybinding hints are shown in the status bar; config lives in `src/ui/keybindings.ts`
+- `T` toggles an `HH:mm:ss.SSS` timestamp gutter in TUI mode; also enabled via `timestamps: true` config or `--timestamps` flag. Accepts a format string (e.g. `timestamps: "HH:mm:ss"`) with tokens: `YYYY`, `MM`, `DD`, `HH`, `hh`, `mm`, `ss`, `SSS`, `A`
+- Compact keybinding hints in the status bar; `H` or `?` opens a full help overlay. Config lives in `src/ui/keybindings.ts`
 - Set `interactive: true` on processes that need stdin (REPLs, shells)
-- Non-interactive panes hide the terminal cursor
+- Non-interactive panes hide the terminal cursor (shown during input mode)
 - Set `errorMatcher: true` to detect ANSI red output, or a regex string to match custom patterns — shows a red indicator on the tab while the process keeps running
+- `readyPattern` accepts `string` (simple match) or `RegExp` (match + capture groups). RegExp captures are expanded into dependent `command` and `env` values via `$dep.group` syntax (e.g. `$odoo.url`)
+- `optional: true` makes a process visible as a tab but not auto-started (starts in `stopped` state). Alt+S starts it manually. Unlike `condition`, optional does not cascade to dependents
+- `platform` restricts a process to specific OS(es) (e.g. `'darwin'`, `'linux'`). Non-matching processes are removed; their dependents still start with the dependency stripped (unlike `condition` which cascades)
+- TUI theme: `theme: 'light' | 'dark' | 'auto'` config or `--theme` flag. `'auto'` (default) detects via OSC 11 → `COLORFGBG` → dark. Resolved theme threads through all UI components (`src/ui/app.ts:start()`); palettes live in `src/utils/theme.ts`
+
+## Commits
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) format: `type(scope): subject`. Enforced by commitlint via a git hook (`.githooks/commit-msg`) and in CI.
 
 ## CI
 
-Runs on push to main and PRs: typecheck, lint, test.
+Runs on PRs: commitlint, typecheck, lint, test.
+
+## Patches
+
+`patches/@opentui%2Fcore@0.4.1.patch` (bun patch) flips the renderer's per-frame `force` flag to always-`true`, so every native `lib.render` is a **full repaint** instead of an incremental cell-diff. OpenTUI's diff emitter desyncs from the host terminal's cursor (ambiguous-width glyphs / autowrap / emulator quirks) and never self-corrects — pane output smears into the sidebar, the scrollbar drops. The diff is the only thing that desyncs; forcing full repaints (the path resize already used) makes the corruption impossible. Composition stays dirty-tracked, so the only cost is more stdout bytes during active output (bounded by `targetFps`, 30). It's a band-aid for an upstream bug — do not revert to "restore the diff optimization" without confirming the drift is fixed in `@opentui/core`. The patch fails loud on upgrade (hashed bundle filename); reapply via `bun patch @opentui/core`.
 
 ## Hooks
 

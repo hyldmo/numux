@@ -1,9 +1,10 @@
-import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
-import { isValidColor } from '../utils/color'
+import type { ResolvedNumuxConfig, ResolvedProcessConfig, SortOrder } from '../types'
+import { type Color, isValidColor } from '../utils/color'
+import type { ThemePref } from '../utils/theme'
 
 export type ValidationWarning = { process: string; message: string }
 
-export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): ResolvedNumuxConfig {
+export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): ResolvedNumuxConfig {
 	if (!raw || typeof raw !== 'object') {
 		throw new Error('Config must be an object')
 	}
@@ -22,7 +23,15 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 	// Extract global options
 	const globalCwd = typeof config.cwd === 'string' ? config.cwd : undefined
+	const globalShowCommand = typeof config.showCommand === 'boolean' ? config.showCommand : undefined
 	const globalEnvFile = validateEnvFile(config.envFile)
+	const globalMaxRestarts =
+		typeof config.maxRestarts === 'number' && config.maxRestarts >= 0 ? config.maxRestarts : undefined
+	const globalReadyTimeout =
+		typeof config.readyTimeout === 'number' && config.readyTimeout > 0 ? config.readyTimeout : undefined
+	const globalStopSignal = validateStopSignal(config.stopSignal)
+	const globalErrorMatcher = validateErrorMatcher('(global)', config.errorMatcher)
+	const globalWatch = validateStringOrStringArray(config.watch)
 	let globalEnv: Record<string, string> | undefined
 	if (config.env && typeof config.env === 'object') {
 		for (const [k, v] of Object.entries(config.env as Record<string, unknown>)) {
@@ -33,7 +42,17 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		globalEnv = config.env as Record<string, string>
 	}
 
-	const validated: Record<string, NumuxProcessConfig> = {}
+	const sort = validateSort(config.sort)
+	const prefix = config.prefix === true ? true : undefined
+	const timestamps =
+		config.timestamps === true ? true : typeof config.timestamps === 'string' ? config.timestamps : undefined
+	const killOthers = config.killOthers === true ? true : undefined
+	const killOthersOnFail = config.killOthersOnFail === true ? true : undefined
+	const noWatch = config.noWatch === true ? true : undefined
+	const logDir = typeof config.logDir === 'string' && config.logDir.trim() ? config.logDir.trim() : undefined
+	const theme = validateTheme(config.theme)
+
+	const validated: Record<string, ResolvedProcessConfig> = {}
 
 	for (const name of names) {
 		let proc = processes[name]
@@ -55,8 +74,9 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 
 		// Validate dependsOn references
 		if (p.dependsOn !== undefined) {
+			if (typeof p.dependsOn === 'string') p.dependsOn = [p.dependsOn]
 			if (!Array.isArray(p.dependsOn)) {
-				throw new Error(`Process "${name}".dependsOn must be an array`)
+				throw new Error(`Process "${name}".dependsOn must be a string or array`)
 			}
 			for (const dep of p.dependsOn) {
 				if (typeof dep !== 'string') {
@@ -88,15 +108,21 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 			}
 		}
 
-		const persistent = typeof p.persistent === 'boolean' ? p.persistent : true
-		const readyPattern = typeof p.readyPattern === 'string' ? p.readyPattern : undefined
+		const readyPattern =
+			p.readyPattern instanceof RegExp
+				? p.readyPattern
+				: typeof p.readyPattern === 'string'
+					? p.readyPattern
+					: undefined
 
-		// Warn when readyPattern is set on non-persistent processes (it's ignored at runtime)
-		if (readyPattern && !persistent) {
-			warnings?.push({
-				process: name,
-				message: 'readyPattern is ignored on non-persistent processes (readiness is determined by exit code)'
-			})
+		if (typeof readyPattern === 'string') {
+			try {
+				new RegExp(readyPattern)
+			} catch (err) {
+				throw new Error(`Process "${name}".readyPattern is not a valid regex: "${readyPattern}"`, {
+					cause: err
+				})
+			}
 		}
 
 		// Validate env values are strings
@@ -112,27 +138,65 @@ export function validateConfig(raw: unknown, warnings?: ValidationWarning[]): Re
 		const processEnv = p.env && typeof p.env === 'object' ? (p.env as Record<string, string>) : undefined
 		const processEnvFile = validateEnvFile(p.envFile)
 
+		const showCommand = typeof p.showCommand === 'boolean' ? p.showCommand : (globalShowCommand ?? true)
+
+		const platform = validatePlatform(name, p.platform)
+
+		const processMaxRestarts = typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined
+		const processReadyTimeout =
+			typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined
+		const processStopSignal = validateStopSignal(p.stopSignal)
+		const processErrorMatcher = validateErrorMatcher(name, p.errorMatcher)
+		const processWatch = validateStringOrStringArray(p.watch)
+
 		validated[name] = {
 			command: p.command,
+			...(p.optional === true ? { optional: true } : {}),
 			cwd: processCwd ?? globalCwd,
 			env: globalEnv || processEnv ? { ...globalEnv, ...processEnv } : undefined,
 			envFile: processEnvFile ?? globalEnvFile,
 			dependsOn: Array.isArray(p.dependsOn) ? (p.dependsOn as string[]) : undefined,
 			readyPattern,
-			persistent,
-			maxRestarts: typeof p.maxRestarts === 'number' && p.maxRestarts >= 0 ? p.maxRestarts : undefined,
-			readyTimeout: typeof p.readyTimeout === 'number' && p.readyTimeout > 0 ? p.readyTimeout : undefined,
+			maxRestarts: processMaxRestarts ?? globalMaxRestarts ?? 0,
+			readyTimeout: processReadyTimeout ?? globalReadyTimeout,
 			delay: typeof p.delay === 'number' && p.delay > 0 ? p.delay : undefined,
 			condition: typeof p.condition === 'string' && p.condition.trim() ? p.condition.trim() : undefined,
-			stopSignal: validateStopSignal(p.stopSignal),
-			color: typeof p.color === 'string' ? p.color : Array.isArray(p.color) ? (p.color as string[]) : undefined,
-			watch: validateStringOrStringArray(p.watch),
+			platform,
+			stopSignal: processStopSignal ?? globalStopSignal,
+			color:
+				typeof p.color === 'string'
+					? (p.color as Color)
+					: Array.isArray(p.color)
+						? (p.color as Color[])
+						: undefined,
+			watch: processWatch ?? globalWatch,
 			interactive: typeof p.interactive === 'boolean' ? p.interactive : false,
-			errorMatcher: validateErrorMatcher(name, p.errorMatcher)
+			errorMatcher: processErrorMatcher ?? globalErrorMatcher,
+			showCommand
 		}
 	}
 
-	return { processes: validated }
+	return {
+		...(sort ? { sort } : {}),
+		...(prefix ? { prefix } : {}),
+		...(timestamps ? { timestamps } : {}),
+		...(killOthers ? { killOthers } : {}),
+		...(killOthersOnFail ? { killOthersOnFail } : {}),
+		...(noWatch ? { noWatch } : {}),
+		...(logDir ? { logDir } : {}),
+		...(theme ? { theme } : {}),
+		processes: validated
+	}
+}
+
+const VALID_THEME_VALUES = new Set<ThemePref>(['light', 'dark', 'auto'])
+
+function validateTheme(value: unknown): ThemePref | undefined {
+	if (value === undefined) return undefined
+	if (typeof value !== 'string' || !VALID_THEME_VALUES.has(value as ThemePref)) {
+		throw new Error(`theme must be one of: light, dark, auto. Got "${String(value)}"`)
+	}
+	return value as ThemePref
 }
 
 function validateStringOrStringArray(value: unknown): string | string[] | undefined {
@@ -160,6 +224,34 @@ function validateErrorMatcher(name: string, value: unknown): boolean | string | 
 		throw new Error(`Process "${name}".errorMatcher must be true or a regex string`)
 	}
 	return undefined
+}
+
+const VALID_SORT_VALUES = new Set(['config', 'alphabetical', 'topological', 'status'])
+
+function validateSort(value: unknown): SortOrder | undefined {
+	if (typeof value === 'string') {
+		if (!VALID_SORT_VALUES.has(value)) {
+			throw new Error(`sort must be one of: ${[...VALID_SORT_VALUES].join(', ')}. Got "${value}"`)
+		}
+		return value as SortOrder
+	}
+	return undefined
+}
+
+const VALID_PLATFORMS = new Set(['aix', 'darwin', 'freebsd', 'linux', 'openbsd', 'sunos', 'win32'])
+
+function validatePlatform(name: string, value: unknown): string | string[] | undefined {
+	const arr = validateStringOrStringArray(value)
+	if (arr === undefined) return undefined
+	const values = typeof arr === 'string' ? [arr] : arr
+	for (const v of values) {
+		if (!VALID_PLATFORMS.has(v)) {
+			throw new Error(
+				`Process "${name}".platform "${v}" is not valid. Must be one of: ${[...VALID_PLATFORMS].join(', ')}`
+			)
+		}
+	}
+	return arr
 }
 
 const VALID_STOP_SIGNALS = new Set(['SIGTERM', 'SIGINT', 'SIGHUP'])

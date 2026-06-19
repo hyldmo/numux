@@ -1,13 +1,19 @@
 import { BoxRenderable, type CliRenderer, createCliRenderer } from '@opentui/core'
 import type { ConfigWatcher } from '../config/config-watcher'
 import type { ProcessManager } from '../process/manager'
-import type { NumuxProcessConfig, ResolvedNumuxConfig } from '../types'
+import type { KeyEvent, ResolvedNumuxConfig, ResolvedProcessConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
+import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
+import { finalizeShutdown } from '../utils/shutdown'
+import { DARK_THEME, resolveTheme, type Theme } from '../utils/theme'
+import { HelpOverlay } from './help-overlay'
 import { SHORTCUTS } from './keybindings'
-import { Pane, type SearchMatch } from './pane'
+import { Pane } from './pane'
+import { SearchController } from './search'
 import { StatusBar } from './status-bar'
 import { TabBar } from './tabs'
+import { openLink } from './url-handler'
 
 export class App {
 	private renderer!: CliRenderer
@@ -15,7 +21,10 @@ export class App {
 	private panes = new Map<string, Pane>()
 	private tabBar!: TabBar
 	private statusBar!: StatusBar
+	private helpOverlay!: HelpOverlay
+	private search!: SearchController
 	private activePane: string | null = null
+	private inputMode = false
 	private destroyed = false
 	private names: string[]
 	private termCols = 80
@@ -25,27 +34,30 @@ export class App {
 
 	private config: ResolvedNumuxConfig
 	private configWatcher?: ConfigWatcher
+	private logWriter: LogWriter
+	private theme: Theme = DARK_THEME
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
-	private searchTimer: ReturnType<typeof setTimeout> | null = null
-
-	// Search state
-	private searchMode = false
-	private searchQuery = ''
-	private searchMatches: SearchMatch[] = []
-	private searchIndex = -1
 
 	// Input-waiting detection for interactive processes
 	private inputWaitTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	private awaitingInput = new Set<string>()
 
-	constructor(manager: ProcessManager, config: ResolvedNumuxConfig) {
+	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, logWriter: LogWriter) {
 		this.manager = manager
 		this.config = config
+		this.logWriter = logWriter
 		this.names = manager.getProcessNames()
 	}
 
 	async start(): Promise<void> {
+		// Resolve theme before the renderer takes over stdin (OSC 11 needs raw stdin)
+		log(
+			`theme detect: pref=${this.config.theme ?? 'auto'} stdin.isTTY=${process.stdin.isTTY} stdout.isTTY=${process.stdout.isTTY} COLORFGBG=${process.env.COLORFGBG ?? '(unset)'}`
+		)
+		this.theme = await resolveTheme(this.config.theme)
+		log(`theme resolved: ${this.theme.mode}`)
+
 		this.renderer = await createCliRenderer({
 			exitOnCtrlC: false,
 			useMouse: true,
@@ -69,8 +81,8 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		const processHexColors = buildProcessHexColorMap(this.names, this.config)
-		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
+		const processHexColors = buildProcessHexColorMap(this.names, this.config, this.theme.palette)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.theme, this.config.sort === 'status')
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -86,7 +98,8 @@ export class App {
 			width: this.sidebarWidth,
 			height: '100%',
 			border: ['right'],
-			borderColor: '#444'
+			borderColor: this.theme.sidebarBorder,
+			backgroundColor: this.theme.sidebarBg
 		})
 		sidebar.add(this.tabBar.renderable)
 
@@ -97,13 +110,25 @@ export class App {
 			border: false
 		})
 
+		// Status bar
+		this.statusBar = new StatusBar(this.renderer, this.theme)
+
+		// Help overlay (hidden by default)
+		this.helpOverlay = new HelpOverlay(this.renderer, this.theme)
+
+		// Search controller
+		this.search = new SearchController({
+			logWriter: this.logWriter,
+			statusBar: this.statusBar,
+			tabBar: this.tabBar,
+			getActivePane: () => this.activePane,
+			getPane: name => this.panes.get(name)
+		})
+
 		// Create a pane per process
 		for (const name of this.names) {
 			this.createPane(name)
 		}
-
-		// Status bar (only visible during search)
-		this.statusBar = new StatusBar(this.renderer)
 
 		// Assemble layout
 		contentRow.add(sidebar)
@@ -111,6 +136,7 @@ export class App {
 		layout.add(contentRow)
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
+		this.renderer.root.add(this.helpOverlay.renderable)
 
 		// Wire tab events (mouse clicks)
 		this.tabBar.onSelect((_index, name) => this.switchPane(name))
@@ -156,134 +182,197 @@ export class App {
 		})
 
 		// Global keyboard handler
-		this.renderer.keyInput.on(
-			'keypress',
-			(key: {
-				ctrl: boolean
-				shift: boolean
-				meta: boolean
-				super?: boolean
-				name: string
-				sequence: string
-			}) => {
-				log(key)
+		this.renderer.keyInput.on('keypress', (key: KeyEvent) => {
+			log(key)
 
-				// Cmd+C: copy selection (macOS, requires kitty keyboard protocol)
-				if (key.super && key.name === 'c') {
-					this.copySelection()
+			// Ctrl+C: quit (always works, except in input mode where it goes to process)
+			if (key.ctrl && key.name === 'c') {
+				if (this.helpOverlay.isVisible) {
+					this.helpOverlay.hide()
 					return
 				}
-
-				// Ctrl+C: quit (always works)
-				if (key.ctrl && key.name === 'c') {
-					if (this.searchMode) {
-						this.exitSearch()
-						return
-					}
-					this.shutdown().then(() => {
-						process.exit(this.hasFailures() ? 1 : 0)
-					})
+				if (this.inputMode) {
+					this.exitInputMode()
 					return
 				}
-
-				// Search mode input handling
-				if (this.searchMode) {
-					this.handleSearchInput(key)
+				if (this.search.isActive) {
+					this.search.exit()
 					return
 				}
+				this.shutdown().then(() => {
+					finalizeShutdown(this.logWriter, this.hasFailures() ? 1 : 0)
+				})
+				return
+			}
 
-				if (!this.activePane) return
+			// Help overlay: ? toggles, Esc closes
+			if (this.helpOverlay.isVisible) {
+				if (key.name === 'escape' || key.sequence === '?' || key.name === 'h') {
+					this.helpOverlay.hide()
+				}
+				return
+			}
 
-				const isInteractive = this.config.processes[this.activePane]?.interactive === true
+			// Search mode input handling
+			if (this.search.isActive) {
+				this.search.handleInput(key)
+				return
+			}
 
-				// Non-interactive panes: plain keys act as shortcuts
-				if (!isInteractive) {
-					const name = key.name.toLowerCase()
-
-					if (key.shift && name === SHORTCUTS.restartAll.key) {
-						this.manager.restartAll(this.termCols, this.termRows)
-						return
-					}
-
-					if (name === SHORTCUTS.copy.key) {
-						this.copySelection()
-						return
-					}
-
-					if (name === SHORTCUTS.search.key) {
-						this.enterSearch()
-						return
-					}
-
-					if (name === SHORTCUTS.restart.key) {
-						this.manager.restart(this.activePane, this.termCols, this.termRows)
-						return
-					}
-
-					if (name === SHORTCUTS.stopStart.key) {
-						const state = this.manager.getState(this.activePane)
-						if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
-							this.manager.start(this.activePane, this.termCols, this.termRows)
-						} else {
-							this.manager.stop(this.activePane)
-						}
-						return
-					}
-
-					if (name === SHORTCUTS.clear.key) {
-						this.panes.get(this.activePane)?.clear()
-						return
-					}
-
-					// 1-9: jump to tab (uses display order from tab bar)
-					const num = Number.parseInt(name, 10)
-					if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
-						this.tabBar.setSelectedIndex(num - 1)
-						this.switchPane(this.tabBar.getNameAtIndex(num - 1))
-						return
-					}
-
-					// Left/Right: cycle tabs
-					if (name === 'left' || name === 'right') {
-						const current = this.tabBar.getSelectedIndex()
-						const count = this.tabBar.count
-						const next = name === 'right' ? (current + 1) % count : (current - 1 + count) % count
-						this.tabBar.setSelectedIndex(next)
-						this.switchPane(this.tabBar.getNameAtIndex(next))
-						return
-					}
-
-					// PageUp/PageDown: scroll by page
-					if (name === 'pageup' || name === 'pagedown') {
-						const pane = this.panes.get(this.activePane)
-						const delta = this.termRows - 2
-						pane?.scrollBy(name === 'pageup' ? -delta : delta)
-						return
-					}
-
-					// Home/End: scroll to top/bottom
-					if (name === 'home') {
-						this.panes.get(this.activePane)?.scrollToTop()
-						return
-					}
-					if (name === 'end') {
-						this.panes.get(this.activePane)?.scrollToBottom()
-						return
-					}
+			// Input mode: forward keys to process, Escape exits
+			if (this.inputMode && this.activePane) {
+				if (key.name === 'escape') {
+					this.exitInputMode()
 					return
 				}
-
-				// Forward all other input to the active process (interactive mode)
 				if (key.sequence) {
 					this.manager.write(this.activePane, key.sequence)
 				}
+				return
 			}
-		)
 
-		// Show first pane and focus sidebar for keyboard navigation
+			if (!this.activePane) return
+
+			const isInteractive = this.config.processes[this.activePane]?.interactive === true
+
+			// Non-interactive panes: plain keys act as shortcuts
+			if (!isInteractive) {
+				const name = key.name.toLowerCase()
+
+				// ?/H shows help overlay
+				if (key.sequence === '?' || name === 'h') {
+					this.helpOverlay.toggle()
+					return
+				}
+
+				// Enter: enter input mode
+				if (name === 'return') {
+					this.enterInputMode()
+					return
+				}
+
+				if (key.shift && name === SHORTCUTS.scrollToBottom.key) {
+					this.panes.get(this.activePane)?.scrollToBottom()
+					return
+				}
+
+				if (name === SHORTCUTS.scrollToTop.key) {
+					this.panes.get(this.activePane)?.scrollToTop()
+					return
+				}
+
+				if (key.shift && name === SHORTCUTS.restartAll.key) {
+					this.manager.restartAll(this.termCols, this.termRows)
+					return
+				}
+
+				if (name === SHORTCUTS.copy.key) {
+					this.copyAllText()
+					return
+				}
+
+				if (name === SHORTCUTS.search.key) {
+					this.search.enter()
+					return
+				}
+
+				if (name === SHORTCUTS.restart.key) {
+					this.manager.restart(this.activePane, this.termCols, this.termRows)
+					return
+				}
+
+				if (name === SHORTCUTS.stopStart.key) {
+					const state = this.manager.getState(this.activePane)
+					if (state?.status === 'stopped' || state?.status === 'finished' || state?.status === 'failed') {
+						this.manager.start(this.activePane, this.termCols, this.termRows)
+					} else {
+						this.manager.stop(this.activePane)
+					}
+					return
+				}
+
+				if (name === SHORTCUTS.clear.key) {
+					this.panes.get(this.activePane)?.clear()
+					this.logWriter.markCopyStart(this.activePane)
+					return
+				}
+
+				if (name === SHORTCUTS.timestamps.key) {
+					// Toggle timestamps on all panes (use config format or default)
+					const firstPane = this.panes.values().next().value
+					if (firstPane?.timestampsEnabled) {
+						for (const pane of this.panes.values()) pane.setTimestamps(false)
+					} else {
+						const fmt: boolean | string = this.config.timestamps ?? true
+						for (const pane of this.panes.values()) pane.setTimestamps(fmt)
+					}
+					return
+				}
+
+				if (name === SHORTCUTS.openLogs.key) {
+					this.openLogDirectory()
+					return
+				}
+
+				// 1-9: jump to tab (uses display order from tab bar)
+				const num = Number.parseInt(name, 10)
+				if (num >= 1 && num <= 9 && num <= this.tabBar.count) {
+					this.tabBar.setSelectedIndex(num - 1)
+					this.switchPane(this.tabBar.getNameAtIndex(num - 1))
+					return
+				}
+
+				// Left/Right: cycle tabs
+				if (name === 'left' || name === 'right') {
+					const current = this.tabBar.getSelectedIndex()
+					const count = this.tabBar.count
+					const next = name === 'right' ? (current + 1) % count : (current - 1 + count) % count
+					this.tabBar.setSelectedIndex(next)
+					this.switchPane(this.tabBar.getNameAtIndex(next))
+					return
+				}
+
+				// Up/Down: scroll by line, Shift+Up/Down: scroll to top/bottom
+				if (name === 'up' || name === 'down') {
+					const pane = this.panes.get(this.activePane)
+					if (key.shift) {
+						name === 'up' ? pane?.scrollToTop() : pane?.scrollToBottom()
+					} else {
+						pane?.scrollBy(name === 'up' ? -1 : 1)
+					}
+					return
+				}
+
+				// PageUp/PageDown: scroll by page
+				if (name === 'pageup' || name === 'pagedown') {
+					const pane = this.panes.get(this.activePane)
+					const delta = this.termRows - 2
+					pane?.scrollBy(name === 'pageup' ? -delta : delta)
+					return
+				}
+
+				// Home/End: scroll to top/bottom
+				if (name === 'home') {
+					this.panes.get(this.activePane)?.scrollToTop()
+					return
+				}
+				if (name === 'end') {
+					this.panes.get(this.activePane)?.scrollToBottom()
+					return
+				}
+				return
+			}
+
+			// Forward all other input to the active process (interactive mode)
+			if (key.sequence) {
+				this.manager.write(this.activePane, key.sequence)
+			}
+		})
+
+		// Show first pane. Tab bar is not focused — keyboard navigation (1-9, Left/Right)
+		// is handled by the global keypress handler so Up/Down can scroll the active pane.
 		if (this.names.length > 0) {
 			this.switchPane(this.names[0])
-			this.tabBar.focus()
 		}
 
 		// Start all processes
@@ -299,29 +388,66 @@ export class App {
 		this.config = config
 	}
 
+	private enterInputMode(): void {
+		this.inputMode = true
+		this.statusBar.setInputMode(true)
+		// Show cursor in active pane while in input mode
+		if (this.activePane) {
+			const pane = this.panes.get(this.activePane)
+			if (pane) pane.terminal.showCursor = true
+		}
+	}
+
+	private exitInputMode(): void {
+		this.inputMode = false
+		this.statusBar.setInputMode(false)
+		// Hide cursor again unless process is natively interactive
+		if (this.activePane) {
+			const isInteractive = this.config.processes[this.activePane]?.interactive === true
+			if (!isInteractive) {
+				const pane = this.panes.get(this.activePane)
+				if (pane) pane.terminal.showCursor = false
+			}
+		}
+	}
+
 	private switchPane(name: string): void {
 		if (this.activePane === name) return
-		// Clear search when switching panes
-		if (this.searchMode) {
-			this.exitSearch()
+		// Exit input mode on pane switch
+		if (this.inputMode) {
+			this.exitInputMode()
+		}
+		// In single-pane search mode, exit search on pane switch
+		if (this.search.isActive && !this.search.isAllMode) {
+			this.search.exit()
 		}
 		if (this.activePane) {
+			this.panes.get(this.activePane)?.clearHighlights()
 			this.panes.get(this.activePane)?.hide()
 		}
 		this.activePane = name
 		this.panes.get(name)?.show()
+		// In all-process search mode, re-highlight for the new pane
+		this.search.onPaneSwitch()
 	}
 
 	private createPane(name: string): Pane {
 		const interactive = this.config.processes[name]?.interactive === true
-		const pane = new Pane(this.renderer, name, this.termCols, this.termRows, interactive)
+		const pane = new Pane(this.renderer, name, this.termCols, this.termRows, interactive, this.theme)
+		if (this.config.timestamps) {
+			pane.setTimestamps(this.config.timestamps)
+		}
 		pane.onCopy(text => {
 			this.copyToClipboard(text)
 			this.statusBar.showTemporaryMessage('Copied!')
 		})
+		pane.onLinkClick(link => {
+			openLink(link)
+			this.statusBar.showTemporaryMessage(`Opening ${link.url}`)
+		})
 		pane.onScroll(() => {
-			if (this.searchMode && this.searchMatches.length > 0 && this.activePane === name) {
-				this.updateSearchHighlights()
+			if (this.search.isActive && this.search.currentMatches.length > 0 && this.activePane === name) {
+				this.search.refreshHighlights()
 			}
 		})
 		this.panes.set(name, pane)
@@ -329,7 +455,7 @@ export class App {
 		return pane
 	}
 
-	private addProcessPane(name: string, procConfig: NumuxProcessConfig): void {
+	private addProcessPane(name: string, procConfig: ResolvedProcessConfig): void {
 		this.names.push(name)
 		this.createPane(name)
 
@@ -424,130 +550,42 @@ export class App {
 					: null
 		if (cmd) {
 			const [bin, ...args] = cmd.split(' ')
-			const proc = Bun.spawn([bin, ...args], { stdin: 'pipe' })
-			proc.stdin.write(text)
-			proc.stdin.end()
+			try {
+				const proc = Bun.spawn([bin, ...args], { stdin: 'pipe' })
+				proc.stdin.write(text)
+				proc.stdin.end()
+				proc.exited.catch(() => {
+					/* ignore */
+				})
+			} catch {
+				// Native clipboard tool not available, OSC 52 is the fallback
+			}
 		}
 	}
 
-	/** Copy selected text to clipboard. Returns true if there was a selection to copy. */
-	private copySelection(): boolean {
-		const selection = this.renderer.getSelection()
-		if (!selection?.isActive) return false
-		const text = selection.getSelectedText()
-		if (!text) return false
+	/** Open the log directory in the system file manager. */
+	private openLogDirectory(): void {
+		const dir = this.logWriter.getDirectory()
+		const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
+		try {
+			Bun.spawn([cmd, dir], { stdout: 'ignore', stderr: 'ignore' })
+			this.statusBar.showTemporaryMessage(`Opening ${dir}`)
+		} catch {
+			this.statusBar.showTemporaryMessage('Could not open log directory')
+		}
+	}
+
+	/** Copy all text in the active pane to clipboard (unwrapped, from log file). */
+	private copyAllText(): void {
+		if (!this.activePane) return
+
+		const text = this.logWriter.readLog(this.activePane)
+		if (!text) {
+			this.statusBar.showTemporaryMessage('No output to copy')
+			return
+		}
 		this.copyToClipboard(text)
-		this.renderer.clearSelection()
-		this.statusBar.showTemporaryMessage('Copied!')
-		return true
-	}
-
-	private enterSearch(): void {
-		this.searchMode = true
-		this.searchQuery = ''
-		this.searchMatches = []
-		this.searchIndex = -1
-		this.statusBar.setSearchMode(true)
-	}
-
-	private exitSearch(): void {
-		this.searchMode = false
-		this.searchQuery = ''
-		this.searchMatches = []
-		this.searchIndex = -1
-		if (this.searchTimer) {
-			clearTimeout(this.searchTimer)
-			this.searchTimer = null
-		}
-		if (this.activePane) {
-			this.panes.get(this.activePane)?.clearHighlights()
-		}
-		this.statusBar.setSearchMode(false)
-	}
-
-	private handleSearchInput(key: {
-		ctrl: boolean
-		shift: boolean
-		meta: boolean
-		name: string
-		sequence: string
-	}): void {
-		if (key.name === 'escape') {
-			this.exitSearch()
-			return
-		}
-
-		if (key.name === 'return') {
-			// Enter: next match, Shift+Enter: previous match
-			if (this.searchMatches.length === 0) return
-			if (key.shift) {
-				this.searchIndex = (this.searchIndex - 1 + this.searchMatches.length) % this.searchMatches.length
-			} else {
-				this.searchIndex = (this.searchIndex + 1) % this.searchMatches.length
-			}
-			this.scrollToCurrentMatch()
-			this.updateSearchHighlights()
-			return
-		}
-
-		if (key.name === 'backspace') {
-			if (this.searchQuery.length > 0) {
-				this.searchQuery = this.searchQuery.slice(0, -1)
-				this.scheduleSearch()
-			}
-			return
-		}
-
-		// Printable character
-		if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
-			this.searchQuery += key.sequence
-			this.scheduleSearch()
-		}
-	}
-
-	private scheduleSearch(): void {
-		// Update status bar immediately for responsive feedback
-		this.statusBar.setSearchMode(true, this.searchQuery, this.searchMatches.length, this.searchIndex)
-		if (this.searchTimer) clearTimeout(this.searchTimer)
-		this.searchTimer = setTimeout(() => {
-			this.searchTimer = null
-			this.runSearch()
-		}, 100)
-	}
-
-	private runSearch(): void {
-		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
-
-		this.searchMatches = pane.search(this.searchQuery)
-		this.searchIndex = this.searchMatches.length > 0 ? 0 : -1
-
-		this.updateSearchHighlights()
-		if (this.searchIndex >= 0) {
-			this.scrollToCurrentMatch()
-		}
-	}
-
-	private updateSearchHighlights(): void {
-		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
-
-		if (this.searchMatches.length > 0) {
-			pane.setHighlights(this.searchMatches, this.searchIndex)
-		} else {
-			pane.clearHighlights()
-		}
-		this.statusBar.setSearchMode(true, this.searchQuery, this.searchMatches.length, this.searchIndex)
-	}
-
-	private scrollToCurrentMatch(): void {
-		if (!this.activePane || this.searchIndex < 0) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
-		const match = this.searchMatches[this.searchIndex]
-		pane.scrollToLine(match.line)
+		this.statusBar.showTemporaryMessage('Copied all output!')
 	}
 
 	async shutdown(): Promise<void> {
@@ -558,10 +596,7 @@ export class App {
 			clearTimeout(this.resizeTimer)
 			this.resizeTimer = null
 		}
-		if (this.searchTimer) {
-			clearTimeout(this.searchTimer)
-			this.searchTimer = null
-		}
+		this.search.dispose()
 		// Clear all input-waiting timers
 		for (const timer of this.inputWaitTimers.values()) {
 			clearTimeout(timer)

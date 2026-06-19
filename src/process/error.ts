@@ -1,4 +1,4 @@
-import type { NumuxProcessConfig } from '../types'
+import type { ResolvedProcessConfig } from '../types'
 import { stripAnsi } from '../utils/color'
 
 /** Keep the last 64 KB of output for pattern matching */
@@ -21,7 +21,7 @@ function hasAnsiRed(text: string): boolean {
  * Determines when a process has emitted error output.
  * Returns null when errorMatcher is not configured.
  */
-export function createErrorChecker(config: NumuxProcessConfig) {
+export function createErrorChecker(config: ResolvedProcessConfig) {
 	const matcher = config.errorMatcher
 	if (!matcher) return null
 

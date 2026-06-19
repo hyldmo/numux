@@ -18,6 +18,9 @@ function interpolateValue(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value.map(interpolateValue)
 	}
+	if (value instanceof RegExp) {
+		return value
+	}
 	if (value && typeof value === 'object') {
 		const result: Record<string, unknown> = {}
 		for (const [k, v] of Object.entries(value)) {

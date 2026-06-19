@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import type { NumuxProcessConfig, ProcessStatus } from '../types'
+import type { ProcessStatus, ResolvedProcessConfig } from '../types'
 import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
 import { createErrorChecker } from './error'
@@ -9,13 +9,13 @@ export type RunnerEventHandler = {
 	onStatus: (status: ProcessStatus) => void
 	onOutput: (data: Uint8Array) => void
 	onExit: (code: number | null) => void
-	onReady: () => void
+	onReady: (captures?: Record<string, string> | null) => void
 	onError: () => void
 }
 
 export class ProcessRunner {
 	readonly name: string
-	private config: NumuxProcessConfig
+	private config: ResolvedProcessConfig
 	private handler: RunnerEventHandler
 	private proc: ReturnType<typeof Bun.spawn> | null = null
 	private readiness: ReturnType<typeof createReadinessChecker>
@@ -28,8 +28,10 @@ export class ProcessRunner {
 	private readyTimer: ReturnType<typeof setTimeout> | null = null
 	private restarting = false
 	private readyTimedOut = false
+	private commandOverride: string | undefined
+	private envOverride: Record<string, string> | undefined
 
-	constructor(name: string, config: NumuxProcessConfig, handler: RunnerEventHandler) {
+	constructor(name: string, config: ResolvedProcessConfig, handler: RunnerEventHandler) {
 		this.name = name
 		this.config = config
 		this.handler = handler
@@ -45,10 +47,13 @@ export class ProcessRunner {
 		return this.config.stopSignal ?? 'SIGTERM'
 	}
 
-	start(cols: number, rows: number): void {
+	start(cols: number, rows: number, commandOverride?: string, envOverride?: Record<string, string>): void {
+		if (commandOverride !== undefined) this.commandOverride = commandOverride
+		if (envOverride !== undefined) this.envOverride = envOverride
+		const command = this.commandOverride ?? this.config.command
 		const gen = ++this.generation
 		this.stopping = false
-		log(`[${this.name}] Starting (gen ${gen}): ${this.config.command}`)
+		log(`[${this.name}] Starting (gen ${gen}): ${command}`)
 		this.handler.onStatus('starting')
 
 		const cwd = this.config.cwd ? resolve(this.config.cwd) : process.cwd()
@@ -61,10 +66,10 @@ export class ProcessRunner {
 				...(noColor ? {} : { FORCE_COLOR: '1' }),
 				TERM: 'xterm-256color',
 				...envFromFile,
-				...this.config.env
+				...(this.envOverride ?? this.config.env)
 			}
 
-			this.proc = Bun.spawn(['sh', '-c', this.config.command], {
+			this.proc = Bun.spawn(['sh', '-c', command], {
 				cwd,
 				env,
 				terminal: {
@@ -88,11 +93,13 @@ export class ProcessRunner {
 			return
 		}
 
-		this.handler.onStatus(this.config.persistent !== false ? 'running' : 'starting')
-
-		if (this.readiness.isImmediatelyReady) {
-			this.markReady()
+		if (this.config.showCommand !== false) {
+			const encoder = new TextEncoder()
+			const msg = `\x1b[2m$ ${command}\x1b[0m\r\n\r\n`
+			this.handler.onOutput(encoder.encode(msg))
 		}
+
+		this.handler.onStatus('running')
 
 		this.startReadyTimeout(gen)
 
@@ -147,7 +154,7 @@ export class ProcessRunner {
 
 	private startReadyTimeout(gen: number): void {
 		const timeout = this.config.readyTimeout
-		if (!(timeout && this.config.readyPattern) || this.config.persistent === false) return
+		if (!(timeout && this.config.readyPattern)) return
 
 		this.readyTimer = setTimeout(() => {
 			this.readyTimer = null
@@ -175,10 +182,15 @@ export class ProcessRunner {
 		this.clearReadyTimeout()
 		log(`[${this.name}] Ready`)
 		this.handler.onStatus('ready')
-		this.handler.onReady()
+		this.handler.onReady(this.readiness.captures)
 	}
 
-	async restart(cols: number, rows: number): Promise<void> {
+	async restart(
+		cols: number,
+		rows: number,
+		commandOverride?: string,
+		envOverride?: Record<string, string>
+	): Promise<void> {
 		if (this.restarting) return
 		this.restarting = true
 		log(`[${this.name}] Restarting`)
@@ -202,7 +214,7 @@ export class ProcessRunner {
 		this.readyTimedOut = false
 		this.readiness = createReadinessChecker(this.config)
 		this.errorChecker = createErrorChecker(this.config)
-		this.start(cols, rows)
+		this.start(cols, rows, commandOverride, envOverride)
 	}
 
 	async stop(timeoutMs = 5000): Promise<void> {
@@ -251,8 +263,6 @@ export class ProcessRunner {
 	}
 
 	write(data: string): void {
-		if (this.config.interactive && this.proc?.terminal) {
-			this.proc.terminal.write(data)
-		}
+		this.proc?.terminal?.write(data)
 	}
 }
