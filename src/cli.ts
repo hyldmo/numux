@@ -1,6 +1,7 @@
 import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
 import type { ResolvedNumuxConfig } from './types'
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface ParsedArgs {
 	help: boolean
@@ -11,12 +12,15 @@ export interface ParsedArgs {
 	exec: boolean
 	execName?: string
 	execCommand?: string
+	logs: boolean
+	logsProcess?: string
 	completions?: string
 	prefix: boolean
 	killOthers: boolean
-	timestamps: boolean
-	noRestart: boolean
+	killOthersOnFail: boolean
+	timestamps: boolean | string
 	noWatch: boolean
+	maxRestarts?: number
 	autoColors: boolean
 	configPath?: string
 	logDir?: string
@@ -26,6 +30,8 @@ export interface ParsedArgs {
 	colors?: string[]
 	workspace?: string
 	envFile?: string | false
+	theme?: ThemePref
+	helpTopic?: string
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }
@@ -50,10 +56,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		init: false,
 		validate: false,
 		exec: false,
+		logs: false,
 		prefix: false,
 		killOthers: false,
+		killOthersOnFail: false,
 		timestamps: false,
-		noRestart: false,
 		noWatch: false,
 		autoColors: false,
 		configPath: undefined,
@@ -71,6 +78,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		if (flag) {
 			if (flag.type === 'boolean') {
 				;(result as any)[flag.key] = true
+			} else if (flag.type === 'optional-value') {
+				// Peek at next arg — consume as value if it exists and doesn't look like a flag
+				const next = args[i + 1]
+				if (next !== undefined && !next.startsWith('-')) {
+					;(result as any)[flag.key] = next
+					i++
+				} else {
+					;(result as any)[flag.key] = true
+				}
 			} else {
 				const next = args[++i]
 				if (next === undefined) {
@@ -79,7 +95,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				const value = flag.parse ? flag.parse(next, arg) : next
 				const current = (result as any)[flag.key]
 				if (Array.isArray(current)) {
-					current.push(value)
+					if (Array.isArray(value)) current.push(...value)
+					else current.push(value)
 				} else {
 					;(result as any)[flag.key] = value
 				}
@@ -103,30 +120,40 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	return result
 }
 
+const RUNNERS = new Set(['npm', 'npx', 'yarn', 'pnpm', 'bun', 'bunx'])
+
+/** Derive a short process name from a command string. For package runners, uses the last arg (the script name). */
+export function deriveProcessName(cmd: string): string {
+	const parts = cmd.split(/\s+/)
+	const first = parts[0].split('/').pop()!
+	if (parts.length > 1 && RUNNERS.has(first)) {
+		return parts[parts.length - 1]
+	}
+	return first
+}
+
 export function buildConfigFromArgs(
 	commands: string[],
 	named: Array<{ name: string; command: string }>,
-	options?: { noRestart?: boolean; colors?: Color[] }
+	options?: { colors?: Color[] }
 ): ResolvedNumuxConfig {
 	const processes: ResolvedNumuxConfig['processes'] = {}
-	const maxRestarts = options?.noRestart ? 0 : undefined
 	const colors = options?.colors
 	let colorIndex = 0
 
 	for (const { name, command } of named) {
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command, persistent: true, maxRestarts, ...(color ? { color } : {}) }
+		processes[name] = { command, ...(color ? { color } : {}) }
 	}
 
 	for (let i = 0; i < commands.length; i++) {
 		const cmd = commands[i]
-		// Derive name from command: first word, deduplicated
-		let name = cmd.split(/\s+/)[0].split('/').pop()!
+		let name = deriveProcessName(cmd)
 		if (processes[name]) {
 			name = `${name}-${i}`
 		}
 		const color = colors?.[colorIndex++ % colors.length]
-		processes[name] = { command: cmd, persistent: true, maxRestarts, ...(color ? { color } : {}) }
+		processes[name] = { command: cmd, ...(color ? { color } : {}) }
 	}
 
 	return { processes }

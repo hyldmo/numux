@@ -93,6 +93,14 @@ export class ProcessManager {
 			const proc = this.config.processes[name]
 			const resolve = readyResolvers.get(name)!
 
+			// Optional processes start as stopped — resolve immediately so dependents aren't blocked
+			if (proc.optional) {
+				this.updateStatus(name, 'stopped')
+				this.createRunner(name)
+				resolve()
+				return
+			}
+
 			// Wait for declared dependencies only
 			const deps = proc.dependsOn ?? []
 			if (deps.length > 0) {
@@ -190,7 +198,6 @@ export class ProcessManager {
 	private scheduleAutoRestart(name: string, exitCode: number | null): void {
 		if (this.stopping) return
 		const proc = this.config.processes[name]
-		if (proc.persistent === false) return
 		if (exitCode === 0) return
 		// null exitCode means spawn failed — retrying won't help
 		if (exitCode === null) return
@@ -204,9 +211,9 @@ export class ProcessManager {
 
 		const attempt = this.restartAttempts.get(name) ?? 0
 
-		// Enforce maxRestarts limit
-		const maxRestarts = proc.maxRestarts
-		if (maxRestarts !== undefined && attempt >= maxRestarts) {
+		// Enforce maxRestarts limit (defaults to 0 = no restarts)
+		const maxRestarts = proc.maxRestarts ?? 0
+		if (attempt >= maxRestarts) {
 			log(`[${name}] Reached maxRestarts limit (${maxRestarts}), not restarting`)
 			if (maxRestarts > 0) {
 				const encoder = new TextEncoder()
@@ -220,7 +227,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, attempt + 1)
 
 		const encoder = new TextEncoder()
-		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1}${maxRestarts !== undefined ? `/${maxRestarts}` : ''})...\x1b[0m\r\n`
+		const msg = `\r\n\x1b[33m[numux] restarting in ${(delay / 1000).toFixed(0)}s (attempt ${attempt + 1}${Number.isFinite(maxRestarts) ? `/${maxRestarts}` : ''})...\x1b[0m\r\n`
 		this.emit({ type: 'output', name, data: encoder.encode(msg) })
 
 		const timer = setTimeout(() => {
@@ -248,11 +255,12 @@ export class ProcessManager {
 			this.fileWatcher.watch(name, patterns, cwd, changedFile => {
 				const state = this.states.get(name)
 				if (!state) return
-				// Don't restart processes that are stopped/finished, pending, stopping, or skipped
+				// Don't restart processes that are stopped, pending, stopping, or skipped
+				// Note: 'finished' is intentionally allowed so one-shot processes
+				// (e.g. codegen) are re-run when watched files change.
 				if (
 					state.status === 'pending' ||
 					state.status === 'stopped' ||
-					state.status === 'finished' ||
 					state.status === 'stopping' ||
 					state.status === 'skipped'
 				)
@@ -319,8 +327,8 @@ export class ProcessManager {
 		const state = this.states.get(name)!
 		state.status = status
 		// Reset backoff counter when a process with readyPattern signals readiness,
-		// meaning it actually stabilized. Processes without readyPattern are immediately
-		// ready on spawn, so we rely on the time-based reset in scheduleAutoRestart instead.
+		// meaning it actually stabilized. Processes without readyPattern become ready
+		// on exit, so we rely on the time-based reset in scheduleAutoRestart instead.
 		if (status === 'ready' && this.config.processes[name].readyPattern) {
 			this.restartAttempts.set(name, 0)
 		}
@@ -344,7 +352,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		runner.restart(cols, rows, command, env)
@@ -400,7 +408,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		this.runners.get(name)?.restart(cols, rows, command, env)

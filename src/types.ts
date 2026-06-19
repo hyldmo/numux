@@ -1,4 +1,5 @@
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface NumuxProcessConfig<K extends string = string> {
 	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
@@ -18,13 +19,8 @@ export interface NumuxProcessConfig<K extends string = string> {
 	/** Regex matched against stdout to signal readiness. Use `RegExp` to capture groups for `$dep.group` expansion */
 	readyPattern?: string | RegExp
 	/**
-	 * Set to `false` for one-shot processes
-	 * @default true
-	 */
-	persistent?: boolean
-	/**
-	 * Limit auto-restart attempts
-	 * @default Infinity
+	 * Limit auto-restart attempts (only restarts on non-zero exit)
+	 * @default 0
 	 */
 	maxRestarts?: number
 	/** Milliseconds to wait for readyPattern before failing */
@@ -49,8 +45,15 @@ export interface NumuxProcessConfig<K extends string = string> {
 	 * @default false
 	 */
 	interactive?: boolean
+	/** Process is visible but not started automatically. Use Alt+S to start manually */
+	optional?: boolean
 	/** `true` = detect ANSI red output, string = regex pattern */
 	errorMatcher?: boolean | string
+	/**
+	 * Run command in monorepo workspaces.
+	 * `true` = all workspaces, string = specific workspace by name/path, string[] = multiple workspaces
+	 */
+	workspaces?: boolean | string | string[]
 	/**
 	 * Print the command being run as the first line of output
 	 * @default true
@@ -75,8 +78,8 @@ export interface NumuxConfig<K extends string = string> {
 	 */
 	showCommand?: boolean
 	/**
-	 * Global restart limit, inherited by all processes
-	 * @default Infinity
+	 * Global restart limit, inherited by all processes (only restarts on non-zero exit)
+	 * @default 0
 	 */
 	maxRestarts?: number
 	/** Global ready timeout (ms), inherited by all processes */
@@ -92,7 +95,8 @@ export interface NumuxConfig<K extends string = string> {
 	watch?: string | string[]
 	/**
 	 * Tab display order. `'config'` preserves definition order (package.json script order for wildcards),
-	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers.
+	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers,
+	 * `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom.
 	 * @default 'config'
 	 */
 	sort?: SortOrder
@@ -101,13 +105,18 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default false
 	 */
 	prefix?: boolean
-	/** Add timestamps to prefixed output lines (only applies when `prefix` is true) */
-	timestamps?: boolean
+	/** Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) */
+	timestamps?: boolean | string
 	/**
-	 * Kill all processes when any one exits
+	 * Kill all processes when any one exits (regardless of exit code)
 	 * @default false
 	 */
 	killOthers?: boolean
+	/**
+	 * Kill all processes when any one exits with a non-zero exit code
+	 * @default false
+	 */
+	killOthersOnFail?: boolean
 	/**
 	 * Disable file watching even if processes have watch patterns
 	 * @default false
@@ -115,13 +124,19 @@ export interface NumuxConfig<K extends string = string> {
 	noWatch?: boolean
 	/** Directory to write per-process log files */
 	logDir?: string
-	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
+	/**
+	 * TUI color theme. `'auto'` detects the terminal background via OSC 11 (falling back
+	 * to `COLORFGBG` then dark). `'light'`/`'dark'` skip detection.
+	 * @default 'auto'
+	 */
+	theme?: ThemePref
+	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string | true>
 }
 
-export type SortOrder = 'config' | 'alphabetical' | 'topological'
+export type SortOrder = 'config' | 'alphabetical' | 'topological' | 'status'
 
 /** Process config after validation — dependsOn is always normalized to an array */
-export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn'> {
+export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn' | 'workspaces'> {
 	dependsOn?: string[]
 }
 
@@ -129,10 +144,12 @@ export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'depends
 export interface ResolvedNumuxConfig {
 	sort?: SortOrder
 	prefix?: boolean
-	timestamps?: boolean
+	timestamps?: boolean | string
 	killOthers?: boolean
+	killOthersOnFail?: boolean
 	noWatch?: boolean
 	logDir?: string
+	theme?: ThemePref
 	processes: Record<string, ResolvedProcessConfig>
 }
 

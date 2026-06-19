@@ -97,12 +97,10 @@ describe('interpolateConfig', () => {
 
 	test('passes through non-string values unchanged', () => {
 		const result = interpolateConfig({
-			persistent: true,
 			maxRestarts: 5,
 			nothing: null
 		})
 		expect(result).toEqual({
-			persistent: true,
 			maxRestarts: 5,
 			nothing: null
 		})

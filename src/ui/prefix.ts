@@ -2,9 +2,29 @@ import type { ProcessManager } from '../process/manager'
 import type { ProcessEvent, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { ANSI_RESET, buildProcessColorMap, STATUS_ANSI, stripAnsi } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
+import { formatTimestamp, resolveTimestampFormat } from '../utils/timestamp'
 
 const RESET = ANSI_RESET
 const DIM = '\x1b[90m'
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences requires \x1b
+const CHA_COL1_RE = /\x1b\[1?G/g
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escape sequences requires \x1b
+const CURSOR_SEQ_RE = /\x1b\[[\d;]*[ABCDEFGHJKLMSTdf]/g
+
+/**
+ * Strip CSI sequences that move the cursor or erase content.
+ * Keeps SGR sequences (\x1b[...m) for colors/styles.
+ *
+ * CHA col-1 (\x1b[G / \x1b[1G) is replaced with \r so the existing
+ * carriage-return overwrite logic applies. All other cursor movement
+ * (A/B/C/D/E/F/H/d/f), erasure (J/K), scrolling (S/T), and
+ * line insert/delete (L/M) are stripped.
+ */
+export function stripCursorSequences(text: string): string {
+	return text.replace(CHA_COL1_RE, '\r').replace(CURSOR_SEQ_RE, '')
+}
 
 /**
  * Concurrently-style prefixed output mode for CI and headless environments.
@@ -13,7 +33,8 @@ const DIM = '\x1b[90m'
 export interface PrefixDisplayOptions {
 	logWriter?: LogWriter
 	killOthers?: boolean
-	timestamps?: boolean
+	killOthersOnFail?: boolean
+	timestamps?: boolean | string
 }
 
 export class PrefixDisplay {
@@ -24,15 +45,18 @@ export class PrefixDisplay {
 	private buffers = new Map<string, string>()
 	private logWriter?: LogWriter
 	private killOthers: boolean
-	private timestamps: boolean
+	private killOthersOnFail: boolean
+	private timestampFormat: string | null
 	private stopping = false
 	private startTime = 0
+	private processTimes = new Map<string, { start: number; end?: number }>()
 
 	constructor(manager: ProcessManager, config: ResolvedNumuxConfig, options: PrefixDisplayOptions = {}) {
 		this.manager = manager
 		this.logWriter = options.logWriter
 		this.killOthers = options.killOthers ?? false
-		this.timestamps = options.timestamps ?? false
+		this.killOthersOnFail = options.killOthersOnFail ?? false
+		this.timestampFormat = resolveTimestampFormat(options.timestamps)
 		this.noColor = 'NO_COLOR' in process.env
 		const names = manager.getProcessNames()
 		this.colors = buildProcessColorMap(names, config)
@@ -56,8 +80,8 @@ export class PrefixDisplay {
 			this.shutdown()
 		})
 		process.on('unhandledRejection', (reason: unknown) => {
-			const message = reason instanceof Error ? reason.message : String(reason)
-			process.stderr.write(`numux: unhandled rejection: ${message}\n`)
+			const stack = reason instanceof Error ? reason.stack : String(reason)
+			process.stderr.write(`numux: unhandled rejection: ${stack}\n`)
 			this.shutdown()
 		})
 
@@ -66,8 +90,8 @@ export class PrefixDisplay {
 		const rows = process.stdout.rows || 24
 		await this.manager.startAll(cols, rows)
 
-		// After all processes started, check if any are non-persistent
-		// If all non-persistent processes have exited, we're done
+		// After all processes started, check if any one-shot processes
+		// have already exited — if all are done, we're finished
 		this.checkAllDone()
 	}
 
@@ -79,7 +103,8 @@ export class PrefixDisplay {
 		} else if (event.type === 'exit') {
 			// Flush remaining buffer
 			this.flushBuffer(event.name)
-			if (this.killOthers) {
+			const exitCode = this.manager.getState(event.name)?.exitCode ?? null
+			if (this.killOthers || (this.killOthersOnFail && exitCode !== 0)) {
 				this.killAllAndExit(event.name)
 			} else {
 				this.checkAllDone()
@@ -89,33 +114,52 @@ export class PrefixDisplay {
 
 	private handleOutput(name: string, data: Uint8Array): void {
 		const decoder = this.decoders.get(name) ?? new TextDecoder()
-		const text = decoder.decode(data, { stream: true })
+		const raw = decoder.decode(data, { stream: true })
+		// Strip ANSI sequences that move the cursor or erase content.
+		// PTY processes emit these for interactive progress displays, but in
+		// prefix mode they would visually destroy the [name] prefix.
+		// Preserves SGR (color/style) sequences (\x1b[...m).
+		const text = stripCursorSequences(raw)
 		const buffer = (this.buffers.get(name) ?? '') + text
-		const lines = buffer.split(/\r?\n/)
 
-		// Keep the last element (incomplete line) in the buffer
-		this.buffers.set(name, lines.pop() ?? '')
+		// Split on line endings. \r*\n handles \n, \r\n, and PTY-doubled \r\r\n.
+		const lines = buffer.split(/\r*\n/)
 
+		// Last element is the incomplete line — buffer it.
+		// Collapse bare \r to prevent unbounded growth from spinner output.
+		// Trailing \r(s) are preserved since they may precede a \n in the next chunk.
+		let tail = lines.pop() ?? ''
+		if (tail.includes('\r')) {
+			const trailingCrs = tail.match(/\r+$/)?.[0] ?? ''
+			const base = tail.slice(0, tail.length - trailingCrs.length)
+			const lastCr = base.lastIndexOf('\r')
+			tail = (lastCr === -1 ? base : base.slice(lastCr + 1)) + trailingCrs
+		}
+		this.buffers.set(name, tail)
+
+		// Bare \r within a completed line means "overwrite from start of line".
+		// Keep only the content after the last bare \r.
 		for (const line of lines) {
-			this.printLine(name, line)
+			const lastCr = line.lastIndexOf('\r')
+			this.printLine(name, lastCr === -1 ? line : line.slice(lastCr + 1))
 		}
 	}
 
-	private handleStatus(_name: string, _status: ProcessStatus): void {
-		// Status messages are not printed in prefix mode — only process output
-	}
-
-	private formatTimestamp(): string {
-		const now = new Date()
-		const h = String(now.getHours()).padStart(2, '0')
-		const m = String(now.getMinutes()).padStart(2, '0')
-		const s = String(now.getSeconds()).padStart(2, '0')
-		return `${h}:${m}:${s}`
+	private handleStatus(name: string, status: ProcessStatus): void {
+		if (status === 'running' || status === 'starting') {
+			if (!this.processTimes.has(name)) {
+				this.processTimes.set(name, { start: Date.now() })
+			}
+		} else if (status === 'finished' || status === 'failed' || status === 'stopped') {
+			const t = this.processTimes.get(name)
+			if (t && !t.end) t.end = Date.now()
+		}
 	}
 
 	private printLine(name: string, line: string): void {
-		const ts = this.timestamps ? `${DIM}[${this.formatTimestamp()}]${RESET} ` : ''
-		const tsPlain = this.timestamps ? `[${this.formatTimestamp()}] ` : ''
+		const fmt = this.timestampFormat
+		const ts = fmt ? `${DIM}[${formatTimestamp(new Date(), fmt)}]${RESET} ` : ''
+		const tsPlain = fmt ? `[${formatTimestamp(new Date(), fmt)}] ` : ''
 		if (this.noColor) {
 			process.stdout.write(`${tsPlain}[${name}] ${stripAnsi(line)}\n`)
 		} else {
@@ -127,7 +171,13 @@ export class PrefixDisplay {
 	private flushBuffer(name: string): void {
 		const remaining = this.buffers.get(name) ?? ''
 		if (remaining.length > 0) {
-			this.printLine(name, remaining)
+			// Strip all trailing \r(s), then collapse bare \r (overwrite semantics)
+			const stripped = remaining.replace(/\r+$/, '')
+			const lastCr = stripped.lastIndexOf('\r')
+			const visible = lastCr === -1 ? stripped : stripped.slice(lastCr + 1)
+			if (visible.length > 0) {
+				this.printLine(name, visible)
+			}
 			this.buffers.set(name, '')
 		}
 	}
@@ -161,8 +211,7 @@ export class PrefixDisplay {
 		})
 	}
 
-	private formatElapsed(): string {
-		const ms = Date.now() - this.startTime
+	private formatDuration(ms: number): string {
 		if (ms < 1000) return `${ms}ms`
 		const s = ms / 1000
 		if (s < 60) return `${s.toFixed(1)}s`
@@ -171,19 +220,29 @@ export class PrefixDisplay {
 		return `${m}m ${rem.toFixed(0)}s`
 	}
 
+	private formatElapsed(): string {
+		return this.formatDuration(Date.now() - this.startTime)
+	}
+
 	private printSummary(): void {
 		const states = this.manager.getAllStates()
 		const namePad = Math.max(...states.map(s => s.name.length))
+		const statusPad = Math.max(...states.map(s => s.status.length))
 		process.stdout.write('\n')
 		for (const s of states) {
 			const name = s.name.padEnd(namePad)
-			const exitStr = s.exitCode !== null ? `exit ${s.exitCode}` : ''
+			const exitStr = s.exitCode !== null ? `(exit ${s.exitCode})` : ''
+			const t = this.processTimes.get(s.name)
+			const duration = t ? this.formatDuration((t.end ?? Date.now()) - t.start) : ''
 			if (this.noColor) {
-				process.stdout.write(`  ${name}  ${s.status}${exitStr ? `  (${exitStr})` : ''}\n`)
+				const status = s.status.padEnd(statusPad)
+				process.stdout.write(`  ${name}  ${status}  ${exitStr.padEnd(9)}  ${duration}\n`)
 			} else {
 				const ansi = STATUS_ANSI[s.status] ?? ''
-				const statusText = ansi ? `${ansi}${s.status}${RESET}` : s.status
-				process.stdout.write(`  ${name}  ${statusText}${exitStr ? `  ${DIM}(${exitStr})${RESET}` : ''}\n`)
+				const statusPlain = s.status.padEnd(statusPad)
+				const statusText = ansi ? `${ansi}${statusPlain}${RESET}` : statusPlain
+				const exitPart = exitStr ? `${DIM}${exitStr.padEnd(9)}${RESET}` : ' '.repeat(9)
+				process.stdout.write(`  ${name}  ${statusText}  ${exitPart}  ${DIM}${duration}${RESET}\n`)
 			}
 		}
 		const elapsed = this.formatElapsed()

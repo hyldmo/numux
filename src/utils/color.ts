@@ -61,12 +61,9 @@ export const STATUS_ANSI: Partial<Record<ProcessStatus, string>> = {
 
 export const ANSI_RESET = '\x1b[0m'
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping requires matching control chars
-const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()#][0-9A-Za-z]|\x1b[A-Za-z><=]/g
-
-/** Strip ANSI escape sequences from text */
+/** Strip ANSI escape sequences from text (SIMD-accelerated via Bun) */
 export function stripAnsi(str: string): string {
-	return str.replace(ANSI_RE, '')
+	return Bun.stripANSI(str)
 }
 
 /** Default palette for automatic process color assignment — cycles through BASIC_COLORS */
@@ -98,19 +95,24 @@ function resolveColor(color: string | string[] | undefined): string | undefined 
 	return undefined
 }
 
-/** Build a map of process names to ANSI color codes, using explicit config colors or a default palette. */
-export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
+/** Build a map of process names to ANSI color codes, using explicit config colors or a palette. */
+export function buildProcessColorMap(
+	names: string[],
+	config: ResolvedNumuxConfig,
+	palette: readonly string[] = DEFAULT_PALETTE
+): Map<string, string> {
 	const map = new Map<string, string>()
 	if ('NO_COLOR' in process.env) return map
+	const ansiPalette = palette === DEFAULT_PALETTE ? DEFAULT_ANSI_COLORS : palette.map(hexToAnsi)
 	let paletteIndex = 0
 	for (const name of names) {
 		const explicit = resolveColor(config.processes[name]?.color)
 		if (explicit) {
 			const hex = resolveToHex(explicit)
 			if (hex) map.set(name, hexToAnsi(hex))
-			else map.set(name, DEFAULT_ANSI_COLORS[paletteIndex++ % DEFAULT_ANSI_COLORS.length])
+			else map.set(name, ansiPalette[paletteIndex++ % ansiPalette.length])
 		} else {
-			map.set(name, DEFAULT_ANSI_COLORS[paletteIndex % DEFAULT_ANSI_COLORS.length])
+			map.set(name, ansiPalette[paletteIndex % ansiPalette.length])
 			paletteIndex++
 		}
 	}
@@ -118,7 +120,11 @@ export function buildProcessColorMap(names: string[], config: ResolvedNumuxConfi
 }
 
 /** Build a map of process names to hex color strings (for StyledText rendering). */
-export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxConfig): Map<string, string> {
+export function buildProcessHexColorMap(
+	names: string[],
+	config: ResolvedNumuxConfig,
+	palette: readonly string[] = DEFAULT_PALETTE
+): Map<string, string> {
 	const map = new Map<string, string>()
 	if ('NO_COLOR' in process.env) return map
 	let paletteIndex = 0
@@ -127,9 +133,9 @@ export function buildProcessHexColorMap(names: string[], config: ResolvedNumuxCo
 		if (explicit) {
 			const hex = resolveToHex(explicit)
 			if (hex) map.set(name, hex)
-			else map.set(name, DEFAULT_PALETTE[paletteIndex++ % DEFAULT_PALETTE.length])
+			else map.set(name, palette[paletteIndex++ % palette.length])
 		} else {
-			map.set(name, DEFAULT_PALETTE[paletteIndex % DEFAULT_PALETTE.length])
+			map.set(name, palette[paletteIndex % palette.length])
 			paletteIndex++
 		}
 	}
