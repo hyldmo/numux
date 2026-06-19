@@ -8,6 +8,7 @@ import {
 	SelectRenderableEvents
 } from '@opentui/core'
 import type { ProcessStatus } from '../types'
+import { DARK_THEME, type Theme } from '../utils/theme'
 
 export const STATUS_ICONS: Record<ProcessStatus, string> = {
 	pending: '○',
@@ -22,16 +23,24 @@ export const STATUS_ICONS: Record<ProcessStatus, string> = {
 }
 
 /** Status-specific icon colors (override process colors) */
-export const STATUS_ICON_HEX: Partial<Record<ProcessStatus, string>> = {
-	ready: '#00cc00',
-	finished: '#66aa66',
-	failed: '#ff5555',
-	stopped: '#888888',
-	skipped: '#888888'
+export function getStatusIconHex(theme: Theme): Partial<Record<ProcessStatus, string>> {
+	return {
+		ready: theme.status.ready,
+		finished: theme.status.finished,
+		failed: theme.status.failed,
+		stopped: theme.status.stopped,
+		skipped: theme.status.skipped
+	}
 }
 
 /** Statuses that represent a terminal (done) state — tabs move to bottom */
 export const TERMINAL_STATUSES = new Set<ProcessStatus>(['finished', 'stopped', 'failed', 'skipped'])
+
+export function getDisplayOrder(originalNames: string[], statuses: Map<string, ProcessStatus>): string[] {
+	const active = originalNames.filter(n => !TERMINAL_STATUSES.has(statuses.get(n)!))
+	const terminal = originalNames.filter(n => TERMINAL_STATUSES.has(statuses.get(n)!))
+	return [...active, ...terminal]
+}
 
 export function formatTab(name: string, status: ProcessStatus): string {
 	return `${STATUS_ICONS[status]} ${name}`
@@ -48,35 +57,31 @@ export function formatDescription(status: ProcessStatus, exitCode?: number | nul
 	return desc
 }
 
-export function getDisplayOrder(originalNames: string[], statuses: Map<string, ProcessStatus>): string[] {
-	const active = originalNames.filter(n => !TERMINAL_STATUSES.has(statuses.get(n)!))
-	const terminal = originalNames.filter(n => TERMINAL_STATUSES.has(statuses.get(n)!))
-	return [...active, ...terminal]
-}
-
 export function resolveOptionColors(
 	names: string[],
 	statuses: Map<string, ProcessStatus>,
 	processColors: Map<string, string>,
 	inputWaiting: Set<string>,
 	erroredProcesses: Set<string>,
+	theme: Theme,
 	searchMatchProcesses?: Set<string>
 ): Array<{ iconHex: string; nameHex: string | null }> {
+	const statusIconHex = getStatusIconHex(theme)
 	return names.map(name => {
 		const status = statuses.get(name)!
 		const waiting = inputWaiting.has(name)
 		const errored = erroredProcesses.has(name)
 		const hasSearchMatch = searchMatchProcesses?.has(name)
 		const statusHex = hasSearchMatch
-			? '#b58900'
+			? theme.searchMatchTab
 			: waiting
-				? '#ffaa00'
+				? theme.inputWaiting
 				: errored
-					? '#ff5555'
-					: STATUS_ICON_HEX[status]
+					? theme.errorIndicator
+					: statusIconHex[status]
 		const processHex = processColors.get(name)
 		return {
-			iconHex: statusHex ?? processHex ?? '#888888',
+			iconHex: statusHex ?? processHex ?? theme.iconDefault,
 			nameHex: processHex ?? null
 		}
 	})
@@ -182,16 +187,26 @@ export class TabBar {
 	private statuses: Map<string, ProcessStatus>
 	private baseDescriptions: Map<string, string>
 	private processColors: Map<string, string>
+	private reorderByStatus: boolean
 	private inputWaiting = new Set<string>()
 	private erroredProcesses = new Set<string>()
 	private searchMatchCounts = new Map<string, number>()
+	private theme: Theme
 
-	constructor(renderer: CliRenderer, names: string[], colors?: Map<string, string>) {
+	constructor(
+		renderer: CliRenderer,
+		names: string[],
+		colors?: Map<string, string>,
+		theme: Theme = DARK_THEME,
+		reorderByStatus = false
+	) {
 		this.originalNames = names
 		this.names = [...names]
+		this.reorderByStatus = reorderByStatus
 		this.statuses = new Map(names.map(n => [n, 'pending' as ProcessStatus]))
 		this.baseDescriptions = new Map(names.map(n => [n, 'pending']))
 		this.processColors = colors ?? new Map()
+		this.theme = theme
 
 		this.renderable = new ColoredSelectRenderable(renderer, {
 			id: 'tab-bar',
@@ -201,9 +216,13 @@ export class TabBar {
 				name: formatTab(n, 'pending'),
 				description: 'pending'
 			})),
-			selectedBackgroundColor: '#334455',
-			selectedTextColor: '#fff',
-			textColor: '#888',
+			backgroundColor: theme.sidebarBg,
+			focusedBackgroundColor: theme.sidebarBg,
+			selectedBackgroundColor: theme.tabSelectedBg,
+			selectedTextColor: theme.tabSelectedText,
+			textColor: theme.tabText,
+			descriptionColor: theme.tabDescriptionText,
+			selectedDescriptionColor: theme.tabSelectedDescriptionText,
 			showDescription: true,
 			wrapSelection: true
 		})
@@ -270,24 +289,19 @@ export class TabBar {
 	}
 
 	private refreshOptions(): void {
-		// Preserve currently selected name
-		const currentIdx = this.renderable.getSelectedIndex()
-		const currentName = this.names[currentIdx]
-
-		// Reorder: active first, terminal states at bottom
-		this.names = getDisplayOrder(this.originalNames, this.statuses)
-
+		if (this.reorderByStatus) {
+			const currentIdx = this.renderable.getSelectedIndex()
+			const currentName = this.names[currentIdx]
+			this.names = getDisplayOrder(this.originalNames, this.statuses)
+			const newIdx = this.names.indexOf(currentName)
+			if (newIdx >= 0 && newIdx !== currentIdx) {
+				this.renderable.setSelectedIndex(newIdx)
+			}
+		}
 		this.renderable.options = this.names.map(n => ({
 			name: formatTab(n, this.statuses.get(n)!),
 			description: this.getDescription(n)
 		}))
-
-		// Restore selection by name
-		const newIdx = this.names.indexOf(currentName)
-		if (newIdx >= 0 && newIdx !== currentIdx) {
-			this.renderable.setSelectedIndex(newIdx)
-		}
-
 		this.updateOptionColors()
 	}
 
@@ -309,6 +323,7 @@ export class TabBar {
 			this.processColors,
 			this.inputWaiting,
 			this.erroredProcesses,
+			this.theme,
 			searchProcesses
 		)
 		const colors = resolved.map(c => ({
@@ -324,9 +339,5 @@ export class TabBar {
 
 	setSelectedIndex(index: number): void {
 		this.renderable.setSelectedIndex(index)
-	}
-
-	focus(): void {
-		this.renderable.focus()
 	}
 }

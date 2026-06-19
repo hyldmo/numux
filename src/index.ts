@@ -9,7 +9,7 @@ import { loadConfig } from './config/loader'
 import { filterByPlatform } from './config/platform'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
-import { resolveWorkspaceProcesses } from './config/workspaces'
+import { expandWorkspaces, resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
@@ -18,6 +18,7 @@ import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
+import { defaultLogDir } from './utils/project-name'
 import { setupShutdownHandlers } from './utils/shutdown'
 
 const HELP = generateHelp()
@@ -49,7 +50,12 @@ async function main() {
 	const parsed = parseArgs(process.argv)
 
 	if (parsed.help) {
-		console.info(HELP)
+		if (parsed.helpTopic) {
+			const { showHelp } = await import('./help')
+			console.info(showHelp(parsed.helpTopic))
+		} else {
+			console.info(HELP)
+		}
 		process.exit(0)
 	}
 
@@ -75,8 +81,43 @@ async function main() {
 		process.exit(0)
 	}
 
+	if (parsed.logs) {
+		const resolved = parsed.logDir ? { dir: parsed.logDir, explicit: true } : await resolveLogDir(parsed.configPath)
+		const logDir = resolved.dir
+		const latestDir = resolve(logDir, 'latest')
+		const usingLatest = existsSync(latestDir)
+		const target = usingLatest ? latestDir : logDir
+
+		if (!resolved.explicit && usingLatest) {
+			console.warn(
+				'Warning: using default log directory; "latest" may have been overwritten by another numux instance in this project.'
+			)
+		}
+
+		if (parsed.logsProcess) {
+			const logFile = resolve(target, `${parsed.logsProcess}.log`)
+			if (!existsSync(logFile)) {
+				const { readdirSync } = await import('node:fs')
+				const files = readdirSync(target)
+					.filter(f => f.endsWith('.log'))
+					.map(f => f.replace(/\.log$/, ''))
+				const available = files.length > 0 ? `Available: ${files.join(', ')}` : 'No log files found'
+				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
+				process.exit(1)
+			}
+			const child = Bun.spawn(['cat', logFile], {
+				stdout: 'inherit',
+				stderr: 'inherit'
+			})
+			process.exit(await child.exited)
+		}
+
+		console.info(target)
+		process.exit(0)
+	}
+
 	if (parsed.validate) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const warnings: ValidationWarning[] = []
 		let config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
@@ -116,7 +157,7 @@ async function main() {
 	}
 
 	if (parsed.exec) {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		const config = validateConfig(raw)
 		const proc = config.processes[parsed.execName!]
 		if (!proc) {
@@ -194,7 +235,7 @@ async function main() {
 			}
 		}
 	} else {
-		const raw = expandScriptPatterns(await loadConfig(parsed.configPath))
+		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
 	}
@@ -225,6 +266,10 @@ async function main() {
 		config = filterConfig(config, parsed.only, parsed.exclude)
 	}
 
+	if (parsed.theme) {
+		config.theme = parsed.theme
+	}
+
 	if (parsed.autoColors) {
 		for (const [name, proc] of Object.entries(config.processes)) {
 			if (!proc.color) {
@@ -235,8 +280,8 @@ async function main() {
 
 	const manager = new ProcessManager(config)
 
-	const logDir = parsed.logDir ?? config.logDir
-	const logWriter = logDir ? LogWriter.createPersistent(logDir) : LogWriter.createTemp()
+	const logDir = parsed.logDir ?? config.logDir ?? defaultLogDir(process.cwd())
+	const logWriter = LogWriter.createPersistent(logDir)
 
 	printWarnings(warnings)
 
@@ -263,6 +308,18 @@ function printWarnings(warnings: ValidationWarning[]): void {
 	for (const w of warnings) {
 		console.warn(`Warning: process "${w.process}": ${w.message}`)
 	}
+}
+
+async function resolveLogDir(configPath?: string): Promise<{ dir: string; explicit: boolean }> {
+	try {
+		const raw = await loadConfig(configPath)
+		if (typeof raw.logDir === 'string' && raw.logDir.trim()) {
+			return { dir: resolve(raw.logDir.trim()), explicit: true }
+		}
+	} catch {
+		// Config may not exist — fall through to default
+	}
+	return { dir: defaultLogDir(process.cwd()), explicit: false }
 }
 
 main().catch(err => {

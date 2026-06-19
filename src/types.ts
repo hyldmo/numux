@@ -1,4 +1,5 @@
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface NumuxProcessConfig<K extends string = string> {
 	/** Shell command to run. Supports `$dep.group` references from dependency capture groups */
@@ -44,8 +45,15 @@ export interface NumuxProcessConfig<K extends string = string> {
 	 * @default false
 	 */
 	interactive?: boolean
+	/** Process is visible but not started automatically. Use Alt+S to start manually */
+	optional?: boolean
 	/** `true` = detect ANSI red output, string = regex pattern */
 	errorMatcher?: boolean | string
+	/**
+	 * Run command in monorepo workspaces.
+	 * `true` = all workspaces, string = specific workspace by name/path, string[] = multiple workspaces
+	 */
+	workspaces?: boolean | string | string[]
 	/**
 	 * Print the command being run as the first line of output
 	 * @default true
@@ -87,7 +95,8 @@ export interface NumuxConfig<K extends string = string> {
 	watch?: string | string[]
 	/**
 	 * Tab display order. `'config'` preserves definition order (package.json script order for wildcards),
-	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers.
+	 * `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers,
+	 * `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom.
 	 * @default 'config'
 	 */
 	sort?: SortOrder
@@ -96,7 +105,7 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default false
 	 */
 	prefix?: boolean
-	/** Add timestamps to output lines. `true` uses default `HH:mm:ss` format, or pass a format string (e.g. `"HH:mm:ss.SSS"`) */
+	/** Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) */
 	timestamps?: boolean | string
 	/**
 	 * Kill all processes when any one exits (regardless of exit code)
@@ -115,13 +124,19 @@ export interface NumuxConfig<K extends string = string> {
 	noWatch?: boolean
 	/** Directory to write per-process log files */
 	logDir?: string
-	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string>
+	/**
+	 * TUI color theme. `'auto'` detects the terminal background via OSC 11 (falling back
+	 * to `COLORFGBG` then dark). `'light'`/`'dark'` skip detection.
+	 * @default 'auto'
+	 */
+	theme?: ThemePref
+	processes: Record<K, NumuxProcessConfig<K> | NumuxScriptPattern<K> | string | true>
 }
 
-export type SortOrder = 'config' | 'alphabetical' | 'topological'
+export type SortOrder = 'config' | 'alphabetical' | 'topological' | 'status'
 
 /** Process config after validation — dependsOn is always normalized to an array */
-export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn'> {
+export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'dependsOn' | 'workspaces'> {
 	dependsOn?: string[]
 }
 
@@ -134,6 +149,7 @@ export interface ResolvedNumuxConfig {
 	killOthersOnFail?: boolean
 	noWatch?: boolean
 	logDir?: string
+	theme?: ThemePref
 	processes: Record<string, ResolvedProcessConfig>
 }
 

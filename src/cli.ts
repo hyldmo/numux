@@ -1,6 +1,7 @@
 import { FLAGS, type FlagDef, SUBCOMMANDS, type SubcommandDef } from './cli-flags'
 import type { ResolvedNumuxConfig } from './types'
 import type { Color } from './utils/color'
+import type { ThemePref } from './utils/theme'
 
 export interface ParsedArgs {
 	help: boolean
@@ -11,6 +12,8 @@ export interface ParsedArgs {
 	exec: boolean
 	execName?: string
 	execCommand?: string
+	logs: boolean
+	logsProcess?: string
 	completions?: string
 	prefix: boolean
 	killOthers: boolean
@@ -27,6 +30,8 @@ export interface ParsedArgs {
 	colors?: string[]
 	workspace?: string
 	envFile?: string | false
+	theme?: ThemePref
+	helpTopic?: string
 	commands: string[]
 	named: Array<{ name: string; command: string }>
 }
@@ -51,6 +56,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		init: false,
 		validate: false,
 		exec: false,
+		logs: false,
 		prefix: false,
 		killOthers: false,
 		killOthersOnFail: false,
@@ -89,7 +95,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				const value = flag.parse ? flag.parse(next, arg) : next
 				const current = (result as any)[flag.key]
 				if (Array.isArray(current)) {
-					current.push(value)
+					if (Array.isArray(value)) current.push(...value)
+					else current.push(value)
 				} else {
 					;(result as any)[flag.key] = value
 				}

@@ -27,10 +27,12 @@ async function runPrefix(
 	extraArgs: string[] = [],
 	envOverrides: Record<string, string> = {}
 ): Promise<{ stdout: string; exitCode: number }> {
+	const env: Record<string, string | undefined> = { ...process.env, FORCE_COLOR: '0', ...envOverrides }
+	if (!('NO_COLOR' in envOverrides)) delete env.NO_COLOR
 	const proc = Bun.spawn(['bun', INDEX, '--prefix', ...extraArgs, '--config', configPath], {
 		stdout: 'pipe',
 		stderr: 'pipe',
-		env: { ...process.env, FORCE_COLOR: '0', ...envOverrides }
+		env
 	})
 	const stdout = await new Response(proc.stdout).text()
 	const exitCode = await proc.exited
@@ -147,7 +149,7 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(1)
 	}, 15000)
 
-	test('--timestamps prepends HH:MM:SS to output lines', async () => {
+	test('--timestamps prepends HH:mm:ss.SSS to output lines', async () => {
 		const config = writeConfig(
 			'timestamps.json',
 			JSON.stringify({
@@ -155,8 +157,8 @@ describe('PrefixDisplay (integration)', () => {
 			})
 		)
 		const { stdout, exitCode } = await runPrefix(config, ['--timestamps'])
-		// Should contain a timestamp like [12:34:56]
-		expect(stdout).toMatch(/\[\d{2}:\d{2}:\d{2}\]/)
+		// Should contain a timestamp like [12:34:56.789]
+		expect(stdout).toMatch(/\[\d{2}:\d{2}:\d{2}\.\d{3}\]/)
 		expect(stdout).toContain('hello')
 		expect(exitCode).toBe(0)
 	}, 10000)
@@ -290,6 +292,42 @@ describe('PrefixDisplay (integration)', () => {
 		expect(exitCode).toBe(1)
 	}, 10000)
 
+	test('-o filters to named process and its deps', async () => {
+		const config = writeConfig(
+			'only-filter.json',
+			JSON.stringify({
+				processes: {
+					db: { command: "echo 'db ready'" },
+					api: { command: "echo 'api ready'", dependsOn: ['db'] },
+					web: { command: "echo 'web ready'" }
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, ['-o', 'api'])
+		expect(stdout).toContain('[api]')
+		expect(stdout).toContain('[db]')
+		expect(stdout).not.toContain('[web]')
+		expect(exitCode).toBe(0)
+	}, 10000)
+
+	test('repeated -o merges filters', async () => {
+		const config = writeConfig(
+			'only-repeated.json',
+			JSON.stringify({
+				processes: {
+					a: { command: "echo 'a'" },
+					b: { command: "echo 'b'" },
+					c: { command: "echo 'c'" }
+				}
+			})
+		)
+		const { stdout, exitCode } = await runPrefix(config, ['-o', 'a', '-o', 'b'])
+		expect(stdout).toContain('[a]')
+		expect(stdout).toContain('[b]')
+		expect(stdout).not.toContain('[c]')
+		expect(exitCode).toBe(0)
+	}, 10000)
+
 	test('cursor-up sequences are stripped to preserve prefix', async () => {
 		// Use bun -e to emit real escape bytes — avoids printf portability issues
 		const config = writeConfig(
@@ -350,6 +388,106 @@ describe('PrefixDisplay (integration)', () => {
 		expect(stdout).toContain('\x1b[32m')
 		expect(stdout).toContain('green')
 		expect(exitCode).toBe(0)
+	}, 10000)
+})
+
+describe('Summary formatting', () => {
+	test('summary aligns status and exit codes into columns', async () => {
+		const config = writeConfig(
+			'summary-align.json',
+			JSON.stringify({
+				processes: {
+					ok: { command: 'true' },
+					fail: { command: "sh -c 'exit 2'" }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		// Summary lines start with two spaces and are not process output (no [brackets])
+		const summaryLines = stdout.split('\n').filter(l => /^\s{2}\S/.test(l) && !l.startsWith('['))
+
+		const okLine = summaryLines.find(l => /\bok\b/.test(l))
+		const failLine = summaryLines.find(l => /\bfail\b/.test(l))
+		expect(okLine).toBeDefined()
+		expect(failLine).toBeDefined()
+
+		// "finished" and "failed" are different lengths — padding should align exit codes
+		const okExitIdx = okLine!.indexOf('(exit')
+		const failExitIdx = failLine!.indexOf('(exit')
+		expect(okExitIdx).toBe(failExitIdx)
+	}, 10000)
+
+	test('summary shows per-process duration', async () => {
+		const config = writeConfig(
+			'summary-duration.json',
+			JSON.stringify({
+				processes: {
+					fast: { command: 'true' }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		// Summary line for the process should contain a duration (e.g. "42ms" or "1.2s")
+		const lines = stdout.split('\n')
+		const summaryLine = lines.find(l => l.includes('fast') && l.includes('finished'))
+		expect(summaryLine).toBeDefined()
+		expect(summaryLine).toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('summary shows duration for failed processes', async () => {
+		const config = writeConfig(
+			'summary-duration-fail.json',
+			JSON.stringify({
+				processes: {
+					bad: { command: "sh -c 'exit 1'" }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const summaryLine = lines.find(l => l.includes('bad') && l.includes('failed'))
+		expect(summaryLine).toBeDefined()
+		expect(summaryLine).toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('skipped processes have no duration', async () => {
+		const config = writeConfig(
+			'summary-skipped.json',
+			JSON.stringify({
+				processes: {
+					dep: { command: "sh -c 'exit 1'" },
+					child: { command: 'true', dependsOn: ['dep'] }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const skippedLine = lines.find(l => l.includes('child') && l.includes('skipped'))
+		expect(skippedLine).toBeDefined()
+		// Skipped processes never started, so no duration should appear
+		expect(skippedLine).not.toMatch(/\d+(ms|\.?\d*s)/)
+	}, 10000)
+
+	test('summary names are padded to equal width', async () => {
+		const config = writeConfig(
+			'summary-namepad.json',
+			JSON.stringify({
+				processes: {
+					a: { command: 'true' },
+					longname: { command: 'true' }
+				}
+			})
+		)
+		const { stdout } = await runPrefix(config, [], { NO_COLOR: '1' })
+		const lines = stdout.split('\n')
+		const aLine = lines.find(l => /^\s+a\s/.test(l) && l.includes('finished'))
+		const longLine = lines.find(l => l.includes('longname') && l.includes('finished'))
+		expect(aLine).toBeDefined()
+		expect(longLine).toBeDefined()
+		// Status text should start at the same column
+		const aStatusIdx = aLine!.indexOf('finished')
+		const longStatusIdx = longLine!.indexOf('finished')
+		expect(aStatusIdx).toBe(longStatusIdx)
 	}, 10000)
 })
 

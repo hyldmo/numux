@@ -4,6 +4,9 @@ import type { KeyEvent, ResolvedNumuxConfig } from '../types'
 import { buildProcessHexColorMap } from '../utils/color'
 import type { LogWriter } from '../utils/log-writer'
 import { log } from '../utils/logger'
+import { finalizeShutdown } from '../utils/shutdown'
+import { DARK_THEME, resolveTheme, type Theme } from '../utils/theme'
+import { HelpOverlay } from './help-overlay'
 import { SHORTCUTS } from './keybindings'
 import { Pane } from './pane'
 import { SearchController } from './search'
@@ -17,8 +20,10 @@ export class App {
 	private panes = new Map<string, Pane>()
 	private tabBar!: TabBar
 	private statusBar!: StatusBar
+	private helpOverlay!: HelpOverlay
 	private search!: SearchController
 	private activePane: string | null = null
+	private inputMode = false
 	private destroyed = false
 	private names: string[]
 	private termCols = 80
@@ -27,6 +32,7 @@ export class App {
 
 	private config: ResolvedNumuxConfig
 	private logWriter: LogWriter
+	private theme: Theme = DARK_THEME
 
 	private resizeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -42,6 +48,13 @@ export class App {
 	}
 
 	async start(): Promise<void> {
+		// Resolve theme before the renderer takes over stdin (OSC 11 needs raw stdin)
+		log(
+			`theme detect: pref=${this.config.theme ?? 'auto'} stdin.isTTY=${process.stdin.isTTY} stdout.isTTY=${process.stdout.isTTY} COLORFGBG=${process.env.COLORFGBG ?? '(unset)'}`
+		)
+		this.theme = await resolveTheme(this.config.theme)
+		log(`theme resolved: ${this.theme.mode}`)
+
 		this.renderer = await createCliRenderer({
 			exitOnCtrlC: false,
 			useMouse: true,
@@ -65,8 +78,8 @@ export class App {
 		})
 
 		// Tab bar (vertical sidebar)
-		const processHexColors = buildProcessHexColorMap(this.names, this.config)
-		this.tabBar = new TabBar(this.renderer, this.names, processHexColors)
+		const processHexColors = buildProcessHexColorMap(this.names, this.config, this.theme.palette)
+		this.tabBar = new TabBar(this.renderer, this.names, processHexColors, this.theme, this.config.sort === 'status')
 
 		// Content row: sidebar | pane
 		const contentRow = new BoxRenderable(this.renderer, {
@@ -82,7 +95,8 @@ export class App {
 			width: this.sidebarWidth,
 			height: '100%',
 			border: ['right'],
-			borderColor: '#444'
+			borderColor: this.theme.sidebarBorder,
+			backgroundColor: this.theme.sidebarBg
 		})
 		sidebar.add(this.tabBar.renderable)
 
@@ -93,8 +107,11 @@ export class App {
 			border: false
 		})
 
-		// Status bar (only visible during search)
-		this.statusBar = new StatusBar(this.renderer)
+		// Status bar
+		this.statusBar = new StatusBar(this.renderer, this.theme)
+
+		// Help overlay (hidden by default)
+		this.helpOverlay = new HelpOverlay(this.renderer, this.theme)
 
 		// Search controller
 		this.search = new SearchController({
@@ -108,7 +125,7 @@ export class App {
 		// Create a pane per process
 		for (const name of this.names) {
 			const interactive = this.config.processes[name].interactive === true
-			const pane = new Pane(this.renderer, name, termCols, termRows, interactive)
+			const pane = new Pane(this.renderer, name, termCols, termRows, interactive, this.theme)
 			if (this.config.timestamps) {
 				pane.setTimestamps(this.config.timestamps)
 			}
@@ -135,6 +152,7 @@ export class App {
 		layout.add(contentRow)
 		layout.add(this.statusBar.renderable)
 		this.renderer.root.add(layout)
+		this.renderer.root.add(this.helpOverlay.renderable)
 
 		// Wire tab events (mouse clicks)
 		this.tabBar.onSelect((_index, name) => this.switchPane(name))
@@ -179,21 +197,49 @@ export class App {
 		this.renderer.keyInput.on('keypress', (key: KeyEvent) => {
 			log(key)
 
-			// Ctrl+C: quit (always works)
+			// Ctrl+C: quit (always works, except in input mode where it goes to process)
 			if (key.ctrl && key.name === 'c') {
+				if (this.helpOverlay.isVisible) {
+					this.helpOverlay.hide()
+					return
+				}
+				if (this.inputMode) {
+					this.exitInputMode()
+					return
+				}
 				if (this.search.isActive) {
 					this.search.exit()
 					return
 				}
 				this.shutdown().then(() => {
-					process.exit(this.hasFailures() ? 1 : 0)
+					finalizeShutdown(this.logWriter, this.hasFailures() ? 1 : 0)
 				})
+				return
+			}
+
+			// Help overlay: ? toggles, Esc closes
+			if (this.helpOverlay.isVisible) {
+				if (key.name === 'escape' || key.sequence === '?' || key.name === 'h') {
+					this.helpOverlay.hide()
+				}
 				return
 			}
 
 			// Search mode input handling
 			if (this.search.isActive) {
 				this.search.handleInput(key)
+				return
+			}
+
+			// Input mode: forward keys to process, Escape exits
+			if (this.inputMode && this.activePane) {
+				if (key.name === 'escape') {
+					this.exitInputMode()
+					return
+				}
+				if (key.sequence) {
+					this.manager.write(this.activePane, key.sequence)
+				}
 				return
 			}
 
@@ -204,6 +250,18 @@ export class App {
 			// Non-interactive panes: plain keys act as shortcuts
 			if (!isInteractive) {
 				const name = key.name.toLowerCase()
+
+				// ?/H shows help overlay
+				if (key.sequence === '?' || name === 'h') {
+					this.helpOverlay.toggle()
+					return
+				}
+
+				// Enter: enter input mode
+				if (name === 'return') {
+					this.enterInputMode()
+					return
+				}
 
 				if (key.shift && name === SHORTCUTS.scrollToBottom.key) {
 					this.panes.get(this.activePane)?.scrollToBottom()
@@ -247,7 +305,7 @@ export class App {
 
 				if (name === SHORTCUTS.clear.key) {
 					this.panes.get(this.activePane)?.clear()
-					this.logWriter.truncate(this.activePane)
+					this.logWriter.markCopyStart(this.activePane)
 					return
 				}
 
@@ -260,6 +318,11 @@ export class App {
 						const fmt: boolean | string = this.config.timestamps ?? true
 						for (const pane of this.panes.values()) pane.setTimestamps(fmt)
 					}
+					return
+				}
+
+				if (name === SHORTCUTS.openLogs.key) {
+					this.openLogDirectory()
 					return
 				}
 
@@ -278,6 +341,17 @@ export class App {
 					const next = name === 'right' ? (current + 1) % count : (current - 1 + count) % count
 					this.tabBar.setSelectedIndex(next)
 					this.switchPane(this.tabBar.getNameAtIndex(next))
+					return
+				}
+
+				// Up/Down: scroll by line, Shift+Up/Down: scroll to top/bottom
+				if (name === 'up' || name === 'down') {
+					const pane = this.panes.get(this.activePane)
+					if (key.shift) {
+						name === 'up' ? pane?.scrollToTop() : pane?.scrollToBottom()
+					} else {
+						pane?.scrollBy(name === 'up' ? -1 : 1)
+					}
 					return
 				}
 
@@ -307,18 +381,45 @@ export class App {
 			}
 		})
 
-		// Show first pane and focus sidebar for keyboard navigation
+		// Show first pane. Tab bar is not focused — keyboard navigation (1-9, Left/Right)
+		// is handled by the global keypress handler so Up/Down can scroll the active pane.
 		if (this.names.length > 0) {
 			this.switchPane(this.names[0])
-			this.tabBar.focus()
 		}
 
 		// Start all processes
 		await this.manager.startAll(termCols, termRows)
 	}
 
+	private enterInputMode(): void {
+		this.inputMode = true
+		this.statusBar.setInputMode(true)
+		// Show cursor in active pane while in input mode
+		if (this.activePane) {
+			const pane = this.panes.get(this.activePane)
+			if (pane) pane.terminal.showCursor = true
+		}
+	}
+
+	private exitInputMode(): void {
+		this.inputMode = false
+		this.statusBar.setInputMode(false)
+		// Hide cursor again unless process is natively interactive
+		if (this.activePane) {
+			const isInteractive = this.config.processes[this.activePane]?.interactive === true
+			if (!isInteractive) {
+				const pane = this.panes.get(this.activePane)
+				if (pane) pane.terminal.showCursor = false
+			}
+		}
+	}
+
 	private switchPane(name: string): void {
 		if (this.activePane === name) return
+		// Exit input mode on pane switch
+		if (this.inputMode) {
+			this.exitInputMode()
+		}
 		// In single-pane search mode, exit search on pane switch
 		if (this.search.isActive && !this.search.isAllMode) {
 			this.search.exit()
@@ -396,13 +497,23 @@ export class App {
 		}
 	}
 
-	/** Copy all text in the active pane to clipboard. */
+	/** Open the log directory in the system file manager. */
+	private openLogDirectory(): void {
+		const dir = this.logWriter.getDirectory()
+		const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open'
+		try {
+			Bun.spawn([cmd, dir], { stdout: 'ignore', stderr: 'ignore' })
+			this.statusBar.showTemporaryMessage(`Opening ${dir}`)
+		} catch {
+			this.statusBar.showTemporaryMessage('Could not open log directory')
+		}
+	}
+
+	/** Copy all text in the active pane to clipboard (unwrapped, from log file). */
 	private copyAllText(): void {
 		if (!this.activePane) return
-		const pane = this.panes.get(this.activePane)
-		if (!pane) return
 
-		const text = pane.getText()
+		const text = this.logWriter.readLog(this.activePane)
 		if (!text) {
 			this.statusBar.showTemporaryMessage('No output to copy')
 			return

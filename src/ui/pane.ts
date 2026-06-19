@@ -5,8 +5,10 @@ import {
 	ScrollBoxRenderable,
 	type Selection
 } from '@opentui/core'
-import { GhosttyTerminalRenderable, type HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import type { HighlightRegion } from 'ghostty-opentui/terminal-buffer'
+import { DARK_THEME, type Theme } from '../utils/theme'
 import { DEFAULT_TIMESTAMP_FORMAT, formatTimestamp } from '../utils/timestamp'
+import { TailingTerminal } from './tailing-terminal'
 import { type DetectedLink, findLinkAtPosition } from './url-handler'
 
 export interface SearchMatch {
@@ -15,17 +17,26 @@ export interface SearchMatch {
 	end: number
 }
 
-// Cap the native terminal buffer to prevent unbounded growth. getJson()
-// serializes the entire buffer on each render — a huge buffer freezes the
-// event loop. Full output is always available in log files, so resetting
-// only loses in-terminal scrollback.
-const MAX_SCROLLBACK_LINES = 50_000
-// Fallback byte cap for hidden panes where lineCount isn't updated
-const MAX_BUFFER_BYTES = 10 * 1024 * 1024
+// Cap what gets serialized per render. Ghostty's native scrollback is unbounded
+// (max_scrollback = usize_max); rendering a million-line buffer via getJson()
+// freezes the event loop. Capping render output via `limit` plus the tail-view
+// offset in TailingTerminal keeps per-frame cost O(RENDER_LIMIT) regardless of
+// how much has been fed. Older lines remain in the native buffer; full history
+// is reachable via the on-disk log file (copy-all + search both read it).
+//
+// 1500 gives ~32ms on the hidden→visible transition with a 100k-line buffer
+// (native textBufferSetStyledText is super-linear in this value: 5000 → ~350ms,
+// 2000 → ~56ms, 1500 → ~32ms, 1000 → ~16ms). At 30 rows that's ~50 screens of
+// in-pane scrollback.
+const RENDER_LIMIT = 1_500
+// OOM backstop for truly runaway output. Much higher than the old 50k cap
+// because render cost is no longer proportional to buffer size.
+const MAX_SCROLLBACK_LINES = 1_000_000
+const MAX_BUFFER_BYTES = 500 * 1024 * 1024
 
 export class Pane {
 	readonly scrollBox: ScrollBoxRenderable
-	readonly terminal: GhosttyTerminalRenderable
+	readonly terminal: TailingTerminal
 	private decoder = new TextDecoder()
 	private bytesFed = 0
 
@@ -36,13 +47,27 @@ export class Pane {
 	/** Epoch ms when each logical line was first created */
 	lineTimestamps: number[] = []
 	private lineCounter = 0
+	private signedLineCount = 0
+	private timestampUpdateTimer: ReturnType<typeof setTimeout> | null = null
+	// Coalesces many feed events into one O(n) rebuild. Tied to ~2 render frames
+	// so multiple PTY chunks in quick succession share a single sign refresh.
+	private static readonly TIMESTAMP_UPDATE_DEBOUNCE_MS = 32
 
 	private _onScroll: (() => void) | null = null
 	private _onCopy: ((text: string) => void) | null = null
 	private _onLinkClick: ((link: DetectedLink) => void) | null = null
+	private theme: Theme
 
-	constructor(renderer: CliRenderer, name: string, cols: number, rows: number, interactive = false) {
+	constructor(
+		renderer: CliRenderer,
+		name: string,
+		cols: number,
+		rows: number,
+		interactive = false,
+		theme: Theme = DARK_THEME
+	) {
 		this.renderer = renderer
+		this.theme = theme
 		this.scrollBox = new ScrollBoxRenderable(renderer, {
 			id: `pane-${name}`,
 			flexGrow: 1,
@@ -50,16 +75,23 @@ export class Pane {
 			stickyScroll: true,
 			stickyStart: 'bottom',
 			visible: false,
-			onMouseScroll: () => this._onScroll?.()
+			onMouseScroll: () => this._onScroll?.(),
+			scrollbarOptions: {
+				trackOptions: {
+					backgroundColor: theme.scrollTrackBg,
+					foregroundColor: theme.scrollThumbBg
+				}
+			}
 		})
 
-		this.terminal = new GhosttyTerminalRenderable(renderer, {
+		this.terminal = new TailingTerminal(renderer, {
 			id: `term-${name}`,
 			cols,
 			rows,
 			persistent: true,
 			showCursor: interactive,
 			trimEnd: true,
+			limit: RENDER_LIMIT,
 			flexGrow: 1
 		})
 
@@ -106,11 +138,13 @@ export class Pane {
 
 	feed(data: Uint8Array): void {
 		this.bytesFed += data.length
-		if (this.terminal.lineCount > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
+		if (this.lineCounter > MAX_SCROLLBACK_LINES || this.bytesFed > MAX_BUFFER_BYTES) {
 			this.terminal.reset()
 			this.bytesFed = 0
 			this.lineTimestamps = []
 			this.lineCounter = 0
+			this.signedLineCount = 0
+			this.timestampGutter?.clearAllLineSigns()
 		}
 		const now = Date.now()
 		// Record timestamp for first line if we haven't yet
@@ -127,9 +161,17 @@ export class Pane {
 		}
 		const text = this.decoder.decode(data, { stream: true })
 		this.terminal.feed(text)
-		if (this._timestampFormat) {
-			this.updateTimestampSigns()
+		if (this._timestampFormat && this.lineTimestamps.length !== this.signedLineCount) {
+			this.scheduleTimestampUpdate()
 		}
+	}
+
+	private scheduleTimestampUpdate(): void {
+		if (this.timestampUpdateTimer) return
+		this.timestampUpdateTimer = setTimeout(() => {
+			this.timestampUpdateTimer = null
+			this.updateTimestampSigns()
+		}, Pane.TIMESTAMP_UPDATE_DEBOUNCE_MS)
 	}
 
 	resize(cols: number, rows: number): void {
@@ -202,7 +244,7 @@ export class Pane {
 				line: m.line,
 				start: m.start,
 				end: m.end,
-				backgroundColor: i === currentIndex ? '#b58900' : '#073642'
+				backgroundColor: i === currentIndex ? this.theme.searchCurrentBg : this.theme.searchMatchBg
 			})
 		}
 		this.terminal.highlights = regions
@@ -222,6 +264,11 @@ export class Pane {
 		this.bytesFed = 0
 		this.lineTimestamps = []
 		this.lineCounter = 0
+		this.signedLineCount = 0
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
 		if (this._timestampFormat) {
 			this.timestampGutter?.clearAllLineSigns()
 		}
@@ -235,6 +282,13 @@ export class Pane {
 
 		if (wasEnabled === isEnabled && this._timestampFormat === newFormat) return
 		this._timestampFormat = newFormat
+		// Any pending debounced rebuild was scheduled against the old format/state.
+		// Cancel it — the branches below decide whether to rebuild synchronously.
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
+		this.signedLineCount = 0
 
 		if (isEnabled && !wasEnabled) {
 			// Wrap terminal in LineNumberRenderable for gutter + scroll sync
@@ -268,23 +322,30 @@ export class Pane {
 		return this._timestampFormat !== null
 	}
 
+	/** Returns the current line signs map from the timestamp gutter, or null if disabled. */
+	getTimestampSigns(): Map<number, LineSign> | null {
+		return this.timestampGutter?.getLineSigns() ?? null
+	}
+
 	private updateTimestampSigns(): void {
 		if (!(this.timestampGutter && this._timestampFormat)) return
 		const fmt = this._timestampFormat
 		const signs = new Map<number, LineSign>()
-		let prevFormatted = ''
 		for (let i = 0; i < this.lineTimestamps.length; i++) {
-			const formatted = formatTimestamp(new Date(this.lineTimestamps[i]), fmt)
-			// Only show timestamp when it changes from the previous line
-			if (formatted !== prevFormatted) {
-				signs.set(i, { before: formatted })
-				prevFormatted = formatted
-			}
+			signs.set(i, { before: formatTimestamp(new Date(this.lineTimestamps[i]), fmt) })
 		}
 		this.timestampGutter.setLineSigns(signs)
+		this.signedLineCount = this.lineTimestamps.length
 	}
 
 	destroy(): void {
+		if (this.timestampUpdateTimer) {
+			clearTimeout(this.timestampUpdateTimer)
+			this.timestampUpdateTimer = null
+		}
+		// Detach terminal from the gutter's target before destroying it, otherwise
+		// the next render walks into a destroyed TextBufferView via the gutter.
+		this.timestampGutter?.clearTarget()
 		this.terminal.destroy()
 	}
 }

@@ -4,7 +4,7 @@ import type { NumuxConfig } from '../types'
 import { log } from '../utils/logger'
 import { interpolateConfig } from './interpolate'
 
-const CONFIG_FILES = ['numux.config.ts', 'numux.config.js'] as const
+export const CONFIG_FILES = ['numux.config.ts', 'numux.config.js'] as const
 
 export async function loadConfig(configPath?: string, cwd?: string): Promise<NumuxConfig> {
 	if (configPath) {

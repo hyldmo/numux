@@ -92,6 +92,19 @@ describe('ProcessManager — initialization', () => {
 		expect(names.indexOf('db')).toBeLessThan(names.indexOf('api'))
 		expect(names.indexOf('api')).toBeLessThan(names.indexOf('web'))
 	})
+
+	test('sort: status returns config order (reorder is applied in TabBar)', () => {
+		const config: ResolvedNumuxConfig = {
+			sort: 'status',
+			processes: {
+				web: { command: 'echo web' },
+				api: { command: 'echo api' },
+				db: { command: 'echo db' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		expect(mgr.getProcessNames()).toEqual(['web', 'api', 'db'])
+	})
 })
 
 describe('ProcessManager — startAll', () => {
@@ -321,8 +334,51 @@ describe('ProcessManager — restartAll', () => {
 		mgr.restartAll(80, 24)
 		// Wait for restarts to complete
 		await new Promise(r => setTimeout(r, 1000))
-		expect(mgr.getState('a')?.restartCount).toBe(1)
-		expect(mgr.getState('b')?.restartCount).toBe(1)
+		expect(mgr.getState('a')?.restartCount).toBe(0)
+		expect(mgr.getState('b')?.restartCount).toBe(0)
+		await mgr.stopAll()
+	}, 10000)
+})
+
+describe('ProcessManager — manual restart resets restartCount', () => {
+	test('restart() resets auto-restart count to 0', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				crasher: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for at least one auto-restart (1s backoff)
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('crasher')?.restartCount).toBeGreaterThan(0)
+
+		// Manual restart should reset the counter
+		mgr.restart('crasher', 80, 24)
+		expect(mgr.getState('crasher')?.restartCount).toBe(0)
+
+		await mgr.stopAll()
+	}, 10000)
+
+	test('start() resets restartCount on stopped process', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				server: { command: "sh -c 'exit 1'", maxRestarts: Infinity }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		// Wait for auto-restarts to accumulate
+		await new Promise(r => setTimeout(r, 1500))
+		expect(mgr.getState('server')?.restartCount).toBeGreaterThan(0)
+
+		await mgr.stop('server')
+		// start() should reset the counter
+		mgr.start('server', 80, 24)
+		expect(mgr.getState('server')?.restartCount).toBe(0)
+
 		await mgr.stopAll()
 	}, 10000)
 })
@@ -695,6 +751,58 @@ describe('ProcessManager — delay', () => {
 
 		// Clean up the startAll promise
 		await startPromise
+	}, 5000)
+})
+
+describe('ProcessManager — optional', () => {
+	test('optional process starts as stopped', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process can be manually started', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'true', optional: true }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+
+		mgr.start('studio', 80, 24)
+		await new Promise(r => setTimeout(r, 500))
+
+		const status = mgr.getState('studio')?.status
+		expect(status === 'finished' || status === 'ready').toBe(true)
+		await mgr.stopAll()
+	}, 5000)
+
+	test('optional process does not block dependents', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				studio: { command: 'sleep 60', optional: true },
+				child: { command: 'true', dependsOn: ['studio'] }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('studio')?.status).toBe('stopped')
+		// child should have started and finished — not blocked by optional dep
+		const childStatus = mgr.getState('child')?.status
+		expect(childStatus).not.toBe('pending')
+		expect(childStatus).not.toBe('skipped')
+		await mgr.stopAll()
 	}, 5000)
 })
 

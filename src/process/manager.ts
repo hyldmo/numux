@@ -93,6 +93,14 @@ export class ProcessManager {
 			const proc = this.config.processes[name]
 			const resolve = readyResolvers.get(name)!
 
+			// Optional processes start as stopped — resolve immediately so dependents aren't blocked
+			if (proc.optional) {
+				this.updateStatus(name, 'stopped')
+				this.createRunner(name)
+				resolve()
+				return
+			}
+
 			// Wait for declared dependencies only
 			const deps = proc.dependsOn ?? []
 			if (deps.length > 0) {
@@ -344,7 +352,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		runner.restart(cols, rows, command, env)
@@ -400,7 +408,7 @@ export class ProcessManager {
 		this.restartAttempts.set(name, 0)
 
 		state.exitCode = null
-		state.restartCount++
+		state.restartCount = 0
 		this.startTimes.set(name, Date.now())
 		const { command, env } = this.expandDependencyCaptures(name)
 		this.runners.get(name)?.restart(cols, rows, command, env)
