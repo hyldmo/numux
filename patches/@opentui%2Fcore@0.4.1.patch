@@ -1,0 +1,13 @@
+diff --git a/index-07zpr2dg.js b/index-07zpr2dg.js
+index 86b8e251fdf72df48ce654a78c95d2f55ad6ee8b..c67b8b24ac2bfd05b87d9f9c26e6e4b60824ad8b 100644
+--- a/index-07zpr2dg.js
++++ b/index-07zpr2dg.js
+@@ -9731,7 +9731,7 @@ Captured external output:
+         this.pendingSplitFooterTransition = null;
+         return "rendered";
+       }
+-      const force = this.forceFullRepaintRequested;
++      const force = true;/* numux: force full repaint every frame, see patches/ */
+       const nativeStatus = this.lib.render(this.rendererPtr, force);
+       if (nativeStatus === NATIVE_RENDER_STATUS_SKIPPED || nativeStatus === NATIVE_RENDER_STATUS_FAILED) {
+         return this.handleNativeRenderRejection(nativeStatus);
