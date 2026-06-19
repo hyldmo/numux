@@ -55,6 +55,10 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 
 Runs on PRs: commitlint, typecheck, lint, test.
 
+## Patches
+
+`patches/@opentui%2Fcore@0.4.1.patch` (bun patch) flips the renderer's per-frame `force` flag to always-`true`, so every native `lib.render` is a **full repaint** instead of an incremental cell-diff. OpenTUI's diff emitter desyncs from the host terminal's cursor (ambiguous-width glyphs / autowrap / emulator quirks) and never self-corrects — pane output smears into the sidebar, the scrollbar drops. The diff is the only thing that desyncs; forcing full repaints (the path resize already used) makes the corruption impossible. Composition stays dirty-tracked, so the only cost is more stdout bytes during active output (bounded by `targetFps`, 30). It's a band-aid for an upstream bug — do not revert to "restore the diff optimization" without confirming the drift is fixed in `@opentui/core`. The patch fails loud on upgrade (hashed bundle filename); reapply via `bun patch @opentui/core`.
+
 ## Hooks
 
 ### PreToolUse hooks (.claude/settings.json)
