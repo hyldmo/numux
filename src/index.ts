@@ -14,6 +14,7 @@ import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
+import { TmuxDisplay } from './ui/tmux'
 import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
@@ -278,8 +279,6 @@ async function main() {
 		}
 	}
 
-	const manager = new ProcessManager(config)
-
 	const logDir = parsed.logDir ?? config.logDir ?? defaultLogDir(process.cwd())
 	const logWriter = LogWriter.createPersistent(logDir)
 
@@ -287,7 +286,20 @@ async function main() {
 
 	const timestamps = parsed.timestamps || config.timestamps
 	const usePrefix = parsed.prefix || config.prefix
-	if (usePrefix) {
+	const useTmux = parsed.tmux
+
+	if (useTmux) {
+		const display = new TmuxDisplay(config, {
+			logWriter,
+			killOthers: parsed.killOthers || config.killOthers,
+			killOthersOnFail: parsed.killOthersOnFail || config.killOthersOnFail
+		})
+		const manager = new ProcessManager(config, display.createRunnerFactory())
+		display.setManager(manager)
+		setupShutdownHandlers(display, logWriter)
+		await display.start()
+	} else if (usePrefix) {
+		const manager = new ProcessManager(config)
 		const display = new PrefixDisplay(manager, config, {
 			logWriter,
 			killOthers: parsed.killOthers || config.killOthers,
@@ -296,6 +308,7 @@ async function main() {
 		})
 		await display.start()
 	} else {
+		const manager = new ProcessManager(config)
 		if (timestamps) config.timestamps = timestamps
 		manager.on(logWriter.handleEvent)
 		const app = new App(manager, config, logWriter)

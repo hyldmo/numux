@@ -13,7 +13,24 @@ export type RunnerEventHandler = {
 	onError: () => void
 }
 
-export class ProcessRunner {
+export interface Runner {
+	readonly name: string
+	readonly isReady: boolean
+	start: (cols: number, rows: number, commandOverride?: string, envOverride?: Record<string, string>) => void
+	restart: (
+		cols: number,
+		rows: number,
+		commandOverride?: string,
+		envOverride?: Record<string, string>
+	) => Promise<void>
+	stop: (timeoutMs?: number) => Promise<void>
+	resize: (cols: number, rows: number) => void
+	write: (data: string) => void
+}
+
+export type RunnerFactory = (name: string, config: ResolvedProcessConfig, handler: RunnerEventHandler) => Runner
+
+export class ProcessRunner implements Runner {
 	readonly name: string
 	private config: ResolvedProcessConfig
 	private handler: RunnerEventHandler

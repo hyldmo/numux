@@ -1,6 +1,10 @@
-import type { App } from '../ui/app'
 import type { LogWriter } from './log-writer'
 import { log } from './logger'
+
+export interface ShutdownTarget {
+	shutdown: () => Promise<void>
+	hasFailures: () => boolean
+}
 
 let finalized = false
 
@@ -15,7 +19,7 @@ export function finalizeShutdown(logWriter: LogWriter | undefined, exitCode: num
 	process.exit(exitCode)
 }
 
-export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
+export function setupShutdownHandlers(target: ShutdownTarget, logWriter?: LogWriter): void {
 	let shuttingDown = false
 
 	const shutdown = () => {
@@ -23,8 +27,8 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 			process.exit(1)
 		}
 		shuttingDown = true
-		app.shutdown().finally(() => {
-			finalizeShutdown(logWriter, app.hasFailures() ? 1 : 0)
+		target.shutdown().finally(() => {
+			finalizeShutdown(logWriter, target.hasFailures() ? 1 : 0)
 		})
 	}
 
@@ -32,7 +36,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	process.on('SIGTERM', shutdown)
 	process.on('uncaughtException', err => {
 		log('Uncaught exception:', err?.message ?? err)
-		app.shutdown().finally(() => {
+		target.shutdown().finally(() => {
 			process.stderr.write(`numux: unexpected error: ${err?.stack ?? err}\n`)
 			logWriter?.cleanup()
 			process.exit(1)
@@ -42,7 +46,7 @@ export function setupShutdownHandlers(app: App, logWriter?: LogWriter): void {
 	process.on('unhandledRejection', (reason: unknown) => {
 		const stack = reason instanceof Error ? reason.stack : String(reason)
 		log('Unhandled rejection:', stack)
-		app.shutdown().finally(() => {
+		target.shutdown().finally(() => {
 			process.stderr.write(`numux: unhandled rejection: ${stack}\n`)
 			logWriter?.cleanup()
 			process.exit(1)

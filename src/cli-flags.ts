@@ -136,6 +136,12 @@ export const FLAGS: FlagDef[] = [
 		description: 'Prefixed output mode (no TUI, for CI/scripts)'
 	},
 	{
+		type: 'boolean',
+		long: '--tmux',
+		key: 'tmux',
+		description: 'Use tmux for display instead of built-in TUI'
+	},
+	{
 		type: 'value',
 		long: '--only',
 		short: '-o',
