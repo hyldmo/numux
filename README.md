@@ -158,7 +158,9 @@ scripts that have sub-scripts beneath them. E.g. if `format:check` has
 `format:check` but keeps the leaf scripts.
 
 **Extra args:** Anything after the first space in the pattern is forwarded
-as extra arguments to each matched command: `lint:* --fix` → `bun run lint:js -- --fix`.
+as extra arguments to each matched command: `lint:* --fix` → `bun run lint:js --fix`.
+npm is the only package manager that needs a `--` separator, so it gets one:
+`npm run lint:js -- --fix`.
 
 **Template inheritance:** Config properties on a pattern entry (color, env,
 dependsOn, etc.) are inherited by all expanded processes. Color arrays are

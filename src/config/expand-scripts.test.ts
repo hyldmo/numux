@@ -406,6 +406,34 @@ describe('expandScriptPatterns', () => {
 		expect(proc(result, 'ts').command).toBe('npm run lint:ts -- --fix')
 	})
 
+	test('yarn gets no -- separator (it would reach the script as a literal arg)', () => {
+		const dir = setupDir('args-yarn', {
+			'package.json': pkgJson({ 'codegen:ts': 'gen-types', 'codegen:go': 'gen-go' }),
+			'yarn.lock': ''
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:codegen:* --project-id abc': {} } }, dir)
+		expect(proc(result, 'ts').command).toBe('yarn run codegen:ts --project-id abc')
+		expect(proc(result, 'go').command).toBe('yarn run codegen:go --project-id abc')
+	})
+
+	test('pnpm gets no -- separator', () => {
+		const dir = setupDir('args-pnpm', {
+			'package.json': pkgJson({ lint: 'eslint' }),
+			'pnpm-lock.yaml': ''
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
+		expect(proc(result, 'lint').command).toBe('pnpm run lint --fix')
+	})
+
+	test('bun gets no -- separator', () => {
+		const dir = setupDir('args-bun', {
+			'package.json': pkgJson({ lint: 'eslint' }),
+			'bun.lock': ''
+		})
+		const result = expandScriptPatterns({ processes: { 'npm:lint --fix': {} } }, dir)
+		expect(proc(result, 'lint').command).toBe('bun run lint --fix')
+	})
+
 	test('multiple extra args forwarded', () => {
 		const dir = setupDir('args-multi', {
 			'package.json': pkgJson({ 'lint:js': 'eslint' })
