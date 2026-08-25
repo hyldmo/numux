@@ -44,6 +44,7 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 
 	const sort = validateSort(config.sort)
 	const prefix = config.prefix === true ? true : undefined
+	const serial = config.serial === true ? true : undefined
 	const timestamps =
 		config.timestamps === true ? true : typeof config.timestamps === 'string' ? config.timestamps : undefined
 	const killOthers = config.killOthers === true ? true : undefined
@@ -181,6 +182,7 @@ export function validateConfig(raw: unknown, _warnings?: ValidationWarning[]): R
 	return {
 		...(sort ? { sort } : {}),
 		...(prefix ? { prefix } : {}),
+		...(serial ? { serial } : {}),
 		...(timestamps ? { timestamps } : {}),
 		...(killOthers ? { killOthers } : {}),
 		...(killOthersOnFail ? { killOthersOnFail } : {}),

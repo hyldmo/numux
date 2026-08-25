@@ -75,11 +75,16 @@ function splitPatternArgs(raw: string): { glob: string; extraArgs: string } {
 	return { glob: raw.slice(0, i), extraArgs: raw.slice(i) }
 }
 
-/** Convert a script name (with optional extra args) into a `<pm> run <script>` command */
+/** Convert a script name (with optional extra args) into a `<pm> run <script>` command.
+ *
+ * Only npm needs a `--` separator — it swallows args that come after the script
+ * name. yarn and pnpm forward those args as-is and pass a literal `--` through to
+ * the script (which breaks flag parsing in most CLIs); bun accepts either form. */
 function expandScriptCommand(raw: string, pm: PackageManager): string {
 	const { glob: script, extraArgs } = splitPatternArgs(raw)
 	if (extraArgs) {
-		return `${pm} run ${script} --${extraArgs}`
+		const separator = pm === 'npm' ? ' --' : ''
+		return `${pm} run ${script}${separator}${extraArgs}`
 	}
 	return `${pm} run ${script}`
 }
@@ -104,7 +109,9 @@ function expandScriptCommand(raw: string, pm: PackageManager): string {
  * `format:check` but keeps the leaf scripts.
  *
  * **Extra args:** Anything after the first space in the pattern is forwarded
- * as extra arguments to each matched command: `lint:* --fix` → `bun run lint:js -- --fix`.
+ * as extra arguments to each matched command: `lint:* --fix` → `bun run lint:js --fix`.
+ * npm is the only package manager that needs a `--` separator, so it gets one:
+ * `npm run lint:js -- --fix`.
  *
  * **Template inheritance:** Config properties on a pattern entry (color, env,
  * dependsOn, etc.) are inherited by all expanded processes. Color arrays are
