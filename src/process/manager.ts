@@ -73,10 +73,42 @@ export class ProcessManager {
 		}
 	}
 
+	/**
+	 * Run order for serial mode: display order, adjusted so no process comes
+	 * before something it depends on (which would deadlock the chain).
+	 */
+	serialOrder(): string[] {
+		const remaining = this.getProcessNames()
+		const placed = new Set<string>()
+		const order: string[] = []
+
+		while (remaining.length > 0) {
+			const ready = remaining.findIndex(name =>
+				(this.config.processes[name].dependsOn ?? []).every(d => placed.has(d) || !this.config.processes[d])
+			)
+			// -1 only on a dependency cycle, which the resolver rejects earlier
+			const [next] = remaining.splice(ready === -1 ? 0 : ready, 1)
+			placed.add(next)
+			order.push(next)
+		}
+
+		return order
+	}
+
 	async startAll(cols: number, rows: number): Promise<void> {
 		log('Starting all processes')
 		this.lastCols = cols
 		this.lastRows = rows
+
+		// Serial mode: each process also waits for the one before it in display order
+		const serialPredecessor = new Map<string, string>()
+		if (this.config.serial) {
+			const order = this.serialOrder()
+			log('Serial mode, run order:', order)
+			for (let i = 1; i < order.length; i++) {
+				serialPredecessor.set(order[i], order[i - 1])
+			}
+		}
 
 		// Create a ready promise per process — each resolves when that process is ready
 		const readyPromises = new Map<string, Promise<void>>()
@@ -105,6 +137,13 @@ export class ProcessManager {
 			const deps = proc.dependsOn ?? []
 			if (deps.length > 0) {
 				await Promise.all(deps.map(d => readyPromises.get(d)!))
+			}
+
+			// A failed predecessor does not skip the rest of the chain — unlike a
+			// failed dependency, it only says the slot is free
+			const predecessor = serialPredecessor.get(name)
+			if (predecessor) {
+				await readyPromises.get(predecessor)!
 			}
 
 			if (this.stopping) {

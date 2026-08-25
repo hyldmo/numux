@@ -126,6 +126,8 @@ async function main() {
 			config = filterConfig(config, parsed.only, parsed.exclude)
 		}
 
+		if (parsed.serial) config.serial = true
+
 		const tiers = resolveDependencyTiers(config)
 		const names = Object.keys(config.processes)
 		const filterNote = parsed.only || parsed.exclude ? ' (filtered)' : ''
@@ -151,6 +153,9 @@ async function main() {
 				const suffix = flags.length > 0 ? `  (${flags.join(', ')})` : ''
 				console.info(`  ${name}: ${proc.command}${suffix}`)
 			}
+		}
+		if (config.serial) {
+			console.info(`\nSerial: one at a time (${new ProcessManager(config).serialOrder().join(' → ')})`)
 		}
 		printWarnings(warnings)
 		process.exit(0)
@@ -242,6 +247,10 @@ async function main() {
 
 	if (parsed.sort) {
 		config.sort = parsed.sort as SortOrder
+	}
+
+	if (parsed.serial) {
+		config.serial = true
 	}
 
 	if (parsed.envFile !== undefined) {

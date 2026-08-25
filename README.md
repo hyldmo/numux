@@ -222,6 +222,7 @@ export default defineConfig({
 | `-e,` `--env-file` `<path|false>` | Env file path, or "false" to disable env file loading |
 | `--config` `<path>` | Config file path (default: auto-detect) |
 | `-p,` `--prefix` | Prefixed output mode (no TUI, for CI/scripts) |
+| `--serial` | Run one process at a time, in display order |
 | `-o,` `--only` `<a,b,...>` | Only run these processes (+ their dependencies) |
 | `-x,` `--exclude` `<a,b,...>` | Exclude these processes |
 | `--kill-others` | Kill all processes when any exits (regardless of exit code) |
@@ -282,6 +283,7 @@ Top-level options apply to all processes (process-level settings override):
 | `watch` | `string \| string[]` | Global watch patterns, inherited by processes without their own watch |
 | `sort` | `'config' \| 'alphabetical' \| 'topological' \| 'status'` | Tab display order. `'config'` preserves definition order (package.json script order for wildcards), `'alphabetical'` sorts by process name, `'topological'` sorts by dependency tiers, `'status'` uses config order but moves finished/stopped/failed/skipped tabs to the bottom. |
 | `prefix` | `boolean` | Use prefixed output mode instead of TUI (for CI/scripts) |
+| `serial` | `boolean` | Run one process at a time, in display order (see `sort`). Each process waits for the previous one to become ready — for one-shot commands, to exit. Dependencies still hold: a process never starts before what it depends on. |
 | `timestamps` | `boolean \| string` | Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) |
 | `killOthers` | `boolean` | Kill all processes when any one exits (regardless of exit code) |
 | `killOthersOnFail` | `boolean` | Kill all processes when any one exits with a non-zero exit code |

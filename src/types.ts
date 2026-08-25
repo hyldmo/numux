@@ -105,6 +105,13 @@ export interface NumuxConfig<K extends string = string> {
 	 * @default false
 	 */
 	prefix?: boolean
+	/**
+	 * Run one process at a time, in display order (see `sort`). Each process waits
+	 * for the previous one to become ready — for one-shot commands, to exit.
+	 * Dependencies still hold: a process never starts before what it depends on.
+	 * @default false
+	 */
+	serial?: boolean
 	/** Add timestamps to output lines. `true` uses default `HH:mm:ss.SSS` format, or pass a format string (e.g. `"HH:mm:ss"`) */
 	timestamps?: boolean | string
 	/**
@@ -156,6 +163,7 @@ export interface ResolvedProcessConfig extends Omit<NumuxProcessConfig, 'depends
 export interface ResolvedNumuxConfig {
 	sort?: SortOrder
 	prefix?: boolean
+	serial?: boolean
 	timestamps?: boolean | string
 	killOthers?: boolean
 	killOthersOnFail?: boolean

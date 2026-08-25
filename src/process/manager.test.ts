@@ -196,6 +196,104 @@ describe('ProcessManager — startAll', () => {
 	}, 10000)
 })
 
+describe('ProcessManager — serial mode', () => {
+	test('runs one process at a time in display order', async () => {
+		const config: ResolvedNumuxConfig = {
+			serial: true,
+			processes: {
+				a: { command: 'sleep 0.3' },
+				b: { command: 'true' },
+				c: { command: 'true' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const running: string[] = []
+		const startOrder: string[] = []
+		let maxConcurrent = 0
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') {
+				startOrder.push(e.name)
+				running.push(e.name)
+				maxConcurrent = Math.max(maxConcurrent, running.length)
+			}
+			if (e.type === 'exit') {
+				const i = running.indexOf(e.name)
+				if (i !== -1) running.splice(i, 1)
+			}
+		})
+
+		await mgr.startAll(80, 24)
+
+		expect(startOrder).toEqual(['a', 'b', 'c'])
+		expect(maxConcurrent).toBe(1)
+		await mgr.stopAll()
+	}, 10000)
+
+	test('a failed process does not skip the rest of the chain', async () => {
+		const config: ResolvedNumuxConfig = {
+			serial: true,
+			processes: {
+				first: { command: 'sh -c "exit 1"' },
+				second: { command: 'true' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+
+		await mgr.startAll(80, 24)
+
+		expect(mgr.getState('first')?.status).toBe('failed')
+		expect(mgr.getState('second')?.status).toBe('finished')
+		await mgr.stopAll()
+	}, 10000)
+
+	test('display order is reordered so dependencies still run first', async () => {
+		const config: ResolvedNumuxConfig = {
+			serial: true,
+			processes: {
+				web: { command: 'true', dependsOn: ['api'] },
+				api: { command: 'true' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const startOrder: string[] = []
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') startOrder.push(e.name)
+		})
+
+		await mgr.startAll(80, 24)
+
+		expect(startOrder).toEqual(['api', 'web'])
+		await mgr.stopAll()
+	}, 10000)
+
+	test('processes start concurrently without serial', async () => {
+		const config: ResolvedNumuxConfig = {
+			processes: {
+				a: { command: 'sleep 0.3' },
+				b: { command: 'sleep 0.3' }
+			}
+		}
+		const mgr = new ProcessManager(config)
+		const running: string[] = []
+		let maxConcurrent = 0
+		mgr.on(e => {
+			if (e.type === 'status' && e.status === 'starting') {
+				running.push(e.name)
+				maxConcurrent = Math.max(maxConcurrent, running.length)
+			}
+			if (e.type === 'exit') {
+				const i = running.indexOf(e.name)
+				if (i !== -1) running.splice(i, 1)
+			}
+		})
+
+		await mgr.startAll(80, 24)
+
+		expect(maxConcurrent).toBe(2)
+		await mgr.stopAll()
+	}, 10000)
+})
+
 describe('ProcessManager — skip propagation', () => {
 	test('skips dependents when a dependency fails', async () => {
 		const config: ResolvedNumuxConfig = {

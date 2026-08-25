@@ -136,6 +136,12 @@ export const FLAGS: FlagDef[] = [
 		description: 'Prefixed output mode (no TUI, for CI/scripts)'
 	},
 	{
+		type: 'boolean',
+		long: '--serial',
+		key: 'serial',
+		description: 'Run one process at a time, in display order'
+	},
+	{
 		type: 'value',
 		long: '--only',
 		short: '-o',
