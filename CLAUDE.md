@@ -60,22 +60,9 @@ Runs on PRs: commitlint, typecheck, lint, test.
 
 ## Hooks
 
-### PreToolUse hooks (.claude/settings.json)
-
-- **Bash matcher**: Runs `save-learnings-reminder.sh` before any Bash tool call. On `git commit` commands, injects a reminder to save session learnings to memory files or CLAUDE.md.
-
 ### Stop hooks (.claude/settings.json)
 
 - **Auto-fix**: Runs `bun run fix` when a Claude session ends, ensuring code is always formatted.
-
-### Hookify rules (.claude/)
-
-| Rule | Action | Pattern | Purpose |
-|------|--------|---------|---------|
-| `block-force-delete` | block | `rm\s+.*-[^\s]*f` | Prevents `rm -f`; use `rm` without force flag |
-| `block-npx` | block | `\bnpx\s+` | Prevents npx; use `bun`/`bunx` instead |
-| `no-git-c-flag` | block | `git\s+-C\s+` | Prevents `git -C`; already in correct directory |
-| `save-learnings-on-commit` | warn | `git\s+commit` | Reminds to save learnings before committing |
 
 ### Headless runner (.claude/run.sh)
 
