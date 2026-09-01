@@ -60,6 +60,10 @@ Runs on PRs: commitlint, typecheck, lint, test.
 
 ## Hooks
 
+### PreToolUse hooks (.claude/settings.json)
+
+- **Docs sync reminder**: Before an actual `git commit`, `.claude/hooks/docs-sync-reminder.sh` checks the full dirty set for user-facing source or tooling changes whose README.md / CLAUDE.md mirror is untouched. If a mirror may be stale, it tells the agent to stop and update the docs first. It emits `additionalContext` only and never changes Bash permissions.
+
 ### Stop hooks (.claude/settings.json)
 
 - **Auto-fix**: Runs `bun run fix` when a Claude session ends, ensuring code is always formatted.
