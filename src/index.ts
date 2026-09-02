@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildConfigFromArgs, deriveProcessName, filterConfig, parseArgs } from './cli'
+import { buildConfigFromArgs, deriveProcessName, filterConfig, type ParsedArgs, parseArgs } from './cli'
 import { generateHelp } from './cli-flags'
 import { generateCompletions } from './completions'
+import { watchConfig } from './config/config-watcher'
 import { expandScriptPatterns } from './config/expand-scripts'
-import { loadConfig } from './config/loader'
+import { loadConfig, resolveConfigPath } from './config/loader'
 import { filterByPlatform } from './config/platform'
 import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
@@ -193,6 +194,7 @@ async function main() {
 	}
 
 	let config: ResolvedNumuxConfig
+	let configFilePath: string | null = null
 	const warnings: ValidationWarning[] = []
 
 	if (parsed.commands.length > 0 || parsed.named.length > 0 || parsed.workspace) {
@@ -240,6 +242,7 @@ async function main() {
 			}
 		}
 	} else {
+		configFilePath = resolveConfigPath(parsed.configPath)
 		const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
 		config = validateConfig(raw, warnings)
 		config = filterByPlatform(config)
@@ -309,6 +312,21 @@ async function main() {
 		manager.on(logWriter.handleEvent)
 		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)
+
+		// Set up config file watching (on by default in TUI mode with a config file)
+		if (configFilePath && !parsed.noConfigWatch) {
+			const watcher = watchConfig(
+				configFilePath,
+				config,
+				() => loadAndApplyConfig(parsed),
+				(newConfig, diff) => {
+					app.updateConfig(newConfig)
+					manager.applyConfigChange(newConfig, diff)
+				}
+			)
+			app.setConfigWatcher(watcher)
+		}
+
 		await app.start()
 	}
 }
@@ -317,6 +335,38 @@ function printWarnings(warnings: ValidationWarning[]): void {
 	for (const w of warnings) {
 		console.warn(`Warning: process "${w.process}": ${w.message}`)
 	}
+}
+
+/** Reload config from file and re-apply CLI overrides. Used by config watcher. */
+async function loadAndApplyConfig(parsed: ParsedArgs): Promise<ResolvedNumuxConfig> {
+	const raw = expandWorkspaces(expandScriptPatterns(await loadConfig(parsed.configPath)))
+	let config = validateConfig(raw)
+	config = filterByPlatform(config)
+
+	if (parsed.maxRestarts !== undefined) {
+		for (const proc of Object.values(config.processes)) {
+			proc.maxRestarts = parsed.maxRestarts
+		}
+	}
+	if (parsed.envFile !== undefined) {
+		for (const proc of Object.values(config.processes)) {
+			proc.envFile = parsed.envFile
+		}
+	}
+	if (parsed.noWatch) {
+		for (const proc of Object.values(config.processes)) {
+			delete proc.watch
+		}
+	}
+	if (parsed.only || parsed.exclude) {
+		config = filterConfig(config, parsed.only, parsed.exclude)
+	}
+	if (parsed.autoColors) {
+		for (const [name, proc] of Object.entries(config.processes)) {
+			if (!proc.color) proc.color = colorFromName(name)
+		}
+	}
+	return config
 }
 
 async function resolveLogDir(configPath?: string): Promise<{ dir: string; explicit: boolean }> {

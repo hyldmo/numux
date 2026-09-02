@@ -198,6 +198,8 @@ export type ProcessEvent =
 	| { type: 'output'; name: string; data: Uint8Array }
 	| { type: 'exit'; name: string; code: number | null }
 	| { type: 'error'; name: string }
+	| { type: 'added'; name: string; config: ResolvedProcessConfig }
+	| { type: 'removed'; name: string }
 
 export interface KeyEvent {
 	ctrl: boolean
