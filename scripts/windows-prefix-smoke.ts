@@ -27,10 +27,7 @@ async function runPrefix(config: unknown): Promise<{ stdout: string; stderr: str
 			stderr: 'pipe',
 			env: { ...process.env, FORCE_COLOR: '0' }
 		})
-		const [stdout, stderr] = await Promise.all([
-			new Response(proc.stdout).text(),
-			new Response(proc.stderr).text()
-		])
+		const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
 		const exitCode = await proc.exited
 		return { stdout, stderr, exitCode }
 	} finally {
