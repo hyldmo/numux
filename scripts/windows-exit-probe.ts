@@ -1,21 +1,8 @@
 #!/usr/bin/env bun
-/** Temporary diagnostic round 3: spaced-path script files + powershell-stdin route. */
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-
-async function probe(name: string, argv: string[], stdinText?: string): Promise<void> {
+/** Temporary diagnostic round 4: windowsVerbatimArguments + Node-style wrapped tail. */
+async function probe(name: string, argv: string[], extra?: Record<string, unknown>): Promise<void> {
 	try {
-		const proc = Bun.spawn(argv, {
-			stdout: 'pipe',
-			stderr: 'pipe',
-			stdin: stdinText !== undefined ? 'pipe' : 'ignore'
-		})
-		if (stdinText !== undefined && proc.stdin) {
-			const sink = proc.stdin as unknown as { write: (c: string) => number; end: () => void }
-			sink.write(stdinText)
-			sink.end()
-		}
+		const proc = Bun.spawn(argv, { stdout: 'pipe', stderr: 'pipe', stdin: 'ignore', ...extra })
 		const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
 		const code = await proc.exited
 		console.info(
@@ -27,15 +14,7 @@ async function probe(name: string, argv: string[], stdinText?: string): Promise<
 }
 
 console.info(`platform=${process.platform} bun=${Bun.version}`)
-// Spaced directory (tmpdir on CI has no spaces, so craft one under cwd)
-const spacedDir = join(process.cwd(), 'probe dir with spaces')
-mkdirSync(spacedDir, { recursive: true })
-const spacedScript = join(spacedDir, 'run.cmd')
-writeFileSync(spacedScript, '@echo off\r\nbun -e "process.exit(50)"\r\n')
-await probe('P10 spaced-script-libuv-quoted', ['cmd', '/d', '/s', '/c', spacedScript])
-await probe(
-	'P13 powershell-stdin',
-	['powershell', '-NoProfile', '-NonInteractive', '-Command', '-'],
-	'bun -e "process.exit(51)"\n'
-)
-console.info(`tmpdir=${tmpdir()}`)
+const V = { windowsVerbatimArguments: true }
+await probe('Q4 verbatim-quoteless', ['cmd', '/d', '/s', '/c', 'bun --version'], V)
+await probe('Q1 verbatim-wrapped-quotes', ['cmd', '/d', '/s', '/c', '"bun -e "process.exit(52)""'], V)
+await probe('Q5 verbatim-compound', ['cmd', '/d', '/s', '/c', '"echo one && bun -e "process.exit(53)""'], V)
