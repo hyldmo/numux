@@ -104,8 +104,14 @@ async function main() {
 				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
 				process.exit(1)
 			}
-			// Stream directly instead of spawning `cat` so this works on Windows
-			await Bun.write(Bun.stdout, Bun.file(logFile))
+			// Stream directly instead of spawning `cat` so this works on Windows.
+			// Chunked writes (not Bun.write/sendfile, which cannot target a
+			// pipe) with drain handling so piped output is never truncated.
+			for await (const chunk of Bun.file(logFile).stream()) {
+				if (!process.stdout.write(chunk)) {
+					await new Promise<void>(resolve => process.stdout.once('drain', resolve))
+				}
+			}
 			process.exit(0)
 		}
 
