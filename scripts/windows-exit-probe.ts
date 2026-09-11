@@ -1,12 +1,21 @@
 #!/usr/bin/env bun
-/** Temporary diagnostic round 2: find a cmd invocation form that preserves quotes. */
-import { writeFileSync } from 'node:fs'
+/** Temporary diagnostic round 3: spaced-path script files + powershell-stdin route. */
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-async function probe(name: string, argv: string[]): Promise<void> {
+async function probe(name: string, argv: string[], stdinText?: string): Promise<void> {
 	try {
-		const proc = Bun.spawn(argv, { stdout: 'pipe', stderr: 'pipe', stdin: 'ignore' })
+		const proc = Bun.spawn(argv, {
+			stdout: 'pipe',
+			stderr: 'pipe',
+			stdin: stdinText !== undefined ? 'pipe' : 'ignore'
+		})
+		if (stdinText !== undefined && proc.stdin) {
+			const sink = proc.stdin as unknown as { write: (c: string) => number; end: () => void }
+			sink.write(stdinText)
+			sink.end()
+		}
 		const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()])
 		const code = await proc.exited
 		console.info(
@@ -18,13 +27,15 @@ async function probe(name: string, argv: string[]): Promise<void> {
 }
 
 console.info(`platform=${process.platform} bun=${Bun.version}`)
-await probe('P1 echo-tail', ['cmd', '/d', '/s', '/c', 'echo hello-tail'])
-await probe('P8 bun-version-noquotes', ['cmd', '/d', '/s', '/c', 'bun --version'])
-await probe('P2 no-S', ['cmd', '/d', '/c', 'bun -e "process.exit(43)"'])
-await probe('P3 bare-C', ['cmd', '/c', 'bun -e "process.exit(44)"'])
-await probe('P4 prequoted-args', ['cmd', '/d', '/s', '/c', '"bun" "-e" "process.exit(45)"'])
-await probe('P9 wrapped-tail', ['cmd', '/d', '/s', '/c', '"bun -e "process.exit(49)""'])
-// Script-file route: zero quoting through the spawn boundary
-const scriptPath = join(tmpdir(), `numux-probe-${process.pid}.cmd`)
-writeFileSync(scriptPath, '@echo off\r\nbun -e "process.exit(48)"\r\n')
-await probe('P7 script-file', ['cmd', '/d', '/s', '/c', scriptPath])
+// Spaced directory (tmpdir on CI has no spaces, so craft one under cwd)
+const spacedDir = join(process.cwd(), 'probe dir with spaces')
+mkdirSync(spacedDir, { recursive: true })
+const spacedScript = join(spacedDir, 'run.cmd')
+writeFileSync(spacedScript, '@echo off\r\nbun -e "process.exit(50)"\r\n')
+await probe('P10 spaced-script-libuv-quoted', ['cmd', '/d', '/s', '/c', spacedScript])
+await probe(
+	'P13 powershell-stdin',
+	['powershell', '-NoProfile', '-NonInteractive', '-Command', '-'],
+	'bun -e "process.exit(51)"\n'
+)
+console.info(`tmpdir=${tmpdir()}`)
