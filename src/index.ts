@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildConfigFromArgs, deriveProcessName, filterConfig, parseArgs } from './cli'
 import { generateHelp } from './cli-flags'
@@ -104,8 +104,8 @@ async function main() {
 				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
 				process.exit(1)
 			}
-			// Read directly instead of spawning `cat` so this works on Windows
-			process.stdout.write(readFileSync(logFile, 'utf-8'))
+			// Stream directly instead of spawning `cat` so this works on Windows
+			await Bun.write(Bun.stdout, Bun.file(logFile))
 			process.exit(0)
 		}
 
