@@ -163,7 +163,7 @@ function parseInterfaceFields(src: string, interfaceName: string): FieldDoc[] {
 // --- Process options table ---
 
 function generateProcessOptionsTable(): string {
-	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8')
+	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8').replace(/\r\n/g, '\n')
 	const fields = parseInterfaceFields(src, 'NumuxProcessConfig')
 
 	const rows: string[] = ['| Field | Type | Default | Description |', '|-------|------|---------|-------------|']
@@ -182,7 +182,7 @@ function generateProcessOptionsTable(): string {
 // --- Global options table ---
 
 function generateGlobalOptionsTable(): string {
-	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8')
+	const src = readFileSync(join(ROOT, 'src/types.ts'), 'utf8').replace(/\r\n/g, '\n')
 	const fields = parseInterfaceFields(src, 'NumuxConfig')
 
 	const rows: string[] = ['| Field | Type | Description |', '|-------|------|-------------|']
@@ -199,7 +199,7 @@ function generateGlobalOptionsTable(): string {
 // --- Script pattern rules ---
 
 function generateScriptPatternRules(): string {
-	const src = readFileSync(join(ROOT, 'src/config/expand-scripts.ts'), 'utf8')
+	const src = readFileSync(join(ROOT, 'src/config/expand-scripts.ts'), 'utf8').replace(/\r\n/g, '\n')
 
 	// Extract the JSDoc block directly above expandScriptPatterns.
 	// Find the function declaration first, then look backwards for its JSDoc.
@@ -255,7 +255,7 @@ function generateSubcommandExamples(name: string): string {
 
 function updateReadme(): void {
 	const readmePath = join(ROOT, 'README.md')
-	let readme = readFileSync(readmePath, 'utf8')
+	let readme = readFileSync(readmePath, 'utf8').replace(/\r\n/g, '\n')
 
 	readme = replaceSection(readme, 'subcommands', generateSubcommandsBlock())
 	readme = replaceSection(readme, 'options', generateOptionsTable())
@@ -290,7 +290,7 @@ function generateHelpTopics(): void {
 	const outDir = join(ROOT, 'src/generated')
 	mkdirSync(outDir, { recursive: true })
 
-	const readme = readFileSync(join(ROOT, 'README.md'), 'utf8')
+	const readme = readFileSync(join(ROOT, 'README.md'), 'utf8').replace(/\r\n/g, '\n')
 
 	// Split on ## or ### headings
 	const parts = readme.split(/(?=^#{2,3} )/m)

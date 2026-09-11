@@ -12,14 +12,13 @@ import { type ValidationWarning, validateConfig } from './config/validator'
 import { expandWorkspaces, resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
-import { App } from './ui/app'
 import { PrefixDisplay } from './ui/prefix'
 import { type Color, colorFromName } from './utils/color'
 import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { defaultLogDir } from './utils/project-name'
-import { setupShutdownHandlers } from './utils/shutdown'
+import { shellArgv, shellSpawnOptions } from './utils/shell'
 
 const HELP = generateHelp()
 
@@ -105,11 +104,15 @@ async function main() {
 				console.error(`No log file for "${parsed.logsProcess}". ${available}`)
 				process.exit(1)
 			}
-			const child = Bun.spawn(['cat', logFile], {
-				stdout: 'inherit',
-				stderr: 'inherit'
-			})
-			process.exit(await child.exited)
+			// Stream directly instead of spawning `cat` so this works on Windows.
+			// Chunked writes (not Bun.write/sendfile, which cannot target a
+			// pipe) with drain handling so piped output is never truncated.
+			for await (const chunk of Bun.file(logFile).stream()) {
+				if (!process.stdout.write(chunk)) {
+					await new Promise<void>(resolve => process.stdout.once('drain', resolve))
+				}
+			}
+			process.exit(0)
 		}
 
 		console.info(target)
@@ -178,9 +181,10 @@ async function main() {
 			...proc.env
 		}
 
-		const child = Bun.spawn(['sh', '-c', parsed.execCommand!], {
+		const child = Bun.spawn(shellArgv(parsed.execCommand!), {
 			cwd,
 			env,
+			...shellSpawnOptions(),
 			stdout: 'inherit',
 			stdin: 'inherit',
 			stderr: 'inherit'
@@ -307,6 +311,11 @@ async function main() {
 	} else {
 		if (timestamps) config.timestamps = timestamps
 		manager.on(logWriter.handleEvent)
+		// Import the TUI lazily: it pulls native modules (@opentui/core,
+		// ghostty-opentui) that crash Bun at load time on Windows, and
+		// --prefix / --validate / exec never need them.
+		const { App } = await import('./ui/app')
+		const { setupShutdownHandlers } = await import('./utils/shutdown')
 		const app = new App(manager, config, logWriter)
 		setupShutdownHandlers(app, logWriter)
 		await app.start()

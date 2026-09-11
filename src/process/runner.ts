@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import type { ProcessStatus, ResolvedProcessConfig } from '../types'
 import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
+import { shellArgv, shellSpawnOptions } from '../utils/shell'
 import { createErrorChecker } from './error'
 import { createReadinessChecker } from './ready'
 
@@ -69,20 +70,31 @@ export class ProcessRunner {
 				...(this.envOverride ?? this.config.env)
 			}
 
-			this.proc = Bun.spawn(['sh', '-c', command], {
+			this.proc = Bun.spawn(shellArgv(command), {
 				cwd,
 				env,
-				terminal: {
-					cols,
-					rows,
-					data: (_terminal, data) => {
-						if (this.generation !== gen) return
-						this.handler.onOutput(data)
-						this.checkReadiness(data)
-						this.checkError(data)
-					}
-				}
+				...shellSpawnOptions(),
+				...(process.platform === 'win32'
+					? // Bun's PTY (`terminal`) is POSIX-only — on Windows use pipes
+						// and forward both streams into the same output handler.
+						{ stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' }
+					: {
+							terminal: {
+								cols,
+								rows,
+								data: (_terminal, data) => {
+									if (this.generation !== gen) return
+									this.handler.onOutput(data)
+									this.checkReadiness(data)
+									this.checkError(data)
+								}
+							}
+						})
 			})
+			if (process.platform === 'win32') {
+				this.pumpPipe(this.proc.stdout as ReadableStream<Uint8Array> | null, gen)
+				this.pumpPipe(this.proc.stderr as ReadableStream<Uint8Array> | null, gen)
+			}
 		} catch (err) {
 			log(`[${this.name}] Spawn failed: ${err}`)
 			const encoder = new TextEncoder()
@@ -150,6 +162,24 @@ export class ProcessRunner {
 		if (this.errorChecker.feedOutput(text)) {
 			this.handler.onError()
 		}
+	}
+
+	/** Forward a piped stdio stream (Windows, where PTY is unavailable) into the output handlers */
+	private pumpPipe(stream: ReadableStream<Uint8Array> | null, gen: number): void {
+		if (!stream) return
+		;(async () => {
+			try {
+				for await (const chunk of stream) {
+					if (this.generation !== gen) break
+					const data = chunk as Uint8Array
+					this.handler.onOutput(data)
+					this.checkReadiness(data)
+					this.checkError(data)
+				}
+			} catch {
+				// Stream closed during stop/restart — safe to ignore
+			}
+		})()
 	}
 
 	private startReadyTimeout(gen: number): void {
@@ -243,16 +273,19 @@ export class ProcessRunner {
 	/** Signal the entire process group (child + its descendants), falling back to direct PID */
 	private killProcessGroup(sig: NodeJS.Signals): void {
 		if (!this.proc) return
-		try {
-			// Negative PID signals the entire process group
-			process.kill(-this.proc.pid, sig)
-		} catch {
-			// Process group may not exist; fall back to direct kill
+		if (process.platform !== 'win32') {
 			try {
-				this.proc.kill(sig)
+				// Negative PID signals the entire process group (POSIX-only)
+				process.kill(-this.proc.pid, sig)
+				return
 			} catch {
-				// Process already exited
+				// Process group may not exist; fall back to direct kill
 			}
+		}
+		try {
+			this.proc.kill(sig)
+		} catch {
+			// Process already exited
 		}
 	}
 
