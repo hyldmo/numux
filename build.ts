@@ -34,12 +34,19 @@ const bundlePatches: BunPlugin = {
 }
 
 // Main bundle — includes patched ghostty-opentui/terminal-buffer
+// Code splitting is required, not an optimization: the TUI (`./ui/app`)
+// is dynamically imported so `--prefix` never evaluates native modules
+// (@opentui/core, ghostty-opentui) at startup. Without splitting, the
+// bundler inlines the whole UI graph into the main chunk and hoists its
+// static native imports to top level — segfaulting Bun on Windows
+// (ghostty-opentui.node) for every invocation, including `--version`.
 const main = await Bun.build({
 	entrypoints: ['src/index.ts'],
 	outdir: 'dist',
 	target: 'bun',
+	splitting: true,
 	external: ['@opentui/core'],
-	naming: { entry: 'numux.js' },
+	naming: { entry: 'numux.js', chunk: 'numux-chunk-[hash].[ext]' },
 	plugins: [bundlePatches]
 })
 
