@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
 	"files": {
 		"includes": ["**"]
 	},
@@ -22,6 +22,7 @@
 		"enabled": true,
 		"rules": {
 			"complexity": {
+				"useArrayFind": "error",
 				"noExcessiveNestedTestSuites": "error",
 				"noUselessStringRaw": "error",
 				"noUselessStringConcat": "error",
@@ -38,6 +39,7 @@
 			},
 			"suspicious": {
 				"useIterableCallbackReturn": "off",
+				"noProto": "error",
 				"noConsole": {
 					"level": "warn",
 					"options": {
@@ -54,17 +56,14 @@
 			},
 			"style": {
 				"noExportedImports": "error",
-				"noNonNullAssertion": "off"
-			},
-			"nursery": {
+				"noNonNullAssertion": "off",
 				"useConsistentEnumValueType": "error",
 				"useConsistentMethodSignatures": "error",
 				"useErrorCause": "error",
-				"noMultiAssign": "error",
-				"useAwaitThenable": "off", // Currently too many false positives as of v2.3.14
-				"noMultiStr": "error",
-				"noProto": "error",
-				"useFind": "error"
+				"noMultiAssign": "error"
+			},
+			"nursery": {
+				"useAwaitThenable": "off" // Currently too many false positives as of v2.5.12
 			}
 		}
 	},

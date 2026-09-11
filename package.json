@@ -49,7 +49,7 @@
     "ghostty-opentui": "^1.5.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.4",
+    "@biomejs/biome": "^2.5.0",
     "@commitlint/cli": "^20.4.2",
     "@commitlint/config-conventional": "^20.4.2",
     "@types/bun": "^1.3.9",
