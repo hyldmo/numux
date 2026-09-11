@@ -18,7 +18,7 @@ import { loadEnvFiles } from './utils/env-file'
 import { LogWriter } from './utils/log-writer'
 import { enableDebugLog } from './utils/logger'
 import { defaultLogDir } from './utils/project-name'
-import { shellArgv } from './utils/shell'
+import { shellArgv, shellSpawnOptions } from './utils/shell'
 
 const HELP = generateHelp()
 
@@ -178,6 +178,7 @@ async function main() {
 		const child = Bun.spawn(shellArgv(parsed.execCommand!), {
 			cwd,
 			env,
+			...shellSpawnOptions(),
 			stdout: 'inherit',
 			stdin: 'inherit',
 			stderr: 'inherit'

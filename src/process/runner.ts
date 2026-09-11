@@ -2,7 +2,7 @@ import { resolve } from 'node:path'
 import type { ProcessStatus, ResolvedProcessConfig } from '../types'
 import { loadEnvFiles } from '../utils/env-file'
 import { log } from '../utils/logger'
-import { shellArgv } from '../utils/shell'
+import { shellArgv, shellSpawnOptions } from '../utils/shell'
 import { createErrorChecker } from './error'
 import { createReadinessChecker } from './ready'
 
@@ -73,6 +73,7 @@ export class ProcessRunner {
 			this.proc = Bun.spawn(shellArgv(command), {
 				cwd,
 				env,
+				...shellSpawnOptions(),
 				...(process.platform === 'win32'
 					? // Bun's PTY (`terminal`) is POSIX-only — on Windows use pipes
 						// and forward both streams into the same output handler.

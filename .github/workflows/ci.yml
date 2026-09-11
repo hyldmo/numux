@@ -46,5 +46,4 @@ jobs:
           bun-version: "1.3.12"
       - run: bun install --frozen-lockfile
       - run: bun run docs
-      - run: bun scripts/windows-exit-probe.ts
       - run: bun scripts/windows-prefix-smoke.ts
