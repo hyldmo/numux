@@ -62,6 +62,37 @@ describe('Pane timestamp tracking', () => {
 	})
 })
 
+// Blocked on ghostty-opentui getText() unwrap fix:
+// https://github.com/remorses/ghostty-opentui/pull/13
+describe('Pane getText()', () => {
+	test.todo('getText returns original text without UI line wrapping', async () => {
+		// Create a narrow 40-col pane so a long line must visually wrap
+		const { renderer } = await createTestRenderer({ width: 40, height: 24 })
+		const pane = new Pane(renderer, 'test', 40, 24)
+		const longLine = 'A'.repeat(120) // 3x the terminal width
+		pane.feed(encoder.encode(`${longLine}\n`))
+		const text = pane.getText()
+		const lines = text.split('\n').filter(Boolean)
+		// Should be a single logical line, not broken into 3 visual lines
+		expect(lines.length).toBe(1)
+		expect(lines[0]).toBe(longLine)
+	})
+
+	test.todo('getText preserves real newlines but not soft wraps', async () => {
+		const { renderer } = await createTestRenderer({ width: 40, height: 24 })
+		const pane = new Pane(renderer, 'test', 40, 24)
+		const line1 = 'B'.repeat(80) // wraps visually
+		const line2 = 'C'.repeat(80) // wraps visually
+		pane.feed(encoder.encode(`${line1}\n${line2}\n`))
+		const text = pane.getText()
+		const lines = text.split('\n').filter(Boolean)
+		// Should be exactly 2 logical lines despite visual wrapping
+		expect(lines.length).toBe(2)
+		expect(lines[0]).toBe(line1)
+		expect(lines[1]).toBe(line2)
+	})
+})
+
 describe('Pane scrollback retention (Phase 1: tail-render)', () => {
 	test('retains line history past the old 50k cap', async () => {
 		const pane = await createPane()
