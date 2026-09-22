@@ -11,6 +11,7 @@ import { resolveDependencyTiers } from './config/resolver'
 import { type ValidationWarning, validateConfig } from './config/validator'
 import { expandWorkspaces, resolveWorkspaceProcesses } from './config/workspaces'
 import { ProcessManager } from './process/manager'
+import { formatReapReport, ReceiptStore, reapOrphans, receiptPath } from './process/receipt'
 import type { NumuxProcessConfig, ResolvedNumuxConfig, SortOrder } from './types'
 import { PrefixDisplay } from './ui/prefix'
 import { type Color, colorFromName } from './utils/color'
@@ -291,7 +292,15 @@ async function main() {
 		}
 	}
 
+	// Reap orphaned groups from a previous run that never shut down cleanly,
+	// before starting anything new. A live owner's processes are left alone.
+	const runReceiptPath = receiptPath(parsed.configPath, process.cwd())
+	const reapReport = await reapOrphans(runReceiptPath)
+	const reapMessage = formatReapReport(reapReport)
+	if (reapMessage) console.info(reapMessage)
+
 	const manager = new ProcessManager(config)
+	manager.attachReceipt(new ReceiptStore(runReceiptPath))
 
 	const logDir = parsed.logDir ?? config.logDir ?? defaultLogDir(process.cwd())
 	const logWriter = LogWriter.createPersistent(logDir)

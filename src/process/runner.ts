@@ -44,6 +44,11 @@ export class ProcessRunner {
 		return this._ready
 	}
 
+	/** OS pid of the running child, if one is spawned */
+	get pid(): number | null {
+		return this.proc?.pid ?? null
+	}
+
 	private get signal(): NodeJS.Signals {
 		return this.config.stopSignal ?? 'SIGTERM'
 	}

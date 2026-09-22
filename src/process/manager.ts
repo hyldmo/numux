@@ -3,9 +3,16 @@ import { resolveDependencyTiers } from '../config/resolver'
 import type { ProcessEvent, ProcessState, ProcessStatus, ResolvedNumuxConfig } from '../types'
 import { log } from '../utils/logger'
 import { FileWatcher } from '../utils/watcher'
+import type { TrackedProcess } from './receipt'
 import { ProcessRunner } from './runner'
 
 type EventListener = (event: ProcessEvent) => void
+
+/** Minimal sink so the manager can keep the run receipt current without owning it */
+export interface ReceiptSink {
+	sync: (processes: TrackedProcess[]) => void
+	clear: () => void
+}
 
 const BACKOFF_BASE_MS = 1000
 const BACKOFF_MAX_MS = 30_000
@@ -26,6 +33,7 @@ export class ProcessManager {
 	private pendingReadyResolvers = new Map<string, () => void>()
 	private readyCaptures = new Map<string, Record<string, string>>()
 	private fileWatcher?: FileWatcher
+	private receipt: ReceiptSink | null = null
 
 	constructor(config: ResolvedNumuxConfig) {
 		this.config = config
@@ -59,6 +67,16 @@ export class ProcessManager {
 
 	getAllStates(): ProcessState[] {
 		return [...this.states.values()]
+	}
+
+	/** Attach the run receipt store; the manager syncs it as processes change state */
+	attachReceipt(receipt: ReceiptSink): void {
+		this.receipt = receipt
+	}
+
+	/** OS pid of a running process, if one is spawned */
+	getPid(name: string): number | null {
+		return this.runners.get(name)?.pid ?? null
 	}
 
 	/** Names in display order (determined by config.sort) */
@@ -372,6 +390,37 @@ export class ProcessManager {
 			this.restartAttempts.set(name, 0)
 		}
 		this.emit({ type: 'status', name, status })
+		this.syncReceipt()
+	}
+
+	/**
+	 * Live processes the receipt must track. pgid equals pid: pty spawns call
+	 * setsid, so every managed process leads its own group.
+	 */
+	private liveProcesses(): TrackedProcess[] {
+		const live: TrackedProcess[] = []
+		for (const [name, state] of this.states) {
+			// 'stopping' still holds a live pid until the kill lands — keep tracking it
+			if (
+				state.status !== 'starting' &&
+				state.status !== 'running' &&
+				state.status !== 'ready' &&
+				state.status !== 'stopping'
+			)
+				continue
+			const pid = this.runners.get(name)?.pid
+			if (pid) live.push({ name, pid, pgid: pid })
+		}
+		return live
+	}
+
+	private syncReceipt(): void {
+		if (!this.receipt) return
+		try {
+			this.receipt.sync(this.liveProcesses())
+		} catch {
+			// Receipt writes must never take down a run
+		}
 	}
 
 	restart(name: string, cols: number, rows: number): void {
@@ -480,6 +529,7 @@ export class ProcessManager {
 	async stopAll(): Promise<void> {
 		log('Stopping all processes')
 		this.stopping = true
+		this.receipt?.clear()
 		// Close file watchers
 		this.fileWatcher?.close()
 		// Cancel all pending auto-restart and delay timers
