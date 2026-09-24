@@ -193,6 +193,12 @@ export const FLAGS: FlagDef[] = [
 		description: 'Disable file watching even if config has watch patterns'
 	},
 	{
+		type: 'boolean',
+		long: '--no-config-watch',
+		key: 'noConfigWatch',
+		description: 'Disable automatic config file watching for live reloads'
+	},
+	{
 		type: 'optional-value',
 		long: '--timestamps',
 		short: '-t',
