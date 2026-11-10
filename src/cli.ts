@@ -21,6 +21,7 @@ export interface ParsedArgs {
 	killOthersOnFail: boolean
 	timestamps: boolean | string
 	noWatch: boolean
+	noConfigWatch: boolean
 	maxRestarts?: number
 	autoColors: boolean
 	configPath?: string
@@ -64,6 +65,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		killOthersOnFail: false,
 		timestamps: false,
 		noWatch: false,
+		noConfigWatch: false,
 		autoColors: false,
 		configPath: undefined,
 		commands: [],
